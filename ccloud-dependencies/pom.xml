@@ -46,6 +46,8 @@
 
         <!-- ========== 文档 ========== -->
         <springdoc.version>2.9.1</springdoc.version>
+        <!-- 与 springdoc 2.9.1 传递解析出的版本保持一致，避免注解与运行时不匹配 -->
+        <swagger-annotations.version>2.2.55</swagger-annotations.version>
         <knife4j.version>4.5.0</knife4j.version>
 
         <!-- ========== 任务调度 ========== -->
@@ -88,6 +90,8 @@
         <minio.version>9.0.3</minio.version>
 
         <!-- ========== 测试 ========== -->
+        <!-- Jakarta EL 实现，hibernate-validator 8.x(EE10) 对应 5.x；6.x 是 EE11 的 -->
+        <expressly.version>5.0.0</expressly.version>
         <h2.version>2.3.232</h2.version>
         <podam.version>8.0.2.RELEASE</podam.version>
         <mockito.version>5.14.2</mockito.version>
@@ -206,6 +210,11 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
                 <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.swagger.core.v3</groupId>
+                <artifactId>swagger-annotations-jakarta</artifactId>
+                <version>${swagger-annotations.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.github.xiaoymin</groupId>
@@ -386,6 +395,11 @@
                 <groupId>uk.co.jemos.podam</groupId>
                 <artifactId>podam</artifactId>
                 <version>${podam.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.glassfish.expressly</groupId>
+                <artifactId>expressly</artifactId>
+                <version>${expressly.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

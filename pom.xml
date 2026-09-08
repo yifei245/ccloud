@@ -23,6 +23,7 @@
 
     <modules>
         <module>ccloud-dependencies</module>
+        <module>ccloud-framework</module>
     </modules>
 
     <properties>

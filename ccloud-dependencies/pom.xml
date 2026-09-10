@@ -35,7 +35,10 @@
         <dynamic-datasource.version>4.5.0</dynamic-datasource.version>
         <mysql.version>9.7.0</mysql.version>
         <druid.version>1.2.28</druid.version>
-        <jsqlparser.version>5.3</jsqlparser.version>
+        <!-- 必须与 mybatis-plus-jsqlparser:3.5.17 编译时所用版本一致。
+             JSqlParser 小版本间有破坏性 API 变更，擅自升版会让租户/数据权限的
+             SQL 改写静默失效——SQL 照常执行，但条件没拼上去。 -->
+        <jsqlparser.version>5.2</jsqlparser.version>
         <p6spy.version>3.9.1</p6spy.version>
 
         <!-- ========== 缓存 / 消息 ========== -->

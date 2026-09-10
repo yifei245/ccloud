@@ -18,5 +18,6 @@
         <module>ccloud-common</module>
         <module>ccloud-spring-boot-starter-web</module>
         <module>ccloud-spring-boot-starter-redis</module>
+        <module>ccloud-spring-boot-starter-mybatis</module>
     </modules>
 </project>

@@ -1,0 +1,2 @@
+com.ccloud.framework.redis.config.CcloudRedisAutoConfiguration
+com.ccloud.framework.redis.config.CcloudCacheAutoConfiguration

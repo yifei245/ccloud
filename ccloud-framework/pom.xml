@@ -17,5 +17,6 @@
     <modules>
         <module>ccloud-common</module>
         <module>ccloud-spring-boot-starter-web</module>
+        <module>ccloud-spring-boot-starter-redis</module>
     </modules>
 </project>

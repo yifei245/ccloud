@@ -16,5 +16,6 @@
 
     <modules>
         <module>ccloud-common</module>
+        <module>ccloud-spring-boot-starter-web</module>
     </modules>
 </project>

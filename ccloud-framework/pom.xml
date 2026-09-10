@@ -19,5 +19,6 @@
         <module>ccloud-spring-boot-starter-web</module>
         <module>ccloud-spring-boot-starter-redis</module>
         <module>ccloud-spring-boot-starter-mybatis</module>
+        <module>ccloud-spring-boot-starter-biz-tenant</module>
     </modules>
 </project>

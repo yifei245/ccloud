@@ -1,0 +1,42 @@
+spring:
+  # 引入 dynamic-datasource 后，数据源必须配在 spring.datasource.dynamic.datasource.<name> 下，
+  # 平铺的 spring.datasource.url 会被忽略并报 "can not find primary datasource"
+  datasource:
+    dynamic:
+      primary: master
+      datasource:
+        master:
+          url: jdbc:h2:mem:ccloud_tenant;MODE=MYSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+          driver-class-name: org.h2.Driver
+          username: sa
+          password: ""
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema.sql
+  # 本测试只验证数据库层的租户隔离，不需要 Redis。
+  # Redisson 会在启动时立即建连，不排除会因连不上而无法启动上下文。
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.redisson.spring.starter.RedissonAutoConfigurationV2
+      - com.ccloud.framework.redis.config.CcloudRedisAutoConfiguration
+      - com.ccloud.framework.redis.config.CcloudCacheAutoConfiguration
+
+mybatis-plus:
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: true
+      logic-not-delete-value: false
+
+ccloud:
+  mybatis:
+    encrypt-key: ccloud1234567890
+  tenant:
+    enable: true
+    ignore-tables:
+      - demo_global

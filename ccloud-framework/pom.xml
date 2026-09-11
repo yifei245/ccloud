@@ -23,5 +23,6 @@
         <module>ccloud-spring-boot-starter-security</module>
         <module>ccloud-spring-boot-starter-biz-data-permission</module>
         <module>ccloud-spring-boot-starter-rpc</module>
+        <module>ccloud-spring-boot-starter-monitor</module>
     </modules>
 </project>

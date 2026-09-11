@@ -21,5 +21,6 @@
         <module>ccloud-spring-boot-starter-mybatis</module>
         <module>ccloud-spring-boot-starter-biz-tenant</module>
         <module>ccloud-spring-boot-starter-security</module>
+        <module>ccloud-spring-boot-starter-biz-data-permission</module>
     </modules>
 </project>

@@ -36,8 +36,13 @@ public class CcloudWebSecurityConfigurerAdapter {
     private AccessDeniedHandler accessDeniedHandler;
     @Resource
     private LoginUserFilter loginUserFilter;
+    /**
+     * 各模块追加的白名单。用 ObjectProvider 而非直接注入 List：
+     * 一个模块可以完全不声明自定义白名单，此时 Spring 找不到任何候选 Bean，
+     * 直接注入 List 会导致服务启动失败。
+     */
     @Resource
-    private List<AuthorizeRequestsCustomizer> authorizeRequestsCustomizers;
+    private org.springframework.beans.factory.ObjectProvider<AuthorizeRequestsCustomizer> authorizeRequestsCustomizers;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -61,7 +66,8 @@ public class CcloudWebSecurityConfigurerAdapter {
                     registry.requestMatchers(RpcConstants.RPC_API_PREFIX + "/**").permitAll();
                     securityProperties.getPermitAllUrls().forEach(url -> registry.requestMatchers(url).permitAll());
                     // 各模块追加自己的白名单
-                    authorizeRequestsCustomizers.forEach(customizer -> customizer.customize(registry));
+                    authorizeRequestsCustomizers.orderedStream()
+                            .forEach(customizer -> customizer.customize(registry));
                     registry.anyRequest().authenticated();
                 })
                 .addFilterBefore(loginUserFilter, UsernamePasswordAuthenticationFilter.class);

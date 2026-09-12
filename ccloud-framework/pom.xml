@@ -24,5 +24,6 @@
         <module>ccloud-spring-boot-starter-biz-data-permission</module>
         <module>ccloud-spring-boot-starter-rpc</module>
         <module>ccloud-spring-boot-starter-monitor</module>
+        <module>ccloud-spring-boot-starter-i18n</module>
     </modules>
 </project>

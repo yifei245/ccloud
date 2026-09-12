@@ -28,5 +28,6 @@
         <module>ccloud-spring-boot-starter-protection</module>
         <module>ccloud-spring-boot-starter-mq</module>
         <module>ccloud-spring-boot-starter-job</module>
+        <module>ccloud-spring-boot-starter-excel</module>
     </modules>
 </project>

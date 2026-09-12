@@ -30,5 +30,6 @@
         <module>ccloud-spring-boot-starter-job</module>
         <module>ccloud-spring-boot-starter-excel</module>
         <module>ccloud-spring-boot-starter-websocket</module>
+        <module>ccloud-spring-boot-starter-test</module>
     </modules>
 </project>

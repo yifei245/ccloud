@@ -1,0 +1,36 @@
+# 单元测试通用配置。各模块的 application-unit-test.yaml 可覆盖其中任意项。
+spring:
+  datasource:
+    dynamic:
+      primary: master
+      datasource:
+        master:
+          url: jdbc:h2:mem:ccloud_ut;MODE=MYSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+          driver-class-name: org.h2.Driver
+          username: sa
+          password: ""
+  # 单测不连 Redis：Redisson 会在启动时立即建连，连不上就起不来上下文
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.redisson.spring.starter.RedissonAutoConfigurationV2
+
+mybatis-plus:
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: true
+      logic-not-delete-value: false
+
+ccloud:
+  mybatis:
+    encrypt-key: ccloud1234567890
+  security:
+    internal-sign-secret: unit-test-secret
+
+logging:
+  level:
+    com.ccloud: debug

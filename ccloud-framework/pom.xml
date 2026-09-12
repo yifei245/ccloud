@@ -29,5 +29,6 @@
         <module>ccloud-spring-boot-starter-mq</module>
         <module>ccloud-spring-boot-starter-job</module>
         <module>ccloud-spring-boot-starter-excel</module>
+        <module>ccloud-spring-boot-starter-websocket</module>
     </modules>
 </project>

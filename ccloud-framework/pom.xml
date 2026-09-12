@@ -27,5 +27,6 @@
         <module>ccloud-spring-boot-starter-i18n</module>
         <module>ccloud-spring-boot-starter-protection</module>
         <module>ccloud-spring-boot-starter-mq</module>
+        <module>ccloud-spring-boot-starter-job</module>
     </modules>
 </project>

@@ -25,5 +25,6 @@
         <module>ccloud-spring-boot-starter-rpc</module>
         <module>ccloud-spring-boot-starter-monitor</module>
         <module>ccloud-spring-boot-starter-i18n</module>
+        <module>ccloud-spring-boot-starter-protection</module>
     </modules>
 </project>

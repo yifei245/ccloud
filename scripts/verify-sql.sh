@@ -128,6 +128,11 @@ if [ "$HAS_DATA" = "1" ] && [ "$(q "SELECT COUNT(*) FROM ccloud.system_menu;")" 
     WHERE ur.user_id=2 AND m.permission='system:user:query';"
   expect_eq "SSO 回调地址白名单包含 E2E 使用的地址" 1 "SELECT COUNT(*) FROM ccloud.system_oauth2_client
     WHERE client_id='ccloud-web' AND JSON_CONTAINS(redirect_uris, '\"http://localhost:8080/cb\"');"
+  # 中文按字节比对而非肉眼看：容器内客户端缺 locale 时中文会显示为 ???，
+  # 与真正的编码损坏在屏幕上无法区分；源文件若丢失 SET NAMES utf8mb4 则会真的写坏
+  EXPECT_HEX=$(printf '超级管理员' | xxd -p | tr 'a-f' 'A-F')
+  expect_eq "中文按 UTF-8 字节原样入库" "$EXPECT_HEX" "SELECT HEX(nickname) FROM ccloud.system_users WHERE id=1;"
+  expect_eq "错误码中英文文案条数一致" 0 "SELECT ABS(SUM(locale='zh_CN') - SUM(locale='en_US')) FROM ccloud.system_i18n_message;"
   expect_eq "会员演示账号" 1 "SELECT COUNT(*) FROM ccloud.member_user WHERE mobile='13800138000';"
 fi
 

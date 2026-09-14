@@ -24,6 +24,7 @@
     <modules>
         <module>ccloud-dependencies</module>
         <module>ccloud-framework</module>
+        <module>ccloud-module-system</module>
     </modules>
 
     <properties>

@@ -83,11 +83,52 @@ fi
 echo "  OK   全部表均有注释"
 
 # 校验初始化数据（仅当导入的是全量脚本时）
-if q "SELECT 1 FROM information_schema.tables WHERE table_schema='ccloud' AND table_name='system_users';" | grep -q 1; then
-  ADMIN=$(q "SELECT COUNT(*) FROM ccloud.system_users WHERE username='admin';")
+HAS_DATA=$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ccloud' AND table_name='system_menu';")
+if [ "$HAS_DATA" = "1" ] && [ "$(q "SELECT COUNT(*) FROM ccloud.system_menu;")" != "0" ]; then
+  check() {  # $1=说明 $2=SQL（返回 0 表示通过）
+    local r; r=$(q "$2")
+    if [ "$r" = "0" ]; then echo "  OK   $1"; else echo "  FAIL $1（违规 $r 条）"; exit 1; fi
+  }
+  expect_eq() {  # $1=说明 $2=期望 $3=SQL
+    local r; r=$(q "$3")
+    if [ "$r" = "$2" ]; then echo "  OK   $1 = $r"; else echo "  FAIL $1 = $r，期望 $2"; exit 1; fi
+  }
+  expect_eq "表数量（按设计清单）" 143 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ccloud';"
+  expect_eq "admin 账号"          1   "SELECT COUNT(*) FROM ccloud.system_users WHERE username='admin';"
+  expect_eq "OAuth2 客户端"        5   "SELECT COUNT(*) FROM ccloud.system_oauth2_client;"
   MENUS=$(q "SELECT COUNT(*) FROM ccloud.system_menu;")
-  CLIENTS=$(q "SELECT COUNT(*) FROM ccloud.system_oauth2_client;")
-  echo "  初始数据: admin=$ADMIN, 菜单=$MENUS, OAuth2 客户端=$CLIENTS"
+  [ "$MENUS" -gt 200 ] || { echo "  FAIL 菜单数 $MENUS 不足 200"; exit 1; }
+  echo "  OK   菜单数 = $MENUS"
+
+  check "菜单无孤儿节点" "SELECT COUNT(*) FROM ccloud.system_menu m WHERE m.parent_id<>0
+    AND NOT EXISTS (SELECT 1 FROM ccloud.system_menu p WHERE p.id=m.parent_id);"
+  check "按钮下不再挂子菜单" "SELECT COUNT(*) FROM ccloud.system_menu m JOIN ccloud.system_menu p
+    ON m.parent_id=p.id WHERE p.type=3;"
+  check "按钮均有权限标识" "SELECT COUNT(*) FROM ccloud.system_menu WHERE type=3 AND permission='';"
+  check "权限标识不重复" "SELECT COUNT(*) FROM (SELECT permission FROM ccloud.system_menu
+    WHERE permission<>'' GROUP BY permission HAVING COUNT(*)>1) t;"
+  check "角色菜单关联无悬空引用" "SELECT COUNT(*) FROM ccloud.system_role_menu rm
+    WHERE NOT EXISTS (SELECT 1 FROM ccloud.system_menu m WHERE m.id=rm.menu_id)
+       OR NOT EXISTS (SELECT 1 FROM ccloud.system_role r WHERE r.id=rm.role_id);"
+  check "用户角色关联无悬空引用" "SELECT COUNT(*) FROM ccloud.system_user_role ur
+    WHERE NOT EXISTS (SELECT 1 FROM ccloud.system_users u WHERE u.id=ur.user_id)
+       OR NOT EXISTS (SELECT 1 FROM ccloud.system_role r WHERE r.id=ur.role_id);"
+  check "用户所属部门均存在" "SELECT COUNT(*) FROM ccloud.system_users u WHERE u.dept_id IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM ccloud.system_dept d WHERE d.id=u.dept_id);"
+  check "字典数据的类型均已定义" "SELECT COUNT(*) FROM ccloud.system_dict_data d
+    WHERE NOT EXISTS (SELECT 1 FROM ccloud.system_dict_type t WHERE t.type=d.dict_type);"
+  check "同一字典类型下值不重复" "SELECT COUNT(*) FROM (SELECT dict_type, value FROM ccloud.system_dict_data
+    GROUP BY dict_type, value HAVING COUNT(*)>1) t;"
+  check "密码均为 BCrypt 格式" "SELECT COUNT(*) FROM ccloud.system_users WHERE password NOT LIKE '\$2a\$04\$%';"
+  check "普通管理员没有任何删除权限（演示权限差异）" "SELECT COUNT(*) FROM ccloud.system_user_role ur
+    JOIN ccloud.system_role_menu rm ON rm.role_id=ur.role_id JOIN ccloud.system_menu m ON m.id=rm.menu_id
+    WHERE ur.user_id=2 AND m.permission LIKE '%:delete';"
+  expect_eq "普通管理员拥有 system:user:query" 1 "SELECT COUNT(*) FROM ccloud.system_user_role ur
+    JOIN ccloud.system_role_menu rm ON rm.role_id=ur.role_id JOIN ccloud.system_menu m ON m.id=rm.menu_id
+    WHERE ur.user_id=2 AND m.permission='system:user:query';"
+  expect_eq "SSO 回调地址白名单包含 E2E 使用的地址" 1 "SELECT COUNT(*) FROM ccloud.system_oauth2_client
+    WHERE client_id='ccloud-web' AND JSON_CONTAINS(redirect_uris, '\"http://localhost:8080/cb\"');"
+  expect_eq "会员演示账号" 1 "SELECT COUNT(*) FROM ccloud.member_user WHERE mobile='13800138000';"
 fi
 
 echo "==> 通过"

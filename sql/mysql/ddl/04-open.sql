@@ -11,7 +11,7 @@ CREATE TABLE `open_app` (
   `id`               bigint        NOT NULL AUTO_INCREMENT COMMENT '应用编号',
   `name`             varchar(64)   NOT NULL COMMENT '应用名称',
   `app_key`          varchar(64)   NOT NULL COMMENT '应用标识，公开',
-  `app_secret`       varchar(128)  NOT NULL COMMENT '应用密钥，加密存储，签名计算使用',
+  `app_secret`       varchar(128)  NOT NULL COMMENT '应用密钥。签名校验需明文参与 HMAC 计算，不可单向哈希',
   `status`           tinyint       NOT NULL DEFAULT 0 COMMENT '状态：0 开启 1 关闭',
   `remark`           varchar(500)  DEFAULT NULL COMMENT '备注',
   `ip_whitelist`     varchar(1024) DEFAULT NULL COMMENT 'IP 白名单，逗号分隔，为空表示不限制',

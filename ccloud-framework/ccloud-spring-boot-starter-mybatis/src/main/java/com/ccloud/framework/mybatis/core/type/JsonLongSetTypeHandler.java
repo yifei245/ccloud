@@ -28,7 +28,18 @@ public class JsonLongSetTypeHandler extends BaseTypeHandler<Set<Long>> {
     @Override
     public void setNonNullParameter(PreparedStatement ps, int i, Set<Long> parameter, JdbcType jdbcType)
             throws SQLException {
-        ps.setString(i, JsonUtils.toJsonString(parameter));
+        // 手工拼接数字数组：全局 JSON 配置会把 Long 写成字符串（为前端精度），存库时要保持 [1,2] 格式
+        StringBuilder json = new StringBuilder("[");
+        for (Long value : parameter) {
+            if (value == null) {
+                continue;
+            }
+            if (json.length() > 1) {
+                json.append(',');
+            }
+            json.append(value);
+        }
+        ps.setString(i, json.append(']').toString());
     }
 
     @Override

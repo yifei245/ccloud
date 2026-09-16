@@ -1,6 +1,7 @@
 package com.ccloud.framework.mybatis.config;
 
 import com.baomidou.mybatisplus.annotation.DbType;
+import com.baomidou.mybatisplus.autoconfigure.ConfigurationCustomizer;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.InnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
@@ -9,6 +10,7 @@ import com.ccloud.framework.mybatis.core.type.EncryptTypeHandler;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.session.LocalCacheScope;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -64,6 +66,18 @@ public class CcloudMybatisAutoConfiguration {
         log.info("[mybatisPlusInterceptor] 拦截器装配顺序: {}",
                 interceptor.getInterceptors().stream().map(i -> i.getClass().getSimpleName()).toList());
         return interceptor;
+    }
+
+    /**
+     * 一级缓存降为语句级。
+     *
+     * <p>SESSION 级缓存在同一事务内会缓存查询结果，而批量写入（insertBatch 等）走独立的批量执行器，
+     * 不会清空当前会话的缓存，随后相同的查询就会读到写入前的旧数据。
+     * 事务内重复执行相同查询的收益很小，数据正确性优先。
+     */
+    @Bean
+    public ConfigurationCustomizer localCacheScopeConfigurationCustomizer() {
+        return configuration -> configuration.setLocalCacheScope(LocalCacheScope.STATEMENT);
     }
 
     /**

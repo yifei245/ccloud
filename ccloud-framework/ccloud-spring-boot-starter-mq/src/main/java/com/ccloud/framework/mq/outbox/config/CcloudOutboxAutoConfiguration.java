@@ -3,6 +3,7 @@ package com.ccloud.framework.mq.outbox.config;
 import com.ccloud.framework.mq.outbox.core.*;
 import com.ccloud.framework.mq.redis.core.RedisStreamMessageSender;
 import com.ccloud.framework.mq.eventbus.DomainEventPublisher;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -14,8 +15,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 本地消息表自动配置
+ *
+ * <p>本 starter 自带的 Mapper 由这里注册：业务服务的 MapperScan 只覆盖 com.ccloud.module.*，
+ * 扫不到框架包。限定 @Mapper 注解，避免把 MessageSender 等普通接口也当成 Mapper 代理。
  */
 @AutoConfiguration
+@MapperScan(value = "com.ccloud.framework.mq.outbox.core",
+        annotationClass = org.apache.ibatis.annotations.Mapper.class)
 public class CcloudOutboxAutoConfiguration {
 
     /**

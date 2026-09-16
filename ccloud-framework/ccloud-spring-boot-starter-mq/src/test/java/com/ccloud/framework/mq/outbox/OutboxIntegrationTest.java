@@ -3,7 +3,6 @@ package com.ccloud.framework.mq.outbox;
 import com.ccloud.framework.mq.outbox.core.*;
 import org.apache.ibatis.annotations.Mapper;
 import org.junit.jupiter.api.*;
-import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,11 +34,7 @@ class OutboxIntegrationTest {
 
     @Configuration
     @EnableAutoConfiguration
-    // 必须限定 annotationClass：不限定时 MyBatis 会把包内所有接口都当作 Mapper 生成代理，
-    // MessageSender 这类普通接口会被顶替成 Mapper 代理，调用时报 Invalid bound statement。
-    // 生产的 CcloudMybatisAutoConfiguration 同样限定了 @Mapper。
-    @MapperScan(value = "com.ccloud.framework.mq.outbox.core",
-            annotationClass = org.apache.ibatis.annotations.Mapper.class)
+    // 不手动 @MapperScan：框架 Mapper 必须由 CcloudOutboxAutoConfiguration 自行注册，业务服务里没人会替它扫描
     static class TestApp {
 
         /**

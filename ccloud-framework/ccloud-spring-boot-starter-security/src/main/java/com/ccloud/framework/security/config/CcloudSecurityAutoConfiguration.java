@@ -14,6 +14,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
@@ -70,6 +71,17 @@ public class CcloudSecurityAutoConfiguration {
     @Bean
     public LoginUserFilter loginUserFilter(SecurityProperties securityProperties) {
         return new LoginUserFilter(securityProperties);
+    }
+
+    /**
+     * LoginUserFilter 由 {@link CcloudWebSecurityConfigurerAdapter} 放进 Security 过滤器链；
+     * 作为 Filter 类型的 Bean，Boot 默认还会把它再注册进 Servlet 容器，这里显式关掉后者。
+     */
+    @Bean
+    public FilterRegistrationBean<LoginUserFilter> loginUserFilterRegistration(LoginUserFilter loginUserFilter) {
+        FilterRegistrationBean<LoginUserFilter> registration = new FilterRegistrationBean<>(loginUserFilter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     /**

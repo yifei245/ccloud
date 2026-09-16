@@ -16,5 +16,6 @@
 
     <modules>
         <module>ccloud-module-system-api</module>
+        <module>ccloud-module-system-biz</module>
     </modules>
 </project>

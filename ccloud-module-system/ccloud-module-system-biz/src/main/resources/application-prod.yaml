@@ -1,0 +1,52 @@
+# 生产环境：不提供任何密码默认值，缺失即启动失败；关闭接口文档。
+spring:
+  datasource:
+    dynamic:
+      druid:
+        initial-size: 10
+        min-idle: 10
+        max-active: 100
+        max-wait: 30000
+        validation-query: SELECT 1
+        test-while-idle: true
+      datasource:
+        master:
+          url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT:3306}/ccloud?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          username: ${MYSQL_USERNAME}
+          password: ${MYSQL_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      password: ${REDIS_PASSWORD:}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+knife4j:
+  enable: false
+  production: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  tracing:
+    sampling:
+      probability: ${TRACING_PROBABILITY:0.1}
+
+ccloud:
+  mybatis:
+    encrypt-key: ${CCLOUD_ENCRYPT_KEY}
+
+logging:
+  file:
+    name: ${user.home}/logs/${spring.application.name}.log
+  level:
+    com.ccloud: info

@@ -1,0 +1,31 @@
+# 开发/联调环境（docker compose）：地址全部来自环境变量，服务名作为默认值。
+spring:
+  datasource:
+    dynamic:
+      druid:
+        initial-size: 5
+        min-idle: 5
+        max-active: 30
+        max-wait: 60000
+        validation-query: SELECT 1
+        test-while-idle: true
+      datasource:
+        master:
+          url: jdbc:mysql://${MYSQL_HOST:ccloud-mysql}:${MYSQL_PORT:3306}/ccloud?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          username: ${MYSQL_USERNAME:root}
+          password: ${MYSQL_PASSWORD:root123}
+  data:
+    redis:
+      host: ${REDIS_HOST:ccloud-redis}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      password: ${REDIS_PASSWORD:}
+
+ccloud:
+  swagger:
+    expose-rpc: true
+
+logging:
+  file:
+    name: ${user.home}/logs/${spring.application.name}.log

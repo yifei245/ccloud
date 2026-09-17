@@ -21,4 +21,9 @@ public interface PermissionService {
     void assignUserRole(Long userId, Collection<Long> roleIds);
 
     Set<Long> getUserRoleIdListByUserId(Long userId);
+
+    /**
+     * 用户删除后清理其角色关联
+     */
+    void processUserDeleted(Long userId);
 }

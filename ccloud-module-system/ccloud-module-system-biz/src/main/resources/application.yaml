@@ -113,6 +113,10 @@ xxl:
       log-retention-days: 30
 
 ccloud:
+  system:
+    user:
+      # 导入用户的初始密码，未配置时导入接口直接报错而不是使用弱默认值
+      init-password: ${CCLOUD_USER_INIT_PASSWORD:}
   security:
     # 网关与各服务共享的内部签名密钥，必须通过环境变量或 Nacos 注入，缺失时所有内部身份均被拒绝
     internal-sign-secret: ${CCLOUD_INTERNAL_SIGN_SECRET:}

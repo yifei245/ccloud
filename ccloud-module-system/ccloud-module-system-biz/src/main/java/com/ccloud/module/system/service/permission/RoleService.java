@@ -4,6 +4,7 @@ import com.ccloud.module.system.controller.admin.permission.vo.role.RoleSaveReqV
 import com.ccloud.module.system.dal.dataobject.permission.RoleDO;
 import jakarta.validation.Valid;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -23,4 +24,6 @@ public interface RoleService {
      * @return 当前租户的全部角色
      */
     List<RoleDO> getRoleList();
+
+    List<RoleDO> getRoleList(Collection<Long> ids);
 }

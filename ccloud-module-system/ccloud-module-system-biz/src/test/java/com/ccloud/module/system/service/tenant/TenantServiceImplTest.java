@@ -38,7 +38,9 @@ import static com.ccloud.module.system.enums.ErrorCodeConstants.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Import({TenantServiceImpl.class, TenantPackageServiceImpl.class, RoleServiceImpl.class,
-        PermissionServiceImpl.class, AdminUserServiceImpl.class})
+        PermissionServiceImpl.class, AdminUserServiceImpl.class,
+        com.ccloud.module.system.service.dept.DeptServiceImpl.class, com.ccloud.module.system.service.dept.PostServiceImpl.class,
+        org.springframework.validation.beanvalidation.LocalValidatorFactoryBean.class})
 class TenantServiceImplTest extends BaseSystemDbUnitTest {
 
     @Resource

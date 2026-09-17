@@ -20,4 +20,8 @@ public interface UserRoleMapper extends BaseMapperX<UserRoleDO> {
                 .eq(UserRoleDO::getUserId, userId)
                 .in(UserRoleDO::getRoleId, roleIds));
     }
+
+    default void deleteListByUserId(Long userId) {
+        delete(UserRoleDO::getUserId, userId);
+    }
 }

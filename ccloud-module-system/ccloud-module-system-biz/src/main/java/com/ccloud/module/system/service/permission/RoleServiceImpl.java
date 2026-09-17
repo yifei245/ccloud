@@ -1,5 +1,6 @@
 package com.ccloud.module.system.service.permission;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.framework.common.util.object.BeanUtils;
@@ -13,6 +14,8 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -62,5 +65,13 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public List<RoleDO> getRoleList() {
         return roleMapper.selectList();
+    }
+
+    @Override
+    public List<RoleDO> getRoleList(Collection<Long> ids) {
+        if (CollUtil.isEmpty(ids)) {
+            return Collections.emptyList();
+        }
+        return roleMapper.selectByIds(ids);
     }
 }

@@ -68,4 +68,9 @@ public class PermissionServiceImpl implements PermissionService {
     public Set<Long> getUserRoleIdListByUserId(Long userId) {
         return CollectionUtils.convertSet(userRoleMapper.selectListByUserId(userId), UserRoleDO::getRoleId);
     }
+
+    @Override
+    public void processUserDeleted(Long userId) {
+        userRoleMapper.deleteListByUserId(userId);
+    }
 }

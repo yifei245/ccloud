@@ -27,6 +27,9 @@ spring:
       password: ${REDIS_PASSWORD:}
 
 ccloud:
+  system:
+    user:
+      init-password: ${CCLOUD_USER_INIT_PASSWORD:123456}
   security:
     internal-sign-secret: ${CCLOUD_INTERNAL_SIGN_SECRET:ccloud-local-internal-sign-secret}
   swagger:

@@ -57,14 +57,16 @@ public class HttpUtils {
     /**
      * 判断是否为合法的重定向地址，防开放重定向。
      *
+     * <p>必须与登记的地址<b>完全一致</b>（OAuth 2.1 要求）：前缀匹配可被
+     * "https://app.example.com.evil.com" 之类的地址绕过，授权码会被发往攻击者控制的域名。
+     *
      * @param url         待校验地址
-     * @param allowedUris 允许的地址列表，支持前缀匹配
+     * @param allowedUris 登记的地址列表
      */
     public static boolean isRedirectUriValid(String url, java.util.Collection<String> allowedUris) {
         if (StringUtils.isBlank(url) || allowedUris == null || allowedUris.isEmpty()) {
             return false;
         }
-        return allowedUris.stream().anyMatch(allowed ->
-                StringUtils.isNotBlank(allowed) && url.startsWith(allowed));
+        return allowedUris.stream().anyMatch(url::equals);
     }
 }

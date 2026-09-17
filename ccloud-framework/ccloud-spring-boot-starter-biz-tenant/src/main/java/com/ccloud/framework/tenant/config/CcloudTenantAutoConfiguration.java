@@ -3,6 +3,7 @@ package com.ccloud.framework.tenant.config;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
 import com.ccloud.framework.common.enums.WebFilterOrderEnum;
 import com.ccloud.framework.redis.config.CcloudCacheAutoConfiguration;
+import com.ccloud.framework.redis.core.RedisCacheManagerFactory;
 import com.ccloud.framework.tenant.core.aop.TenantIgnoreAspect;
 import com.ccloud.framework.tenant.core.db.TenantLineHandlerImpl;
 import com.ccloud.framework.tenant.core.job.TenantJobAspect;
@@ -14,16 +15,13 @@ import com.ccloud.framework.web.config.CcloudWebAutoConfiguration;
 import com.ccloud.framework.web.config.WebProperties;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.core.annotation.Order;
-import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
-import org.springframework.data.redis.cache.RedisCacheWriter;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.util.AntPathMatcher;
 
 /**
@@ -82,12 +80,12 @@ public class CcloudTenantAutoConfiguration {
      * 覆盖 redis starter 提供的缓存管理器，加上租户前缀。
      * 数据库隔离了而缓存没隔离，等于隔离形同虚设。
      */
+    /**
+     * 缓存键按租户隔离：通过工厂替换全局唯一 CacheManager 的实现，不另行注册
+     */
     @Bean
-    @Primary
-    @ConditionalOnBean({RedisConnectionFactory.class, RedisCacheConfiguration.class})
-    public RedisCacheManager tenantRedisCacheManager(RedisConnectionFactory factory,
-                                                     RedisCacheConfiguration configuration) {
-        RedisCacheWriter writer = RedisCacheWriter.nonLockingRedisCacheWriter(factory);
-        return new TenantRedisCacheManager(writer, configuration);
+    @ConditionalOnClass(RedisCacheManager.class)
+    public RedisCacheManagerFactory tenantRedisCacheManagerFactory() {
+        return TenantRedisCacheManager::new;
     }
 }

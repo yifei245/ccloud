@@ -1,5 +1,13 @@
 package com.ccloud.framework.security.config;
 
+import com.ccloud.framework.security.core.service.PermissionCacheRefresher;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import com.ccloud.framework.security.core.context.TransmittableThreadLocalSecurityContextHolderStrategy;
 import com.ccloud.framework.security.core.filter.LoginUserFilter;
 import com.ccloud.framework.security.core.handler.AccessDeniedHandlerImpl;
@@ -30,7 +38,8 @@ import java.util.function.Supplier;
 /**
  * 安全自动配置
  */
-@AutoConfiguration
+// 排在 Redis 之后：权限缓存刷新依赖 RedisConnectionFactory 的 @ConditionalOnBean 判断
+@AutoConfiguration(afterName = "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration")
 @EnableConfigurationProperties(SecurityProperties.class)
 @ConditionalOnClass(AccessDeniedException.class)
 @Import(CcloudWebSecurityConfigurerAdapter.class)
@@ -82,6 +91,31 @@ public class CcloudSecurityAutoConfiguration {
         FilterRegistrationBean<LoginUserFilter> registration = new FilterRegistrationBean<>(loginUserFilter);
         registration.setEnabled(false);
         return registration;
+    }
+
+    /**
+     * 权限缓存跨节点刷新：有 Redis 时启用
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(RedisConnectionFactory.class)
+    @ConditionalOnBean(RedisConnectionFactory.class)
+    static class PermissionCacheRefreshConfiguration {
+
+        @Bean
+        public PermissionCacheRefresher permissionCacheRefresher(
+                StringRedisTemplate stringRedisTemplate,
+                ObjectProvider<SecurityFrameworkServiceImpl> securityFrameworkServiceProvider) {
+            return new PermissionCacheRefresher(stringRedisTemplate, securityFrameworkServiceProvider);
+        }
+
+        @Bean
+        public RedisMessageListenerContainer permissionCacheRefreshListenerContainer(
+                RedisConnectionFactory connectionFactory, PermissionCacheRefresher refresher) {
+            RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+            container.setConnectionFactory(connectionFactory);
+            container.addMessageListener(refresher, new ChannelTopic(PermissionCacheRefresher.CHANNEL));
+            return container;
+        }
     }
 
     /**

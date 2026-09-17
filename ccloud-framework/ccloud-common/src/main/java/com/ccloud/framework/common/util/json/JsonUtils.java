@@ -47,6 +47,14 @@ public class JsonUtils {
      * 构建与全项目一致的 ObjectMapper。Spring 容器里的 Jackson 配置也复用它。
      */
     public static ObjectMapper createObjectMapper() {
+        return createObjectMapper(true);
+    }
+
+    /**
+     * @param longAsString 是否把 Long 写成字符串。面向前端的 HTTP 响应需要（JS 数字精度只有 53 位）；
+     *                     面向 Java 自身的存储（如 Redis 缓存）不能开启，否则单值 Long 会被还原成 String
+     */
+    public static ObjectMapper createObjectMapper(boolean longAsString) {
         ObjectMapper mapper = new ObjectMapper();
 
         JavaTimeModule javaTimeModule = new JavaTimeModule();
@@ -64,12 +72,13 @@ public class JsonUtils {
                 new LocalTimeDeserializer(DateTimeFormatter.ofPattern(DEFAULT_TIME_PATTERN)));
         mapper.registerModule(javaTimeModule);
 
-        // 长整型转字符串，避免前端精度丢失
-        SimpleModule longModule = new SimpleModule();
-        longModule.addSerializer(Long.class, ToStringSerializer.instance);
-        longModule.addSerializer(Long.TYPE, ToStringSerializer.instance);
-        longModule.addSerializer(java.math.BigInteger.class, ToStringSerializer.instance);
-        mapper.registerModule(longModule);
+        if (longAsString) {
+            SimpleModule longModule = new SimpleModule();
+            longModule.addSerializer(Long.class, ToStringSerializer.instance);
+            longModule.addSerializer(Long.TYPE, ToStringSerializer.instance);
+            longModule.addSerializer(java.math.BigInteger.class, ToStringSerializer.instance);
+            mapper.registerModule(longModule);
+        }
 
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);

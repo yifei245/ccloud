@@ -35,16 +35,16 @@ public class CcloudRedisAutoConfiguration {
     }
 
     /**
-     * 与 {@link JsonUtils} 共用同一套 Jackson 配置，
-     * 保证同一个对象在 HTTP 响应与 Redis 里的表示一致。
+     * 与 {@link JsonUtils} 共用同一套 Jackson 配置（时间格式等），
+     * 但 Long 保持数字：缓存由 Java 读回，写成字符串会让单值 Long 还原成 String。
      *
-     * <p>额外开启类型信息：反序列化时需要知道具体类型，
-     * 否则集合类字段会退化成 LinkedHashMap。
+     * <p>对所有值（含 Long 等 final 类型）记录类型信息：NON_FINAL 不记录 Long，
+     * 小数值会被还原成 Integer，缓存方法返回时抛 ClassCastException；集合与对象同样依赖类型信息还原。
      */
     public static RedisSerializer<Object> buildRedisSerializer() {
-        ObjectMapper objectMapper = JsonUtils.createObjectMapper();
+        ObjectMapper objectMapper = JsonUtils.createObjectMapper(false);
         objectMapper.activateDefaultTyping(LaissezFaireSubTypeValidator.instance,
-                ObjectMapper.DefaultTyping.NON_FINAL,
+                ObjectMapper.DefaultTyping.EVERYTHING,
                 com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY);
         return new GenericJackson2JsonRedisSerializer(objectMapper);
     }

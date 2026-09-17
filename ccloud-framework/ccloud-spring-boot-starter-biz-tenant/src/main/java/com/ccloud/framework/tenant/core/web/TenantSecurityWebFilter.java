@@ -26,7 +26,8 @@ import java.util.Objects;
  * <ol>
  *   <li>登录用户所属租户与请求声明的租户不一致——这是跨租户越权的主要入口，
  *       攻击者只需改一个请求头；</li>
- *   <li>租户本身不可用（不存在 / 已禁用 / 已过期）。</li>
+ *   <li>租户本身不可用（不存在 / 已禁用 / 已过期）；</li>
+ *   <li>管理端、用户端接口未携带租户编号（白名单路径除外）。</li>
  * </ol>
  */
 @Slf4j
@@ -38,12 +39,14 @@ public class TenantSecurityWebFilter extends ApiRequestFilter {
     public static final String REQUEST_ATTRIBUTE_LOGIN_USER_TENANT_ID = "ccloud.login_user_tenant_id";
 
     private final TenantProperties tenantProperties;
+    private final String openApiPrefix;
     private final PathMatcher pathMatcher;
     private final TenantFrameworkService tenantFrameworkService;
 
     public TenantSecurityWebFilter(TenantProperties tenantProperties, WebProperties webProperties,
                                    PathMatcher pathMatcher, TenantFrameworkService tenantFrameworkService) {
         super(webProperties);
+        this.openApiPrefix = webProperties.getOpenApi().getPrefix();
         this.tenantProperties = tenantProperties;
         this.pathMatcher = pathMatcher;
         this.tenantFrameworkService = tenantFrameworkService;
@@ -64,6 +67,14 @@ public class TenantSecurityWebFilter extends ApiRequestFilter {
             return;
         }
 
+        // 未携带租户编号时持久层不做租户过滤，匿名接口（如登录）会跨全部租户查询，必须拒绝。
+        // 开放接口由开放平台按应用确定租户，不在此要求
+        if (tenantId == null && !isOpenApi(request)) {
+            log.warn("[doFilterInternal] 未携带租户编号，url={}", request.getRequestURI());
+            ServletUtils.writeJSON(response, CommonResult.error(GlobalErrorCodeConstants.BAD_REQUEST.getCode(),
+                    "请求未携带租户编号"));
+            return;
+        }
         if (tenantId != null && !isIgnoreUrl(request)) {
             try {
                 tenantFrameworkService.validTenant(tenantId);
@@ -78,6 +89,10 @@ public class TenantSecurityWebFilter extends ApiRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         return super.shouldNotFilter(request) || isIgnoreUrl(request);
+    }
+
+    private boolean isOpenApi(HttpServletRequest request) {
+        return request.getRequestURI().startsWith(openApiPrefix);
     }
 
     private boolean isIgnoreUrl(HttpServletRequest request) {

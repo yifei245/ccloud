@@ -120,4 +120,30 @@ class TenantSecurityWebFilterTest {
         assertThat(chain.getRequest()).isNotNull();
         verify(tenantFrameworkService, never()).validTenant(anyLong());
     }
+
+    /**
+     * 没有租户上下文时持久层不做租户过滤：匿名接口（如登录）若不带租户编号，会跨全部租户查询
+     */
+    @Test
+    @DisplayName("管理端与用户端接口未携带租户编号时应拒绝")
+    void shouldRejectWhenTenantMissing() throws Exception {
+        for (String uri : List.of("/admin-api/system/auth/sms-login", "/app-api/member/auth/login")) {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            FilterChain chain = mock(FilterChain.class);
+
+            filter.doFilter(request(uri), response, chain);
+
+            verify(chain, never()).doFilter(any(), any());
+            CommonResult<?> result = JsonUtils.parseObject(response.getContentAsString(), CommonResult.class);
+            assertThat(result.getCode()).isEqualTo(400);
+        }
+    }
+
+    @Test
+    @DisplayName("开放接口由开放平台按应用确定租户，不要求请求头携带")
+    void shouldAllowOpenApiWithoutTenant() throws Exception {
+        MockFilterChain chain = new MockFilterChain();
+        filter.doFilter(request("/open-api/demo/get"), new MockHttpServletResponse(), chain);
+        assertThat(chain.getRequest()).isNotNull();
+    }
 }

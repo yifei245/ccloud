@@ -37,8 +37,10 @@ public class SecurityConfiguration {
                 registry.requestMatchers(
                         "/admin-api/system/tenant/get-id-by-name",
                         "/admin-api/system/tenant/get-by-website").permitAll();
-                // OAuth2 令牌端点由客户端凭据自行校验
-                registry.requestMatchers("/oauth2/token", "/oauth2/check-token").permitAll();
+                // OAuth2 令牌、撤销、校验端点由客户端凭据自行校验（授权端点 /authorize 仍要求用户登录）
+                registry.requestMatchers(
+                        "/admin-api/system/oauth2/token",
+                        "/admin-api/system/oauth2/check-token").permitAll();
                 // 字典数据在登录页也要用（性别、终端等下拉框）
                 registry.requestMatchers("/admin-api/system/dict-data/simple-list").permitAll();
             }

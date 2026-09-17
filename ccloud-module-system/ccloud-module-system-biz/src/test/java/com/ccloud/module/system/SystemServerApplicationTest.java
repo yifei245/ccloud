@@ -137,7 +137,8 @@ class SystemServerApplicationTest {
     void 全局数据的缓存应登记为不按租户隔离() {
         assertThat(tenantProperties.getIgnoreCaches()).contains(
                 cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.PERMISSION_MENU_ID_LIST),
-                cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.DICT_DATA_LIST));
+                cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.DICT_DATA_LIST),
+                cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.OAUTH2_CLIENT));
     }
 
     private static String cacheName(String nameWithTtl) {

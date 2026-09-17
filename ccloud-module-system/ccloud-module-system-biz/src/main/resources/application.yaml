@@ -140,12 +140,13 @@ ccloud:
       - /admin-api/system/tenant/get-id-by-name
       - /admin-api/system/tenant/get-by-website
       - /admin-api/system/captcha/**
-      - /oauth2/token
-      - /oauth2/check-token
+      # 令牌端点不在此列：密码模式须按请求租户查询用户。校验端点按令牌本身确定租户
+      - /admin-api/system/oauth2/check-token
     # 缓存全局表数据的缓存名（不含 #ttl 后缀），不按租户隔离，否则系统租户修改后其他租户读到旧数据
     ignore-caches:
       - permission_menu_ids
       - dict_data_list
+      - oauth2_client
     # 不含 tenant_id 列的全局表，与 sql/mysql/ddl 保持一致（由 SystemServerApplicationTest 校验）
     ignore-tables:
       - system_menu

@@ -39,4 +39,10 @@ public interface RedisKeyConstants {
      * 字典为全局数据，缓存需登记在 ccloud.tenant.ignore-caches 中
      */
     String DICT_DATA_LIST = "dict_data_list#1h";
+
+    /**
+     * OAuth2 客户端：key 为 client_id，value 为 OAuth2ClientDO。
+     * 客户端为全局数据，缓存需登记在 ccloud.tenant.ignore-caches 中
+     */
+    String OAUTH2_CLIENT = "oauth2_client#30m";
 }

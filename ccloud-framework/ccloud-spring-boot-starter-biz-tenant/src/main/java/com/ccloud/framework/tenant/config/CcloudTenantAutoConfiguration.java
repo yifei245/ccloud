@@ -85,7 +85,8 @@ public class CcloudTenantAutoConfiguration {
      */
     @Bean
     @ConditionalOnClass(RedisCacheManager.class)
-    public RedisCacheManagerFactory tenantRedisCacheManagerFactory() {
-        return TenantRedisCacheManager::new;
+    public RedisCacheManagerFactory tenantRedisCacheManagerFactory(TenantProperties properties) {
+        return (writer, configuration) ->
+                new TenantRedisCacheManager(writer, configuration, properties.getIgnoreCaches());
     }
 }

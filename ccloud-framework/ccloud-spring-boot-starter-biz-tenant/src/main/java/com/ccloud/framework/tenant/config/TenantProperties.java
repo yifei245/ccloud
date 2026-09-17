@@ -29,4 +29,9 @@ public class TenantProperties {
      * 不做租户校验的请求路径。登录、获取租户编号等接口在拿到身份之前就要访问。
      */
     private List<String> ignoreUrls = Collections.emptyList();
+
+    /**
+     * 全局共享（不按租户隔离）的缓存名，不含 "#ttl" 后缀。缓存全局表数据时必须登记，否则修改后其他租户读到旧数据
+     */
+    private Set<String> ignoreCaches = Collections.emptySet();
 }

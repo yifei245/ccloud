@@ -89,6 +89,10 @@ class SystemServerApplicationTest {
                 .satisfies(r -> assertThat(r.isEnabled()).isFalse());
         assertThat(ctx.getBean(PasswordEncoder.class)).isInstanceOf(BCryptPasswordEncoder.class);
         assertThat(ctx.getBean("messageSource", MessageSource.class)).isInstanceOf(DatabaseMessageSource.class);
+        // 缓存切面按类型解析 CacheManager（LoadBalancer 另有一个内部实现），必须解析到按租户隔离的实现
+        assertThat(ctx.getBean(org.springframework.cache.CacheManager.class))
+                .isInstanceOf(com.ccloud.framework.tenant.core.redis.TenantRedisCacheManager.class);
+        assertThat(ctx.getBeansOfType(com.ccloud.framework.security.core.service.PermissionCacheRefresher.class)).hasSize(1);
     }
 
     @Test

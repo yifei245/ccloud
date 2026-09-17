@@ -244,5 +244,7 @@ INSERT INTO `system_i18n_message` (`id`, `locale`, `code`, `content`, `source`, 
   (233, 'zh_CN', 'error.code.1001032000', '国际化文案不存在', 1, '1'),
   (234, 'en_US', 'error.code.1001032000', 'Localized message does not exist', 1, '1'),
   (235, 'zh_CN', 'error.code.1001032001', '语言【{}】下已存在编码为【{}】的文案', 1, '1'),
-  (236, 'en_US', 'error.code.1001032001', 'A message with code [{}] already exists for locale [{}]', 1, '1');
+  (236, 'en_US', 'error.code.1001032001', 'A message with code [{}] already exists for locale [{}]', 1, '1'),
+  (237, 'zh_CN', 'error.code.1001002006', '只有超级管理员才能分配超级管理员角色', 1, '1'),
+  (238, 'en_US', 'error.code.1001002006', 'Only a super administrator can assign the super administrator role', 1, '1');
 

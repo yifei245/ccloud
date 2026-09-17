@@ -53,9 +53,14 @@ public abstract class BaseSystemDbUnitTest extends BaseDbUnitTest {
         MySqlTestContainer.get();
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.beans.factory.ObjectProvider<org.springframework.cache.CacheManager> cacheManagerProvider;
+
     @BeforeEach
     void setUpTenant() {
         TenantContextHolder.setTenantId(TENANT_ID);
+        cacheManagerProvider.ifAvailable(manager ->
+                manager.getCacheNames().forEach(name -> manager.getCache(name).clear()));
     }
 
     @AfterEach

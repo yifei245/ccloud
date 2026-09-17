@@ -24,4 +24,12 @@ public interface UserRoleMapper extends BaseMapperX<UserRoleDO> {
     default void deleteListByUserId(Long userId) {
         delete(UserRoleDO::getUserId, userId);
     }
+
+    default List<UserRoleDO> selectListByRoleIds(Collection<Long> roleIds) {
+        return selectList(UserRoleDO::getRoleId, roleIds);
+    }
+
+    default void deleteListByRoleId(Long roleId) {
+        delete(UserRoleDO::getRoleId, roleId);
+    }
 }

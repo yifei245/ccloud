@@ -246,5 +246,7 @@ INSERT INTO `system_i18n_message` (`id`, `locale`, `code`, `content`, `source`, 
   (235, 'zh_CN', 'error.code.1001032001', '语言【{}】下已存在编码为【{}】的文案', 1, '1'),
   (236, 'en_US', 'error.code.1001032001', 'A message with code [{}] already exists for locale [{}]', 1, '1'),
   (237, 'zh_CN', 'error.code.1001002006', '只有超级管理员才能分配超级管理员角色', 1, '1'),
-  (238, 'en_US', 'error.code.1001002006', 'Only a super administrator can assign the super administrator role', 1, '1');
+  (238, 'en_US', 'error.code.1001002006', 'Only a super administrator can assign the super administrator role', 1, '1'),
+  (239, 'zh_CN', 'error.code.1001001006', '菜单为全部租户共用，只有系统租户可以维护', 1, '1'),
+  (240, 'en_US', 'error.code.1001001006', 'Menus are shared by all tenants and can only be maintained by the system tenant', 1, '1');
 

@@ -27,6 +27,7 @@ public interface ErrorCodeConstants {
     ErrorCode MENU_NOT_EXISTS = new ErrorCode(1_001_001_003, "菜单不存在");
     ErrorCode MENU_EXISTS_CHILDREN = new ErrorCode(1_001_001_004, "存在子菜单，无法删除");
     ErrorCode MENU_PARENT_NOT_DIR_OR_MENU = new ErrorCode(1_001_001_005, "父菜单的类型必须是目录或者菜单");
+    ErrorCode MENU_ONLY_SYSTEM_TENANT = new ErrorCode(1_001_001_006, "菜单为全部租户共用，只有系统租户可以维护");
 
     // ========== 角色 1-001-002-000 ==========
     ErrorCode ROLE_NOT_EXISTS = new ErrorCode(1_001_002_000, "角色不存在");

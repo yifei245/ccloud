@@ -130,6 +130,21 @@ class SystemServerApplicationTest {
         assertThat(new TreeSet<>(tenantProperties.getIgnoreTables())).isEqualTo(withoutTenantId);
     }
 
+    /**
+     * 缓存全局表数据的缓存必须全局共享：否则系统租户修改后只清掉自己那份，其他租户持续读到旧数据
+     */
+    @Test
+    void 全局数据的缓存应登记为不按租户隔离() {
+        assertThat(tenantProperties.getIgnoreCaches()).contains(
+                cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.PERMISSION_MENU_ID_LIST),
+                cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.DICT_DATA_LIST));
+    }
+
+    private static String cacheName(String nameWithTtl) {
+        int index = nameWithTtl.indexOf('#');
+        return index == -1 ? nameWithTtl : nameWithTtl.substring(0, index);
+    }
+
     private List<FilterRegistrationBean<?>> filterRegistrations(Class<?> filterClass) {
         List<FilterRegistrationBean<?>> result = new ArrayList<>();
         for (FilterRegistrationBean<?> r : ctx.getBeansOfType(FilterRegistrationBean.class).values()) {

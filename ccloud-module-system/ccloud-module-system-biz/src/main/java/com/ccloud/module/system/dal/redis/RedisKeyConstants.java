@@ -27,4 +27,9 @@ public interface RedisKeyConstants {
      * 某权限标识对应的菜单编号：key 为权限标识，value 为 List&lt;Long&gt;
      */
     String PERMISSION_MENU_ID_LIST = "permission_menu_ids#30m";
+
+    /**
+     * 部门的全部子孙部门编号：key 为部门编号，value 为 Set&lt;Long&gt;。数据权限"本部门及以下"依赖它
+     */
+    String DEPT_CHILDREN_ID_LIST = "dept_children_ids#30m";
 }

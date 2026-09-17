@@ -3,7 +3,6 @@ package com.ccloud.module.system.service.permission;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.framework.datapermission.core.rule.dept.DeptDataPermissionRespDTO;
 import com.ccloud.framework.security.core.service.PermissionCacheRefresher;
-import com.ccloud.module.system.dal.dataobject.dept.DeptDO;
 import com.ccloud.module.system.dal.dataobject.permission.MenuDO;
 import com.ccloud.module.system.dal.dataobject.permission.RoleDO;
 import com.ccloud.module.system.dal.dataobject.user.AdminUserDO;
@@ -216,8 +215,7 @@ class PermissionServiceImplTest extends BaseSystemDbUnitTest {
     @Test
     void getDeptDataPermission_本部门及以下() {
         mockUserDept(63L, 100L);
-        when(deptService.getChildDeptList(100L)).thenReturn(List.of(
-                new DeptDO().setId(101L), new DeptDO().setId(102L)));
+        when(deptService.getChildDeptIdListFromCache(100L)).thenReturn(Set.of(101L, 102L));
         assignRolesTo(63L, insertRole("tree", CommonStatusEnum.ENABLE, DataScopeEnum.DEPT_AND_CHILD, null));
         assertThat(permissionService.getDeptDataPermission(63L).getDeptIds()).containsExactlyInAnyOrder(100L, 101L, 102L);
     }
@@ -260,7 +258,7 @@ class PermissionServiceImplTest extends BaseSystemDbUnitTest {
         when(userService.getUser(67L)).thenReturn(new AdminUserDO().setId(67L));
         assignRolesTo(67L, insertRole("nodept", CommonStatusEnum.ENABLE, DataScopeEnum.DEPT_AND_CHILD, null));
         assertThat(permissionService.getDeptDataPermission(67L).getDeptIds()).isEmpty();
-        verify(deptService, never()).getChildDeptList(anyLong());
+        verify(deptService, never()).getChildDeptIdListFromCache(anyLong());
     }
 
     // ========== 清理 ==========

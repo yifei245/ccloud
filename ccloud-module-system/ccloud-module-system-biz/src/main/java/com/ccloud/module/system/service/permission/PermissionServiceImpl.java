@@ -5,7 +5,6 @@ import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.framework.common.util.collection.CollectionUtils;
 import com.ccloud.framework.datapermission.core.rule.dept.DeptDataPermissionRespDTO;
 import com.ccloud.framework.security.core.service.PermissionCacheRefresher;
-import com.ccloud.module.system.dal.dataobject.dept.DeptDO;
 import com.ccloud.module.system.dal.dataobject.permission.MenuDO;
 import com.ccloud.module.system.dal.dataobject.permission.RoleDO;
 import com.ccloud.module.system.dal.dataobject.permission.RoleMenuDO;
@@ -249,7 +248,7 @@ public class PermissionServiceImpl implements PermissionService {
                     Long deptId = userDeptId.get();
                     if (deptId != null) {
                         deptIds.add(deptId);
-                        deptIds.addAll(CollectionUtils.convertSet(deptService.getChildDeptList(deptId), DeptDO::getId));
+                        deptIds.addAll(deptService.getChildDeptIdListFromCache(deptId));
                     }
                 }
                 case SELF -> result.setSelf(true);

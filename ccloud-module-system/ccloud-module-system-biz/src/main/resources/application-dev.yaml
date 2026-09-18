@@ -23,6 +23,9 @@ spring:
       password: ${REDIS_PASSWORD:}
 
 ccloud:
+  system:
+    captcha:
+      enable: ${CCLOUD_CAPTCHA_ENABLED:false}
   swagger:
     expose-rpc: true
 

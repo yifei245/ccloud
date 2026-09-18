@@ -1,16 +1,51 @@
 package com.ccloud.module.system.service.auth;
 
+import cn.hutool.core.util.StrUtil;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
+import com.ccloud.framework.common.enums.UserTypeEnum;
+import com.ccloud.framework.common.util.collection.CollectionUtils;
+import com.ccloud.framework.common.util.object.BeanUtils;
+import com.ccloud.framework.tenant.core.context.TenantContextHolder;
+import com.ccloud.framework.tenant.core.util.TenantUtils;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthLoginReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthLoginRespVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthPermissionInfoRespVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthRegisterReqVO;
+import com.ccloud.module.system.controller.admin.permission.vo.menu.MenuListReqVO;
+import com.ccloud.module.system.controller.admin.user.vo.user.UserSaveReqVO;
+import com.ccloud.module.system.dal.dataobject.logger.LoginLogDO;
+import com.ccloud.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
+import com.ccloud.module.system.dal.dataobject.permission.MenuDO;
+import com.ccloud.module.system.dal.dataobject.permission.RoleDO;
+import com.ccloud.module.system.dal.dataobject.tenant.TenantDO;
 import com.ccloud.module.system.dal.dataobject.user.AdminUserDO;
+import com.ccloud.module.system.dal.redis.auth.LoginFailCountRedisDAO;
+import com.ccloud.module.system.enums.logger.LoginLogTypeEnum;
+import com.ccloud.module.system.enums.logger.LoginResultEnum;
+import com.ccloud.module.system.enums.permission.MenuTypeEnum;
+import com.ccloud.module.system.service.captcha.CaptchaService;
+import com.ccloud.module.system.service.logger.LoginLogService;
+import com.ccloud.module.system.service.oauth2.OAuth2TokenService;
+import com.ccloud.module.system.service.permission.MenuService;
+import com.ccloud.module.system.service.permission.PermissionService;
+import com.ccloud.module.system.service.permission.RoleService;
+import com.ccloud.module.system.service.tenant.TenantService;
 import com.ccloud.module.system.service.user.AdminUserService;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
+
+import java.time.Duration;
+import java.util.*;
 
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static com.ccloud.module.system.enums.ErrorCodeConstants.AUTH_LOGIN_BAD_CREDENTIALS;
-import static com.ccloud.module.system.enums.ErrorCodeConstants.AUTH_LOGIN_USER_DISABLED;
+import static com.ccloud.module.system.enums.ErrorCodeConstants.*;
 
 @Service
+@Validated
+@Slf4j
 public class AdminAuthServiceImpl implements AdminAuthService {
 
     /**
@@ -20,6 +55,95 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
     @Resource
     private AdminUserService userService;
+    @Resource
+    private RoleService roleService;
+    @Resource
+    private PermissionService permissionService;
+    @Resource
+    private MenuService menuService;
+    @Resource
+    private TenantService tenantService;
+    @Resource
+    private OAuth2TokenService oauth2TokenService;
+    @Resource
+    private LoginLogService loginLogService;
+    @Resource
+    private CaptchaService captchaService;
+    @Resource
+    private LoginFailCountRedisDAO loginFailCountRedisDAO;
+
+    /**
+     * 管理后台登录使用的 OAuth2 客户端
+     */
+    @Value("${ccloud.system.auth.client-id:ccloud-web}")
+    private String clientId;
+    @Value("${ccloud.system.auth.login-fail-limit:5}")
+    private int loginFailLimit;
+    @Value("${ccloud.system.auth.login-fail-lock-minutes:10}")
+    private int loginFailLockMinutes;
+    @Value("${ccloud.system.auth.register-enabled:false}")
+    private boolean registerEnabled;
+
+    // ========== 登录 ==========
+
+    @Override
+    public AuthLoginRespVO login(AuthLoginReqVO reqVO, String userIp, String userAgent) {
+        // 验证码失败不计入登录失败次数：否则攻击者可以用错误的验证码把别人的账号锁死
+        if (captchaService.isEnabled()) {
+            try {
+                captchaService.validate(reqVO.getCaptchaUuid(), reqVO.getCaptchaCode());
+            } catch (RuntimeException ex) {
+                createLoginLog(0L, reqVO.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME,
+                        LoginResultEnum.CAPTCHA_CODE_ERROR, userIp, userAgent);
+                throw ex;
+            }
+        }
+        Long tenantId = resolveTenantId(reqVO.getTenantName());
+        return TenantUtils.execute(tenantId, () -> loginByUsername(reqVO, userIp, userAgent));
+    }
+
+    /**
+     * 登录页可以按租户名登录；未传时沿用请求头中的租户编号
+     */
+    private Long resolveTenantId(String tenantName) {
+        if (StrUtil.isEmpty(tenantName)) {
+            return TenantContextHolder.getRequiredTenantId();
+        }
+        TenantDO tenant = tenantService.getTenantByName(tenantName);
+        if (tenant == null) {
+            throw exception(TENANT_NOT_EXISTS);
+        }
+        return tenant.getId();
+    }
+
+    private AuthLoginRespVO loginByUsername(AuthLoginReqVO reqVO, String userIp, String userAgent) {
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        String username = reqVO.getUsername();
+        if (loginFailCountRedisDAO.get(tenantId, username) >= loginFailLimit) {
+            createLoginLog(0L, username, LoginLogTypeEnum.LOGIN_USERNAME, LoginResultEnum.BAD_CREDENTIALS,
+                    userIp, userAgent);
+            throw exception(AUTH_LOGIN_FAIL_LOCKED, loginFailLockMinutes);
+        }
+
+        AdminUserDO user;
+        try {
+            user = authenticate(username, reqVO.getPassword());
+        } catch (RuntimeException ex) {
+            loginFailCountRedisDAO.increment(tenantId, username, Duration.ofMinutes(loginFailLockMinutes));
+            AdminUserDO failedUser = userService.getUserByUsername(username);
+            LoginResultEnum result = isDisabled(ex) ? LoginResultEnum.USER_DISABLED : LoginResultEnum.BAD_CREDENTIALS;
+            createLoginLog(failedUser != null ? failedUser.getId() : 0L, username,
+                    LoginLogTypeEnum.LOGIN_USERNAME, result, userIp, userAgent);
+            throw ex;
+        }
+        loginFailCountRedisDAO.delete(tenantId, username);
+        return createTokenAfterLoginSuccess(user, LoginLogTypeEnum.LOGIN_USERNAME, userIp, userAgent);
+    }
+
+    private static boolean isDisabled(RuntimeException ex) {
+        return ex instanceof com.ccloud.framework.common.exception.ServiceException serviceException
+                && Objects.equals(serviceException.getCode(), AUTH_LOGIN_USER_DISABLED.getCode());
+    }
 
     @Override
     public AdminUserDO authenticate(String username, String password) {
@@ -36,5 +160,137 @@ public class AdminAuthServiceImpl implements AdminAuthService {
             throw exception(AUTH_LOGIN_USER_DISABLED);
         }
         return user;
+    }
+
+    private AuthLoginRespVO createTokenAfterLoginSuccess(AdminUserDO user, LoginLogTypeEnum logType,
+                                                         String userIp, String userAgent) {
+        userService.updateUserLogin(user.getId(), userIp);
+        createLoginLog(user.getId(), user.getUsername(), logType, LoginResultEnum.SUCCESS, userIp, userAgent);
+        OAuth2AccessTokenDO accessToken = oauth2TokenService.createAccessToken(user.getId(),
+                UserTypeEnum.ADMIN.getValue(), clientId, null);
+        return buildLoginResp(accessToken);
+    }
+
+    private static AuthLoginRespVO buildLoginResp(OAuth2AccessTokenDO accessToken) {
+        AuthLoginRespVO respVO = new AuthLoginRespVO();
+        respVO.setUserId(accessToken.getUserId());
+        respVO.setAccessToken(accessToken.getAccessToken());
+        respVO.setRefreshToken(accessToken.getRefreshToken());
+        respVO.setExpiresTime(accessToken.getExpiresTime());
+        return respVO;
+    }
+
+    private void createLoginLog(Long userId, String username, LoginLogTypeEnum logType, LoginResultEnum result,
+                                String userIp, String userAgent) {
+        loginLogService.createLoginLog(new LoginLogDO().setLogType(logType.getType())
+                .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setUsername(username)
+                .setResult(result.getResult()).setUserIp(userIp == null ? "" : userIp)
+                .setUserAgent(userAgent == null ? "" : userAgent));
+    }
+
+    // ========== 注册 ==========
+
+    @Override
+    public AuthLoginRespVO register(AuthRegisterReqVO reqVO, String userIp, String userAgent) {
+        if (!registerEnabled) {
+            throw exception(AUTH_REGISTER_DISABLED);
+        }
+        if (captchaService.isEnabled()) {
+            captchaService.validate(reqVO.getCaptchaUuid(), reqVO.getCaptchaCode());
+        }
+        UserSaveReqVO createReqVO = new UserSaveReqVO();
+        createReqVO.setUsername(reqVO.getUsername());
+        createReqVO.setNickname(reqVO.getNickname());
+        createReqVO.setPassword(reqVO.getPassword());
+        Long userId = userService.createUser(createReqVO);
+        return createTokenAfterLoginSuccess(userService.getUser(userId), LoginLogTypeEnum.LOGIN_USERNAME,
+                userIp, userAgent);
+    }
+
+    // ========== 登出与刷新 ==========
+
+    @Override
+    public void logout(String accessToken, Integer logType) {
+        OAuth2AccessTokenDO token = oauth2TokenService.removeAccessToken(accessToken);
+        if (token == null) {
+            return;
+        }
+        if (!UserTypeEnum.ADMIN.getValue().equals(token.getUserType())) {
+            return;
+        }
+        // 日志归属令牌所在租户，而不是发起登出请求时的租户
+        TenantUtils.execute(token.getTenantId(), () -> {
+            AdminUserDO user = userService.getUser(token.getUserId());
+            loginLogService.createLoginLog(new LoginLogDO().setLogType(logType)
+                    .setUserId(token.getUserId()).setUserType(token.getUserType())
+                    .setUsername(user != null ? user.getUsername() : "")
+                    .setResult(LoginResultEnum.SUCCESS.getResult()).setUserIp("").setUserAgent(""));
+        });
+    }
+
+    @Override
+    public AuthLoginRespVO refreshToken(String refreshToken) {
+        return buildLoginResp(oauth2TokenService.refreshAccessToken(refreshToken, clientId));
+    }
+
+    // ========== 权限与菜单 ==========
+
+    @Override
+    public AuthPermissionInfoRespVO getPermissionInfo(Long userId) {
+        AdminUserDO user = userService.getUser(userId);
+        if (user == null) {
+            return null;
+        }
+        // 只取开启的角色：停用角色的菜单与权限立即失效
+        List<RoleDO> roles = CollectionUtils.filterList(
+                roleService.getRoleListFromCache(permissionService.getUserRoleIdListByUserIdFromCache(userId)),
+                role -> CommonStatusEnum.isEnable(role.getStatus()));
+        Set<Long> roleIds = CollectionUtils.convertSet(roles, RoleDO::getId);
+
+        // 菜单先按角色授权取，再按租户套餐与启用状态过滤，最后拆成"权限标识"与"菜单树"
+        Set<Long> menuIds = permissionService.getRoleMenuListByRoleId(roleIds);
+        MenuListReqVO menuReqVO = new MenuListReqVO();
+        menuReqVO.setStatus(CommonStatusEnum.ENABLE.getStatus());
+        List<MenuDO> menus = CollectionUtils.filterList(
+                menuService.filterDisableMenus(menuService.getMenuListByTenant(menuReqVO)),
+                menu -> menuIds.contains(menu.getId()));
+
+        AuthPermissionInfoRespVO respVO = new AuthPermissionInfoRespVO();
+        respVO.setUser(BeanUtils.toBean(user, AuthPermissionInfoRespVO.UserVO.class));
+        respVO.setRoles(CollectionUtils.convertSet(roles, RoleDO::getCode));
+        respVO.setPermissions(CollectionUtils.convertSet(
+                CollectionUtils.filterList(menus, menu -> StrUtil.isNotEmpty(menu.getPermission())),
+                MenuDO::getPermission));
+        respVO.setMenus(buildMenuTree(menus));
+        return respVO;
+    }
+
+    /**
+     * 只有目录与菜单进入菜单树，按钮仅贡献权限标识；同级按 sort 升序
+     */
+    private static List<AuthPermissionInfoRespVO.MenuVO> buildMenuTree(List<MenuDO> menus) {
+        List<MenuDO> routable = CollectionUtils.filterList(menus,
+                menu -> !MenuTypeEnum.BUTTON.getType().equals(menu.getType()));
+        routable.sort(Comparator.comparing(MenuDO::getSort, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(MenuDO::getId));
+
+        Map<Long, AuthPermissionInfoRespVO.MenuVO> nodes = new LinkedHashMap<>();
+        routable.forEach(menu -> nodes.put(menu.getId(),
+                BeanUtils.toBean(menu, AuthPermissionInfoRespVO.MenuVO.class)));
+
+        List<AuthPermissionInfoRespVO.MenuVO> roots = new ArrayList<>();
+        nodes.forEach((id, node) -> {
+            AuthPermissionInfoRespVO.MenuVO parent = nodes.get(node.getParentId());
+            // 父菜单未被授权（或已停用）时，子菜单上提为根，避免整块菜单不可见
+            if (parent == null) {
+                roots.add(node);
+                return;
+            }
+            if (parent.getChildren() == null) {
+                parent.setChildren(new ArrayList<>());
+            }
+            parent.getChildren().add(node);
+        });
+        return roots;
     }
 }

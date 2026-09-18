@@ -8,16 +8,16 @@ import java.util.List;
 /**
  * OAuth2 测试数据
  */
-final class OAuth2TestData {
+public final class OAuth2TestData {
 
-    static final String CLIENT_ID = "test-web";
-    static final String SECRET = "test-web-secret";
-    static final String REDIRECT_URI = "http://localhost:8080/cb";
+    public static final String CLIENT_ID = "test-web";
+    public static final String SECRET = "test-web-secret";
+    public static final String REDIRECT_URI = "http://localhost:8080/cb";
 
     private OAuth2TestData() {
     }
 
-    static OAuth2ClientDO client() {
+    public static OAuth2ClientDO client() {
         return new OAuth2ClientDO().setClientId(CLIENT_ID).setSecret(SECRET).setName("测试客户端").setLogo("")
                 .setStatus(CommonStatusEnum.ENABLE.getStatus())
                 .setAccessTokenValiditySeconds(1800).setRefreshTokenValiditySeconds(86400)

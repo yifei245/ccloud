@@ -4,6 +4,7 @@ import cn.hutool.core.util.IdUtil;
 import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.pojo.PageResult;
 import com.ccloud.framework.common.util.collection.CollectionUtils;
+import com.ccloud.framework.tenant.core.context.TenantContextHolder;
 import com.ccloud.framework.tenant.core.util.TenantUtils;
 import com.ccloud.module.system.controller.admin.oauth2.vo.token.OAuth2AccessTokenPageReqVO;
 import com.ccloud.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
@@ -60,6 +61,7 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         OAuth2RefreshTokenDO refreshToken = new OAuth2RefreshTokenDO().setRefreshToken(generateToken())
                 .setUserId(userId).setUserType(userType).setClientId(client.getClientId()).setScopes(scopes)
                 .setExpiresTime(LocalDateTime.now().plusSeconds(client.getRefreshTokenValiditySeconds()));
+        refreshToken.setTenantId(TenantContextHolder.getRequiredTenantId());
         refreshTokenMapper.insert(refreshToken);
         return refreshToken;
     }
@@ -71,6 +73,9 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
                 .setUserId(userId).setUserType(userType).setUserInfo(buildUserInfo(userId, userType))
                 .setClientId(client.getClientId()).setScopes(scopes)
                 .setExpiresTime(LocalDateTime.now().plusSeconds(client.getAccessTokenValiditySeconds()));
+        // 显式写入租户编号：多租户拦截器只负责数据库列，若不赋值，返回与缓存的对象里 tenantId 为空，
+        // 网关据此构造的登录身份就会丢掉租户
+        accessToken.setTenantId(TenantContextHolder.getRequiredTenantId());
         accessTokenMapper.insert(accessToken);
         accessTokenRedisDAO.set(accessToken);
         return accessToken;

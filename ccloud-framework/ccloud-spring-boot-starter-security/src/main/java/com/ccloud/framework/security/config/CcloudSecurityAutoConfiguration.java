@@ -12,6 +12,7 @@ import com.ccloud.framework.security.core.context.TransmittableThreadLocalSecuri
 import com.ccloud.framework.security.core.filter.LoginUserFilter;
 import com.ccloud.framework.security.core.handler.AccessDeniedHandlerImpl;
 import com.ccloud.framework.security.core.handler.AuthenticationEntryPointImpl;
+import com.ccloud.framework.security.core.service.DenyAllSecurityFrameworkServiceImpl;
 import com.ccloud.framework.security.core.service.PermissionFrameworkService;
 import com.ccloud.framework.security.core.service.SecurityFrameworkService;
 import com.ccloud.framework.security.core.service.SecurityFrameworkServiceImpl;
@@ -127,6 +128,16 @@ public class CcloudSecurityAutoConfiguration {
             PermissionFrameworkService permissionFrameworkService, SecurityProperties properties) {
         return new SecurityFrameworkServiceImpl(permissionFrameworkService,
                 properties.getPermissionCacheDuration(), properties.getPermissionCacheMaxSize());
+    }
+
+    /**
+     * 服务未提供 {@link PermissionFrameworkService} 时的兜底：一律拒绝。
+     * 缺实现时若放行，等于所有权限注解失效；若不注册，表达式求值报错也会被误当成配置问题忽略
+     */
+    @Bean("ss")
+    @ConditionalOnMissingBean(PermissionFrameworkService.class)
+    public SecurityFrameworkService denyAllSecurityFrameworkService() {
+        return new DenyAllSecurityFrameworkServiceImpl();
     }
 
     /**

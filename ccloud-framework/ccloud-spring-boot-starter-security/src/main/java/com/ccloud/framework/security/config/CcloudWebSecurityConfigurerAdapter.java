@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -26,6 +27,8 @@ import java.util.List;
  */
 @Slf4j
 @EnableWebSecurity
+// 没有它，所有 @PreAuthorize 注解都会被静默忽略——接口看似有权限控制，实际任何登录用户都能调用
+@EnableMethodSecurity
 public class CcloudWebSecurityConfigurerAdapter {
 
     @Resource

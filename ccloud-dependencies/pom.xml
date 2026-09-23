@@ -75,7 +75,7 @@
         <oshi.version>7.6.1</oshi.version>
         <ip2region.version>3.3.7</ip2region.version>
         <jsoup.version>1.21.2</jsoup.version>
-        <bouncycastle.version>1.85.2</bouncycastle.version>
+        <bouncycastle.version>1.84</bouncycastle.version>
         <tika.version>3.3.2</tika.version>
         <zxing.version>3.5.4</zxing.version>
         <commons-io.version>2.20.0</commons-io.version>
@@ -311,9 +311,21 @@
                 <artifactId>jsoup</artifactId>
                 <version>${jsoup.version}</version>
             </dependency>
+            <!-- BouncyCastle 各模块必须同版本：只锁 bcprov 时 bcpkix/bcutil 随微信 SDK 停在旧版，
+                 Hutool 初始化 BouncyCastle 即报 NoSuchFieldError，加密字段读写全部失败 -->
             <dependency>
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcpkix-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcutil-jdk18on</artifactId>
                 <version>${bouncycastle.version}</version>
             </dependency>
             <dependency>

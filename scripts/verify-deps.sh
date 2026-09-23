@@ -30,4 +30,13 @@ if grep -nE '<[a-z0-9.-]+\.version>.*(SNAPSHOT|-RC|-M[0-9]|\.B<)' ccloud-depende
   echo "  FAIL BOM 中存在非稳定版本"; exit 1
 fi
 echo "  OK   全部为稳定版本"
+echo "==> 校验 BouncyCastle 各模块同版本（混用会让 Hutool 初始化失败，加密字段全部不可用）"
+# verbose 树会列出被仲裁掉的版本，任何一处残留旧版都能发现；需先 install 或在 reactor 内离线解析
+bc=$(mvn -o dependency:tree -Dverbose -pl ccloud-module-system/ccloud-module-system-biz -am \
+      -Dincludes=org.bouncycastle 2>/dev/null | grep -oE 'bc[a-z]+-jdk18on:jar:[0-9.]+:' | sort -u || true)
+versions=$(echo "$bc" | awk -F: '{print $3}' | sort -u)
+if [ "$(echo "$versions" | wc -l | tr -d ' ')" != "1" ]; then
+  echo "  FAIL 存在多个版本："; echo "$bc"; exit 1
+fi
+echo "  OK   $(echo "$bc" | tr '\n' ' ')"
 echo "==> 全部通过"

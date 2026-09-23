@@ -60,6 +60,10 @@
             <artifactId>weixin-java-miniapp</artifactId>
         </dependency>
         <dependency>
+            <groupId>me.zhyd.oauth</groupId>
+            <artifactId>JustAuth</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.aliyun</groupId>
             <artifactId>dysmsapi20170525</artifactId>
         </dependency>

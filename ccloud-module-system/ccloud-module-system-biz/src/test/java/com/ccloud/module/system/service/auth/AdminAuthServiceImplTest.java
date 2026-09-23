@@ -110,6 +110,10 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
     private CaptchaService captchaService;
     @MockitoBean
     private SmsCodeService smsCodeService;
+    @MockitoBean
+    private com.ccloud.module.system.service.social.SocialUserService socialUserService;
+    @MockitoBean
+    private com.ccloud.module.system.service.social.SocialClientService socialClientService;
 
     private static final String MOBILE = "13800000000";
 
@@ -505,6 +509,101 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
 
         assertServiceException(() -> authService.resetPassword(reqVO, "10.0.0.1"), SMS_CODE_NOT_FOUND);
         assertThat(authService.authenticate("admin", "admin123").getId()).isEqualTo(userId);
+    }
+
+    // ========== 社交登录 ==========
+
+    private static final Integer DING = com.ccloud.module.system.enums.social.SocialTypeEnum.DINGTALK.getType();
+
+    @Test
+    void socialLogin_已绑定时签发令牌并记录社交登录日志() {
+        when(socialUserService.getSocialUserByCode(UserTypeEnum.ADMIN.getValue(), DING, "code", "state"))
+                .thenReturn(socialUser(userId));
+
+        AuthLoginRespVO respVO = authService.socialLogin(socialLoginReqVO(), "10.0.0.1", "JUnit");
+
+        assertThat(tokenService.checkAccessToken(respVO.getAccessToken()).getUserId()).isEqualTo(userId);
+        LoginLogDO log = loginLogMapper.selectList().get(0);
+        assertThat(log.getLogType()).isEqualTo(LoginLogTypeEnum.LOGIN_SOCIAL.getType());
+        assertThat(log.getResult()).isEqualTo(LoginResultEnum.SUCCESS.getResult());
+    }
+
+    @Test
+    void socialLogin_未绑定时提示绑定且不签发() {
+        when(socialUserService.getSocialUserByCode(UserTypeEnum.ADMIN.getValue(), DING, "code", "state"))
+                .thenReturn(socialUser(null));
+
+        assertServiceException(() -> authService.socialLogin(socialLoginReqVO(), "10.0.0.1", "JUnit"),
+                AUTH_THIRD_LOGIN_NOT_BIND);
+        assertThat(accessTokenMapper.selectCount()).isZero();
+    }
+
+    @Test
+    void socialLogin_绑定的用户已禁用应拒绝() {
+        userService.updateUserStatus(userId, CommonStatusEnum.DISABLE.getStatus());
+        when(socialUserService.getSocialUserByCode(UserTypeEnum.ADMIN.getValue(), DING, "code", "state"))
+                .thenReturn(socialUser(userId));
+
+        assertServiceException(() -> authService.socialLogin(socialLoginReqVO(), "10.0.0.1", "JUnit"),
+                AUTH_LOGIN_USER_DISABLED);
+    }
+
+    @Test
+    void socialBindLogin_账密正确时绑定社交账号并签发令牌() {
+        when(socialUserService.getSocialUserByCode(UserTypeEnum.ADMIN.getValue(), DING, "code", "state"))
+                .thenReturn(socialUser(null));
+
+        AuthLoginRespVO respVO = authService.socialBindLogin(socialBindLoginReqVO("admin123"), "10.0.0.1", "JUnit");
+
+        assertThat(respVO.getUserId()).isEqualTo(userId);
+        verify(socialUserService).bindSocialUser(argThat(dto -> userId.equals(dto.getUserId())
+                && DING.equals(dto.getSocialType()) && "code".equals(dto.getCode())
+                && UserTypeEnum.ADMIN.getValue().equals(dto.getUserType())));
+    }
+
+    @Test
+    void socialBindLogin_账密错误时不绑定() {
+        when(socialUserService.getSocialUserByCode(UserTypeEnum.ADMIN.getValue(), DING, "code", "state"))
+                .thenReturn(socialUser(null));
+
+        assertServiceException(() -> authService.socialBindLogin(socialBindLoginReqVO("wrong"), "10.0.0.1", "JUnit"),
+                AUTH_LOGIN_BAD_CREDENTIALS);
+        verify(socialUserService, never()).bindSocialUser(any());
+    }
+
+    @Test
+    void socialBindLogin_社交账号已绑定他人时直接拒绝_不校验账密也不签发() {
+        when(socialUserService.getSocialUserByCode(UserTypeEnum.ADMIN.getValue(), DING, "code", "state"))
+                .thenReturn(socialUser(999L));
+
+        assertServiceException(() -> authService.socialBindLogin(socialBindLoginReqVO("admin123"), "10.0.0.1", "JUnit"),
+                SOCIAL_USER_BIND_DUPLICATE);
+        assertThat(accessTokenMapper.selectCount()).isZero();
+    }
+
+    private static com.ccloud.module.system.api.social.dto.SocialUserRespDTO socialUser(Long boundUserId) {
+        var dto = new com.ccloud.module.system.api.social.dto.SocialUserRespDTO();
+        dto.setOpenid("open-1");
+        dto.setUserId(boundUserId);
+        return dto;
+    }
+
+    private static com.ccloud.module.system.controller.admin.auth.vo.AuthSocialLoginReqVO socialLoginReqVO() {
+        var reqVO = new com.ccloud.module.system.controller.admin.auth.vo.AuthSocialLoginReqVO();
+        reqVO.setType(DING);
+        reqVO.setCode("code");
+        reqVO.setState("state");
+        return reqVO;
+    }
+
+    private static com.ccloud.module.system.controller.admin.auth.vo.AuthSocialBindLoginReqVO socialBindLoginReqVO(String password) {
+        var reqVO = new com.ccloud.module.system.controller.admin.auth.vo.AuthSocialBindLoginReqVO();
+        reqVO.setType(DING);
+        reqVO.setCode("code");
+        reqVO.setState("state");
+        reqVO.setUsername("admin");
+        reqVO.setPassword(password);
+        return reqVO;
     }
 
     // ========== 工具 ==========

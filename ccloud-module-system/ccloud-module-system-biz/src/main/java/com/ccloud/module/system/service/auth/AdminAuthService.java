@@ -7,6 +7,8 @@ import com.ccloud.module.system.controller.admin.auth.vo.AuthRegisterReqVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthResetPasswordReqVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthSmsLoginReqVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthSmsSendReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSocialBindLoginReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSocialLoginReqVO;
 import com.ccloud.module.system.dal.dataobject.user.AdminUserDO;
 import jakarta.validation.Valid;
 
@@ -34,6 +36,21 @@ public interface AdminAuthService {
      * 短信验证码重置密码，并作废该用户已签发的全部令牌
      */
     void resetPassword(@Valid AuthResetPasswordReqVO reqVO, String userIp);
+
+    /**
+     * 获得管理后台社交登录的授权跳转地址
+     */
+    String getSocialAuthorizeUrl(Integer socialType, String redirectUri);
+
+    /**
+     * 社交登录：社交账号须已绑定管理员，未绑定时返回 AUTH_THIRD_LOGIN_NOT_BIND，前端据此引导绑定
+     */
+    AuthLoginRespVO socialLogin(@Valid AuthSocialLoginReqVO reqVO, String userIp, String userAgent);
+
+    /**
+     * 社交登录并绑定已有账号：先按账号密码登录（含图形验证码与失败锁定），再绑定社交账号
+     */
+    AuthLoginRespVO socialBindLogin(@Valid AuthSocialBindLoginReqVO reqVO, String userIp, String userAgent);
 
     /**
      * 注册并直接登录；是否开放注册由 ccloud.system.auth.register-enabled 控制

@@ -11,10 +11,13 @@ import com.ccloud.module.system.controller.admin.auth.vo.AuthRegisterReqVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthResetPasswordReqVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthSmsLoginReqVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthSmsSendReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSocialBindLoginReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSocialLoginReqVO;
 import com.ccloud.module.system.enums.logger.LoginLogTypeEnum;
 import com.ccloud.module.system.service.auth.AdminAuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -63,6 +66,34 @@ public class AuthController {
                                                HttpServletRequest request) {
         authService.resetPassword(reqVO, ServletUtils.getClientIP(request));
         return success(true);
+    }
+
+    @GetMapping("/social-auth-redirect")
+    @Operation(summary = "获得社交登录的授权跳转地址")
+    @Parameters({
+            @Parameter(name = "type", description = "社交平台，见 SocialTypeEnum", required = true, example = "20"),
+            @Parameter(name = "redirectUri", description = "授权回调地址", required = true,
+                    example = "https://admin.ccloud.local/social-login")
+    })
+    public CommonResult<String> socialAuthRedirect(@RequestParam("type") Integer type,
+                                                   @RequestParam("redirectUri") String redirectUri) {
+        return success(authService.getSocialAuthorizeUrl(type, redirectUri));
+    }
+
+    @PostMapping("/social-login")
+    @Operation(summary = "社交登录", description = "社交账号未绑定时返回 AUTH_THIRD_LOGIN_NOT_BIND，前端据此引导绑定")
+    public CommonResult<AuthLoginRespVO> socialLogin(@RequestBody @Valid AuthSocialLoginReqVO reqVO,
+                                                     HttpServletRequest request) {
+        return success(authService.socialLogin(reqVO, ServletUtils.getClientIP(request),
+                ServletUtils.getUserAgent(request)));
+    }
+
+    @PostMapping("/social-bind-login")
+    @Operation(summary = "社交登录并绑定已有账号")
+    public CommonResult<AuthLoginRespVO> socialBindLogin(@RequestBody @Valid AuthSocialBindLoginReqVO reqVO,
+                                                         HttpServletRequest request) {
+        return success(authService.socialBindLogin(reqVO, ServletUtils.getClientIP(request),
+                ServletUtils.getUserAgent(request)));
     }
 
     @PostMapping("/register")

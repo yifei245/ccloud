@@ -7,6 +7,12 @@ import com.ccloud.framework.common.util.collection.CollectionUtils;
 import com.ccloud.framework.common.util.object.BeanUtils;
 import com.ccloud.framework.tenant.core.context.TenantContextHolder;
 import com.ccloud.framework.tenant.core.util.TenantUtils;
+import com.ccloud.module.system.api.social.dto.SocialUserBindReqDTO;
+import com.ccloud.module.system.api.social.dto.SocialUserRespDTO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSocialBindLoginReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSocialLoginReqVO;
+import com.ccloud.module.system.service.social.SocialClientService;
+import com.ccloud.module.system.service.social.SocialUserService;
 import com.ccloud.module.system.api.sms.dto.SmsCodeSendReqDTO;
 import com.ccloud.module.system.api.sms.dto.SmsCodeUseReqDTO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthResetPasswordReqVO;
@@ -81,6 +87,10 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     private LoginFailCountRedisDAO loginFailCountRedisDAO;
     @Resource
     private SmsCodeService smsCodeService;
+    @Resource
+    private SocialUserService socialUserService;
+    @Resource
+    private SocialClientService socialClientService;
 
     /**
      * 管理后台登录使用的 OAuth2 客户端
@@ -268,6 +278,58 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         reqDTO.setScene(scene.getScene());
         reqDTO.setUsedIp(userIp);
         return reqDTO;
+    }
+
+    // ========== 社交登录 ==========
+
+    @Override
+    public String getSocialAuthorizeUrl(Integer socialType, String redirectUri) {
+        return socialClientService.getAuthorizeUrl(socialType, UserTypeEnum.ADMIN.getValue(), redirectUri);
+    }
+
+    @Override
+    public AuthLoginRespVO socialLogin(AuthSocialLoginReqVO reqVO, String userIp, String userAgent) {
+        SocialUserRespDTO socialUser = socialUserService.getSocialUserByCode(UserTypeEnum.ADMIN.getValue(),
+                reqVO.getType(), reqVO.getCode(), reqVO.getState());
+        AdminUserDO user = socialUser.getUserId() != null ? userService.getUser(socialUser.getUserId()) : null;
+        if (user == null) {
+            throw exception(AUTH_THIRD_LOGIN_NOT_BIND);
+        }
+        if (CommonStatusEnum.isDisable(user.getStatus())) {
+            createLoginLog(user.getId(), user.getUsername(), LoginLogTypeEnum.LOGIN_SOCIAL,
+                    LoginResultEnum.USER_DISABLED, userIp, userAgent);
+            throw exception(AUTH_LOGIN_USER_DISABLED);
+        }
+        return createTokenAfterLoginSuccess(user, LoginLogTypeEnum.LOGIN_SOCIAL, userIp, userAgent);
+    }
+
+    @Override
+    public AuthLoginRespVO socialBindLogin(AuthSocialBindLoginReqVO reqVO, String userIp, String userAgent) {
+        // 先确认社交账号可绑定，避免账密登录成功、签发令牌之后才发现绑定不了
+        Integer userType = UserTypeEnum.ADMIN.getValue();
+        SocialUserRespDTO socialUser = socialUserService.getSocialUserByCode(userType, reqVO.getType(),
+                reqVO.getCode(), reqVO.getState());
+        if (socialUser.getUserId() != null) {
+            AdminUserDO target = userService.getUserByUsername(reqVO.getUsername());
+            if (target == null || !target.getId().equals(socialUser.getUserId())) {
+                throw exception(SOCIAL_USER_BIND_DUPLICATE);
+            }
+        }
+        AuthLoginReqVO loginReqVO = new AuthLoginReqVO();
+        loginReqVO.setUsername(reqVO.getUsername());
+        loginReqVO.setPassword(reqVO.getPassword());
+        loginReqVO.setCaptchaUuid(reqVO.getCaptchaUuid());
+        loginReqVO.setCaptchaCode(reqVO.getCaptchaCode());
+        AuthLoginRespVO respVO = login(loginReqVO, userIp, userAgent);
+
+        SocialUserBindReqDTO bindReqDTO = new SocialUserBindReqDTO();
+        bindReqDTO.setUserId(respVO.getUserId());
+        bindReqDTO.setUserType(userType);
+        bindReqDTO.setSocialType(reqVO.getType());
+        bindReqDTO.setCode(reqVO.getCode());
+        bindReqDTO.setState(reqVO.getState());
+        socialUserService.bindSocialUser(bindReqDTO);
+        return respVO;
     }
 
     // ========== 注册 ==========

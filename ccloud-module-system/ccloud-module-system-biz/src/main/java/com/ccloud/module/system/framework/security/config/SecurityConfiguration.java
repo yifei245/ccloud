@@ -33,6 +33,7 @@ public class SecurityConfiguration {
                         "/admin-api/system/auth/logout",
                         "/admin-api/system/auth/social-auth-redirect",
                         "/admin-api/system/auth/social-login",
+                        "/admin-api/system/auth/social-bind-login",
                         "/admin-api/system/captcha/**").permitAll();
                 // 登录页需要先按租户名或域名解析出租户编号
                 registry.requestMatchers(

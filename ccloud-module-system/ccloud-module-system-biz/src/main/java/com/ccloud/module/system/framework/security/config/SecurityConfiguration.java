@@ -3,6 +3,7 @@ package com.ccloud.module.system.framework.security.config;
 import com.ccloud.framework.security.config.AuthorizeRequestsCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
 
@@ -41,6 +42,10 @@ public class SecurityConfiguration {
                 registry.requestMatchers(
                         "/admin-api/system/oauth2/token",
                         "/admin-api/system/oauth2/check-token").permitAll();
+                // SSO 授权检查（未登录返回 needLogin）与统一登出（幂等）；确认授权 POST /sso/authorize 仍要求登录
+                registry.requestMatchers(HttpMethod.GET,
+                        "/admin-api/system/sso/authorize",
+                        "/admin-api/system/sso/logout").permitAll();
                 // 字典数据在登录页也要用（性别、终端等下拉框）
                 registry.requestMatchers("/admin-api/system/dict-data/simple-list").permitAll();
             }

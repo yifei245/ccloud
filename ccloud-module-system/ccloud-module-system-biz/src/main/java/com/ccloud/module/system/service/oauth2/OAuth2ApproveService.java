@@ -5,6 +5,7 @@ import com.ccloud.module.system.dal.dataobject.oauth2.OAuth2ApproveDO;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * OAuth2 授权同意 Service
@@ -29,4 +30,9 @@ public interface OAuth2ApproveService {
      * @return 未过期的同意记录
      */
     List<OAuth2ApproveDO> getApproveList(Long userId, Integer userType, String clientId);
+
+    /**
+     * 用户同意过（未过期）的客户端，用于统一登出时告知前端需要一并登出的应用
+     */
+    Set<String> getApprovedClientIds(Long userId, Integer userType);
 }

@@ -3,7 +3,6 @@ package com.ccloud.module.system.controller.admin.oauth2;
 import cn.hutool.core.codec.Base64;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.core.util.URLUtil;
 import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.common.util.collection.CollectionUtils;
@@ -15,11 +14,10 @@ import com.ccloud.module.system.controller.admin.oauth2.vo.open.OAuth2OpenCheckT
 import com.ccloud.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
 import com.ccloud.module.system.dal.dataobject.oauth2.OAuth2ApproveDO;
 import com.ccloud.module.system.dal.dataobject.oauth2.OAuth2ClientDO;
-import com.ccloud.module.system.dal.dataobject.oauth2.OAuth2CodeDO;
 import com.ccloud.module.system.enums.oauth2.OAuth2GrantTypeEnum;
 import com.ccloud.module.system.service.oauth2.OAuth2ApproveService;
 import com.ccloud.module.system.service.oauth2.OAuth2ClientService;
-import com.ccloud.module.system.service.oauth2.OAuth2CodeService;
+import com.ccloud.module.system.service.oauth2.OAuth2AuthorizeService;
 import com.ccloud.module.system.service.oauth2.OAuth2GrantService;
 import com.ccloud.module.system.service.oauth2.OAuth2TokenService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -39,7 +37,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 
-import static com.ccloud.framework.common.exception.enums.GlobalErrorCodeConstants.BAD_REQUEST;
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.invalidParamException;
 import static com.ccloud.framework.common.pojo.CommonResult.success;
@@ -65,7 +62,7 @@ public class OAuth2OpenController {
     @Resource
     private OAuth2TokenService oauth2TokenService;
     @Resource
-    private OAuth2CodeService oauth2CodeService;
+    private OAuth2AuthorizeService oauth2AuthorizeService;
 
     @PostMapping("/token")
     @Operation(summary = "获得访问令牌", description = "支持 authorization_code、password、refresh_token、client_credentials")
@@ -156,8 +153,7 @@ public class OAuth2OpenController {
     }
 
     /**
-     * 用户在授权页确认（或静默自动授权）后签发授权码，返回应跳转的地址。
-     * 只支持 response_type=code：隐式模式在浏览器地址栏暴露访问令牌，OAuth 2.1 已将其移除
+     * 用户在授权页确认（或静默自动授权）后签发授权码，返回应跳转的地址。只支持 response_type=code
      *
      * @return 自动授权未通过（需用户确认）时返回 null，前端据此展示授权页
      */
@@ -177,37 +173,9 @@ public class OAuth2OpenController {
                                               @RequestParam("redirect_uri") String redirectUri,
                                               @RequestParam(value = "auto_approve") Boolean autoApprove,
                                               @RequestParam(value = "state", required = false) String state) {
-        if (!"code".equals(responseType)) {
-            throw exception(BAD_REQUEST.getCode(), "仅支持 response_type=code");
-        }
-        Map<String, Boolean> scopes = StrUtil.isEmpty(scope) ? Collections.emptyMap()
-                : JsonUtils.parseObject(scope, new TypeReference<LinkedHashMap<String, Boolean>>() {
-        });
-        if (scopes == null) {
-            throw invalidParamException("scope 格式不正确");
-        }
-        // 校验客户端支持授权码模式、申请范围不越界、重定向地址已登记（精确匹配），防止授权码被发往任意地址
-        oauth2ClientService.validOAuthClientFromCache(clientId, null,
-                OAuth2GrantTypeEnum.AUTHORIZATION_CODE.getGrantType(), scopes.keySet(), redirectUri);
-
-        Long userId = getLoginUserId();
-        Integer userType = UserTypeEnum.ADMIN.getValue();
-        List<String> approvedScopes;
-        if (Boolean.TRUE.equals(autoApprove)) {
-            if (!oauth2ApproveService.checkForPreApproval(userId, userType, clientId, scopes.keySet())) {
-                return success(null);
-            }
-            approvedScopes = new ArrayList<>(scopes.keySet());
-        } else {
-            if (!oauth2ApproveService.updateAfterApproval(userId, userType, clientId, scopes)) {
-                return success(buildRedirectUri(redirectUri, Map.of("error", "access_denied",
-                        "error_description", "User denied access"), state));
-            }
-            approvedScopes = CollectionUtils.filterList(new ArrayList<>(scopes.keySet()), scopes::get);
-        }
-        OAuth2CodeDO code = oauth2CodeService.createAuthorizationCode(userId, userType, clientId, approvedScopes,
-                redirectUri, state);
-        return success(buildRedirectUri(redirectUri, Map.of("code", code.getCode()), state));
+        Map<String, Boolean> scopes = parseScopeApprovals(scope);
+        return success(oauth2AuthorizeService.authorize(getLoginUserId(), UserTypeEnum.ADMIN.getValue(), responseType,
+                clientId, scopes, redirectUri, state, Boolean.TRUE.equals(autoApprove)));
     }
 
     private static Long getLoginUserId() {
@@ -222,14 +190,17 @@ public class OAuth2OpenController {
         return StrUtil.isBlank(scope) ? Collections.emptyList() : StrUtil.splitTrim(scope, ' ');
     }
 
-    private static String buildRedirectUri(String redirectUri, Map<String, String> params, String state) {
-        StringBuilder url = new StringBuilder(redirectUri).append(redirectUri.contains("?") ? '&' : '?');
-        Map<String, String> all = new LinkedHashMap<>(params);
-        if (StrUtil.isNotEmpty(state)) {
-            all.put("state", state);
+    /**
+     * 授权页提交的范围及是否同意，JSON 对象，如 {"user.read": true}
+     */
+    public static Map<String, Boolean> parseScopeApprovals(String scope) {
+        Map<String, Boolean> scopes = StrUtil.isEmpty(scope) ? Collections.emptyMap()
+                : JsonUtils.parseObject(scope, new TypeReference<LinkedHashMap<String, Boolean>>() {
+        });
+        if (scopes == null) {
+            throw invalidParamException("scope 格式不正确");
         }
-        all.forEach((key, value) -> url.append(key).append('=').append(URLUtil.encodeAll(value)).append('&'));
-        return url.substring(0, url.length() - 1);
+        return scopes;
     }
 
     /**

@@ -24,4 +24,10 @@ public interface OAuth2ApproveMapper extends BaseMapperX<OAuth2ApproveDO> {
                 .eq(OAuth2ApproveDO::getUserType, userType)
                 .eq(OAuth2ApproveDO::getClientId, clientId));
     }
+
+    default List<OAuth2ApproveDO> selectListByUserIdAndUserType(Long userId, Integer userType) {
+        return selectList(new LambdaQueryWrapperX<OAuth2ApproveDO>()
+                .eq(OAuth2ApproveDO::getUserId, userId)
+                .eq(OAuth2ApproveDO::getUserType, userType));
+    }
 }

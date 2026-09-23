@@ -62,6 +62,14 @@ public class OAuth2ApproveServiceImpl implements OAuth2ApproveService {
                 approve -> approve.getExpiresTime().isAfter(now));
     }
 
+    @Override
+    public Set<String> getApprovedClientIds(Long userId, Integer userType) {
+        LocalDateTime now = LocalDateTime.now();
+        return CollectionUtils.convertSet(CollectionUtils.filterList(
+                oauth2ApproveMapper.selectListByUserIdAndUserType(userId, userType),
+                approve -> Boolean.TRUE.equals(approve.getApproved()) && approve.getExpiresTime().isAfter(now)), OAuth2ApproveDO::getClientId);
+    }
+
     /**
      * 每个用户、客户端、范围只保留一条记录：存在则更新
      */

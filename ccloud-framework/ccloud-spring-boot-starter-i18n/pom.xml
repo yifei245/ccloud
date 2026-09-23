@@ -23,6 +23,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- 文案变更经 Redis Pub/Sub 通知各服务刷新 -->
+        <dependency>
+            <groupId>com.ccloud</groupId>
+            <artifactId>ccloud-spring-boot-starter-redis</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>

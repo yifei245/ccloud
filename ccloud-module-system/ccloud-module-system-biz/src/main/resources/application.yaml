@@ -165,6 +165,7 @@ ccloud:
       - permission_menu_ids
       - dict_data_list
       - oauth2_client
+      - i18n_message_map
     # 不含 tenant_id 列的全局表，与 sql/mysql/ddl 保持一致（由 SystemServerApplicationTest 校验）
     ignore-tables:
       - system_menu

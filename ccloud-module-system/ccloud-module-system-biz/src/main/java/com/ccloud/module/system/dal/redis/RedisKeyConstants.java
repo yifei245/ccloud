@@ -45,4 +45,10 @@ public interface RedisKeyConstants {
      * 客户端为全局数据，缓存需登记在 ccloud.tenant.ignore-caches 中
      */
     String OAUTH2_CLIENT = "oauth2_client#30m";
+
+    /**
+     * 某语言的全部国际化文案：key 为语言，value 为 Map&lt;编码, 文案&gt;。
+     * 文案为全局数据，缓存需登记在 ccloud.tenant.ignore-caches 中
+     */
+    String I18N_MESSAGE_MAP = "i18n_message_map#1h";
 }

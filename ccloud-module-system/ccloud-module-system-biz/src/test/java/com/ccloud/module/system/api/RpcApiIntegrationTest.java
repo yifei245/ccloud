@@ -91,8 +91,7 @@ class RpcApiIntegrationTest extends BaseSystemDbAndRedisUnitTest {
      * 服务尚未实现、随对应任务提供 RPC 实现的接口。实现落地后须从此处移除，否则本测试失败
      */
     private static final Map<String, String> PENDING_APIS = Map.of(
-            "SocialClientApi", "Task 38", "SocialUserApi", "Task 38",
-            "I18nMessageApi", "Task 38");
+            "SocialClientApi", "Task 38", "SocialUserApi", "Task 38");
 
     @Resource
     private ApplicationContext applicationContext;

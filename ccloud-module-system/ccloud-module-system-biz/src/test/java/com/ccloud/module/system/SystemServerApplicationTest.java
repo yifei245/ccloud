@@ -101,6 +101,8 @@ class SystemServerApplicationTest {
         assertThat(ctx.getBean(com.ccloud.framework.operatelog.core.service.OperateLogFrameworkService.class))
                 .isInstanceOf(com.ccloud.module.system.service.logger.OperateLogFrameworkServiceImpl.class);
         assertThat(ctx.getBeansOfType(com.ccloud.framework.operatelog.core.aop.OperateLogAspect.class)).hasSize(1);
+        // 数据库文案须被加载进 messageSource，并能收到其他节点的刷新通知
+        assertThat(ctx.getBeansOfType(com.ccloud.framework.i18n.core.I18nMessageRefresher.class)).hasSize(1);
         // 多实例部署下站内信等实时推送必须经 Redis 广播，否则连接在其他节点上的用户收不到
         assertThat(ctx.getBean(com.ccloud.framework.websocket.core.sender.WebSocketMessageSender.class))
                 .isInstanceOf(com.ccloud.framework.websocket.core.sender.RedisWebSocketMessageSender.class);
@@ -149,7 +151,8 @@ class SystemServerApplicationTest {
         assertThat(tenantProperties.getIgnoreCaches()).contains(
                 cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.PERMISSION_MENU_ID_LIST),
                 cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.DICT_DATA_LIST),
-                cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.OAUTH2_CLIENT));
+                cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.OAUTH2_CLIENT),
+                cacheName(com.ccloud.module.system.dal.redis.RedisKeyConstants.I18N_MESSAGE_MAP));
     }
 
     private static String cacheName(String nameWithTtl) {

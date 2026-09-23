@@ -1,1 +1,2 @@
 com.ccloud.framework.i18n.config.CcloudI18nAutoConfiguration
+com.ccloud.framework.i18n.config.CcloudI18nRefreshAutoConfiguration

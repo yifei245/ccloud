@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import com.ccloud.module.system.api.logger.dto.OperateLogCreateReqDTO;
 import jakarta.validation.Valid;
 
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemOperateLogApi")
 @Tag(name = "RPC 服务 - 操作日志")
 public interface OperateLogApi {
 

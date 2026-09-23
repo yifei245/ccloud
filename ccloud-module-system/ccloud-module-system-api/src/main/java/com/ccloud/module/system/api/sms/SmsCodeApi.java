@@ -15,7 +15,7 @@ import jakarta.validation.Valid;
  * 短信验证码 RPC。验证码的发送频率、每日上限、有效期、一次性使用全部在 system 侧控制，
  * 调用方不应自行实现任何一项——分散实现必然出现有的入口不限频的漏洞。
  */
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemSmsCodeApi")
 @Tag(name = "RPC 服务 - 短信验证码")
 public interface SmsCodeApi {
 

@@ -11,7 +11,7 @@ import com.ccloud.module.system.api.social.dto.SocialUserRespDTO;
 import com.ccloud.module.system.api.social.dto.SocialUserUnbindReqDTO;
 import jakarta.validation.Valid;
 
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemSocialUserApi")
 @Tag(name = "RPC 服务 - 社交用户")
 public interface SocialUserApi {
 

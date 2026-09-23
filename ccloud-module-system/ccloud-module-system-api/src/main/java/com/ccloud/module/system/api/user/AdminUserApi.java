@@ -11,7 +11,7 @@ import com.ccloud.module.system.api.user.dto.AdminUserRespDTO;
 import java.util.Collection;
 import java.util.List;
 
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemAdminUserApi")
 @Tag(name = "RPC 服务 - 管理员用户")
 public interface AdminUserApi {
 

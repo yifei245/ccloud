@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * 国际化文案 RPC。各服务的 DatabaseMessageSource 经由它加载数据库中的文案覆盖
  */
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemI18nMessageApi")
 @Tag(name = "RPC 服务 - 国际化文案")
 public interface I18nMessageApi {
 

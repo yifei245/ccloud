@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * 租户 RPC。多租户框架的 TenantFrameworkService 经由它回查
  */
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemTenantApi")
 @Tag(name = "RPC 服务 - 租户")
 public interface TenantApi {
 

@@ -8,7 +8,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 import com.ccloud.module.system.api.social.dto.SocialWxPhoneNumberInfoRespDTO;
 
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemSocialClientApi")
 @Tag(name = "RPC 服务 - 社交应用")
 public interface SocialClientApi {
 

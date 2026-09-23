@@ -11,7 +11,7 @@ import com.ccloud.module.system.api.dept.dto.DeptRespDTO;
 import java.util.Collection;
 import java.util.List;
 
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemDeptApi")
 @Tag(name = "RPC 服务 - 部门")
 public interface DeptApi {
 

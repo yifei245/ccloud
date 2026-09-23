@@ -17,7 +17,7 @@ import java.util.Set;
  * <p>集合参数用 {@link Collection} 而非可变参数：Feign 对集合的 GET 编码是稳定的
  * {@code ?permissions=a&permissions=b}，对数组的处理在不同版本间有差异。
  */
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemPermissionApi")
 @Tag(name = "RPC 服务 - 权限")
 public interface PermissionApi {
 

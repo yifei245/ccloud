@@ -11,7 +11,7 @@ import com.ccloud.module.system.api.dept.dto.PostRespDTO;
 import java.util.Collection;
 import java.util.List;
 
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemPostApi")
 @Tag(name = "RPC 服务 - 岗位")
 public interface PostApi {
 

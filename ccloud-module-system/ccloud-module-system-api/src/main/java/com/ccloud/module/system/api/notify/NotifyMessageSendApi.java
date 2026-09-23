@@ -12,7 +12,7 @@ import jakarta.validation.Valid;
 /**
  * 站内信发送 RPC。发送后会经 WebSocket 实时推送给在线的接收人
  */
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemNotifyMessageSendApi")
 @Tag(name = "RPC 服务 - 站内信发送")
 public interface NotifyMessageSendApi {
 

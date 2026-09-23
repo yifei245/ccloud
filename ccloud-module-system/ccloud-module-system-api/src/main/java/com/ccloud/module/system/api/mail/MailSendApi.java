@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import com.ccloud.module.system.api.mail.dto.MailSendSingleToUserReqDTO;
 import jakarta.validation.Valid;
 
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemMailSendApi")
 @Tag(name = "RPC 服务 - 邮件发送")
 public interface MailSendApi {
 

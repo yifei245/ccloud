@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import com.ccloud.module.system.api.sms.dto.SmsSendSingleToUserReqDTO;
 import jakarta.validation.Valid;
 
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemSmsSendApi")
 @Tag(name = "RPC 服务 - 短信发送")
 public interface SmsSendApi {
 

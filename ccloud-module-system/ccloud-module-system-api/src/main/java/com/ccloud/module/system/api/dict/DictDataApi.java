@@ -14,7 +14,7 @@ import java.util.List;
 /**
  * 字典数据 RPC。excel 导入导出的字典翻译与各模块的取值校验依赖它
  */
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemDictDataApi")
 @Tag(name = "RPC 服务 - 字典数据")
 public interface DictDataApi {
 

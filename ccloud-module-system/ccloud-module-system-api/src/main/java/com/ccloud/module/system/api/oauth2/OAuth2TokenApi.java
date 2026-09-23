@@ -17,7 +17,7 @@ import jakarta.validation.Valid;
  * <p>令牌只由 system 模块签发与校验：member 等模块完成各自的身份认证后调用 {@link #createAccessToken}，
  * 网关调用 {@link #checkAccessToken} 解析身份。令牌逻辑集中一处，才能保证统一登出、强制下线全局生效。
  */
-@FeignClient(name = ApiConstants.NAME)
+@FeignClient(name = ApiConstants.NAME, contextId = "systemOAuth2TokenApi")
 @Tag(name = "RPC 服务 - OAuth2 令牌")
 public interface OAuth2TokenApi {
 

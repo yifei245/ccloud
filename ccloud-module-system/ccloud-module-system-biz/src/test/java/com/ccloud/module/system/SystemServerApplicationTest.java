@@ -93,6 +93,8 @@ class SystemServerApplicationTest {
         assertThat(ctx.getBean(org.springframework.cache.CacheManager.class))
                 .isInstanceOf(com.ccloud.framework.tenant.core.redis.TenantRedisCacheManager.class);
         assertThat(ctx.getBeansOfType(com.ccloud.framework.security.core.service.PermissionCacheRefresher.class)).hasSize(1);
+        // 本地消息表的投递以 Redis 为条件，自动配置顺序不对时会被静默跳过，业务发消息直接报找不到 Bean
+        assertThat(ctx.getBeansOfType(com.ccloud.framework.mq.outbox.core.OutboxMessageService.class)).hasSize(1);
     }
 
     @Test

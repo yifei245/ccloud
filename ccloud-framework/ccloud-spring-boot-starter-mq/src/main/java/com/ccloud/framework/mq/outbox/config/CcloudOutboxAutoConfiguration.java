@@ -19,7 +19,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>本 starter 自带的 Mapper 由这里注册：业务服务的 MapperScan 只覆盖 com.ccloud.module.*，
  * 扫不到框架包。限定 @Mapper 注解，避免把 MessageSender 等普通接口也当成 Mapper 代理。
  */
-@AutoConfiguration
+// 投递实现以 StringRedisTemplate 为条件，必须排在 Redis 自动配置之后，否则条件判断时 Bean 尚未注册，投递能力被静默跳过
+@AutoConfiguration(afterName = {"org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration",
+        "com.ccloud.framework.redis.config.CcloudRedisAutoConfiguration"})
 @MapperScan(value = "com.ccloud.framework.mq.outbox.core",
         annotationClass = org.apache.ibatis.annotations.Mapper.class)
 public class CcloudOutboxAutoConfiguration {

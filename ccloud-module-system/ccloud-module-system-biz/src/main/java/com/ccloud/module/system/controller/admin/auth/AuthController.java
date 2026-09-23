@@ -8,6 +8,9 @@ import com.ccloud.module.system.controller.admin.auth.vo.AuthLoginReqVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthLoginRespVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthPermissionInfoRespVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthRegisterReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthResetPasswordReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSmsLoginReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSmsSendReqVO;
 import com.ccloud.module.system.enums.logger.LoginLogTypeEnum;
 import com.ccloud.module.system.service.auth.AdminAuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +40,29 @@ public class AuthController {
     @Operation(summary = "账号密码登录")
     public CommonResult<AuthLoginRespVO> login(@RequestBody @Valid AuthLoginReqVO reqVO, HttpServletRequest request) {
         return success(authService.login(reqVO, ServletUtils.getClientIP(request), ServletUtils.getUserAgent(request)));
+    }
+
+    @PostMapping("/send-sms-code")
+    @Operation(summary = "发送短信验证码", description = "用于短信登录与忘记密码")
+    public CommonResult<Boolean> sendSmsCode(@RequestBody @Valid AuthSmsSendReqVO reqVO, HttpServletRequest request) {
+        authService.sendSmsCode(reqVO, ServletUtils.getClientIP(request));
+        return success(true);
+    }
+
+    @PostMapping("/sms-login")
+    @Operation(summary = "短信验证码登录")
+    public CommonResult<AuthLoginRespVO> smsLogin(@RequestBody @Valid AuthSmsLoginReqVO reqVO,
+                                                  HttpServletRequest request) {
+        return success(authService.smsLogin(reqVO, ServletUtils.getClientIP(request),
+                ServletUtils.getUserAgent(request)));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "短信验证码重置密码", description = "重置后该账号已登录的会话全部下线")
+    public CommonResult<Boolean> resetPassword(@RequestBody @Valid AuthResetPasswordReqVO reqVO,
+                                               HttpServletRequest request) {
+        authService.resetPassword(reqVO, ServletUtils.getClientIP(request));
+        return success(true);
     }
 
     @PostMapping("/register")

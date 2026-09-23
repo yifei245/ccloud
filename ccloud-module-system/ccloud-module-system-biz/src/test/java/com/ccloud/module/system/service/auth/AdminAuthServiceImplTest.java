@@ -7,6 +7,13 @@ import com.ccloud.module.system.controller.admin.auth.vo.AuthLoginReqVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthLoginRespVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthPermissionInfoRespVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthRegisterReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthResetPasswordReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSmsLoginReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSmsSendReqVO;
+import com.ccloud.module.system.api.sms.dto.SmsCodeSendReqDTO;
+import com.ccloud.module.system.api.sms.dto.SmsCodeUseReqDTO;
+import com.ccloud.module.system.enums.sms.SmsSceneEnum;
+import com.ccloud.module.system.service.sms.SmsCodeService;
 import com.ccloud.module.system.controller.admin.permission.vo.role.RoleSaveReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.user.UserSaveReqVO;
 import com.ccloud.module.system.dal.dataobject.dict.DictDataDO;
@@ -54,6 +61,8 @@ import static com.ccloud.module.system.enums.ErrorCodeConstants.*;
 import static com.ccloud.module.system.service.oauth2.OAuth2TestData.CLIENT_ID;
 import static com.ccloud.module.system.service.oauth2.OAuth2TestData.client;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -87,6 +96,8 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
     @Resource
     private LoginLogMapper loginLogMapper;
     @Resource
+    private com.ccloud.module.system.dal.mysql.oauth2.OAuth2AccessTokenMapper accessTokenMapper;
+    @Resource
     private MenuMapper menuMapper;
     @Resource
     private RoleMapper roleMapper;
@@ -97,6 +108,10 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
     private TenantService tenantService;
     @MockitoBean
     private CaptchaService captchaService;
+    @MockitoBean
+    private SmsCodeService smsCodeService;
+
+    private static final String MOBILE = "13800000000";
 
     private Long userId;
 
@@ -107,6 +122,7 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
         reqVO.setUsername("admin");
         reqVO.setNickname("管理员");
         reqVO.setPassword("admin123");
+        reqVO.setMobile(MOBILE);
         userId = userService.createUser(reqVO);
         loginFailCountRedisDAO.delete(1L, "admin");
         when(captchaService.isEnabled()).thenReturn(false);
@@ -223,7 +239,8 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
 
     @Test
     void login_多租户下应按tenantName解析出正确的tenantId() {
-        TenantDO otherTenant = new TenantDO().setName("其他公司").setContactName("联系人").setStatus(0)
+        // 显式指定编号：空库单独运行本类时自增编号恰为 1，会与当前租户重合
+        TenantDO otherTenant = new TenantDO().setId(TENANT_ID + 1000).setName("其他公司").setContactName("联系人").setStatus(0)
                 .setPackageId(1L).setExpireTime(LocalDateTime.now().plusYears(1)).setAccountCount(10);
         tenantMapper.insert(otherTenant);
         when(tenantService.getTenantByName("其他公司")).thenReturn(otherTenant);
@@ -386,6 +403,110 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
         assertThat(authService.getPermissionInfo(-1L)).isNull();
     }
 
+    // ========== 短信验证码：发送、登录、重置密码 ==========
+
+    @Test
+    void sendSmsCode_手机号已注册时按场景发送() {
+        authService.sendSmsCode(smsSendReqVO(MOBILE, SmsSceneEnum.ADMIN_MEMBER_LOGIN), "10.0.0.1");
+
+        verify(smsCodeService).sendSmsCode(argThat((SmsCodeSendReqDTO dto) -> MOBILE.equals(dto.getMobile())
+                && SmsSceneEnum.ADMIN_MEMBER_LOGIN.getScene().equals(dto.getScene())
+                && "10.0.0.1".equals(dto.getCreateIp())));
+    }
+
+    @Test
+    void sendSmsCode_手机号未注册应拒绝且不发送() {
+        assertServiceException(() -> authService.sendSmsCode(smsSendReqVO("13900000000", SmsSceneEnum.ADMIN_MEMBER_LOGIN),
+                "10.0.0.1"), AUTH_MOBILE_NOT_EXISTS);
+        verifyNoInteractions(smsCodeService);
+    }
+
+    @Test
+    void sendSmsCode_只允许管理后台场景() {
+        assertThatThrownBy(() -> authService.sendSmsCode(smsSendReqVO(MOBILE, SmsSceneEnum.MEMBER_LOGIN), "10.0.0.1"))
+                .isInstanceOf(com.ccloud.framework.common.exception.ServiceException.class);
+        verifyNoInteractions(smsCodeService);
+    }
+
+    @Test
+    void sendSmsCode_开启图形验证码时须先通过校验_防止被刷短信() {
+        when(captchaService.isEnabled()).thenReturn(true);
+        doThrow(exception(AUTH_LOGIN_CAPTCHA_CODE_ERROR, "验证码不正确")).when(captchaService).validate(any(), any());
+
+        assertServiceException(() -> authService.sendSmsCode(smsSendReqVO(MOBILE, SmsSceneEnum.ADMIN_MEMBER_LOGIN),
+                "10.0.0.1"), AUTH_LOGIN_CAPTCHA_CODE_ERROR);
+        verifyNoInteractions(smsCodeService);
+    }
+
+    @Test
+    void smsLogin_验证码正确时签发令牌并记录短信登录日志() {
+        AuthLoginRespVO respVO = authService.smsLogin(smsLoginReqVO("123456"), "10.0.0.1", "JUnit");
+
+        assertThat(tokenService.checkAccessToken(respVO.getAccessToken()).getUserId()).isEqualTo(userId);
+        verify(smsCodeService).useSmsCode(argThat((SmsCodeUseReqDTO dto) -> MOBILE.equals(dto.getMobile())
+                && "123456".equals(dto.getCode())
+                && SmsSceneEnum.ADMIN_MEMBER_LOGIN.getScene().equals(dto.getScene())
+                && "10.0.0.1".equals(dto.getUsedIp())));
+        LoginLogDO log = loginLogMapper.selectList().get(0);
+        assertThat(log.getLogType()).isEqualTo(LoginLogTypeEnum.LOGIN_MOBILE.getType());
+        assertThat(log.getResult()).isEqualTo(LoginResultEnum.SUCCESS.getResult());
+        assertThat(log.getUsername()).isEqualTo("admin");
+    }
+
+    @Test
+    void smsLogin_验证码错误应抛异常且不签发() {
+        doThrow(exception(SMS_CODE_NOT_FOUND)).when(smsCodeService).useSmsCode(any());
+
+        assertServiceException(() -> authService.smsLogin(smsLoginReqVO("000000"), "10.0.0.1", "JUnit"),
+                SMS_CODE_NOT_FOUND);
+        assertThat(accessTokenMapper.selectCount()).as("不应签发令牌").isZero();
+        LoginLogDO log = loginLogMapper.selectList().get(0);
+        assertThat(log.getResult()).isEqualTo(LoginResultEnum.CAPTCHA_CODE_ERROR.getResult());
+        assertThat(log.getLogType()).isEqualTo(LoginLogTypeEnum.LOGIN_MOBILE.getType());
+    }
+
+    @Test
+    void smsLogin_手机号未注册应拒绝_管理员账号不自动注册() {
+        AuthSmsLoginReqVO reqVO = smsLoginReqVO("123456");
+        reqVO.setMobile("13900000000");
+        assertServiceException(() -> authService.smsLogin(reqVO, "10.0.0.1", "JUnit"), AUTH_MOBILE_NOT_EXISTS);
+    }
+
+    @Test
+    void smsLogin_用户被禁用应拒绝() {
+        userService.updateUserStatus(userId, CommonStatusEnum.DISABLE.getStatus());
+        assertServiceException(() -> authService.smsLogin(smsLoginReqVO("123456"), "10.0.0.1", "JUnit"),
+                AUTH_LOGIN_USER_DISABLED);
+    }
+
+    @Test
+    void resetPassword_验证码正确时修改密码并作废已有令牌() {
+        String oldToken = authService.login(loginReqVO("admin", "admin123"), "10.0.0.1", "JUnit").getAccessToken();
+        AuthResetPasswordReqVO reqVO = new AuthResetPasswordReqVO();
+        reqVO.setMobile(MOBILE);
+        reqVO.setCode("123456");
+        reqVO.setPassword("newpass1");
+
+        authService.resetPassword(reqVO, "10.0.0.1");
+
+        verify(smsCodeService).useSmsCode(argThat((SmsCodeUseReqDTO dto) ->
+                SmsSceneEnum.ADMIN_MEMBER_RESET_PASSWORD.getScene().equals(dto.getScene())));
+        assertThat(authService.authenticate("admin", "newpass1").getId()).isEqualTo(userId);
+        assertThat(tokenService.getAccessToken(oldToken)).isNull();
+    }
+
+    @Test
+    void resetPassword_验证码错误时不修改密码() {
+        doThrow(exception(SMS_CODE_NOT_FOUND)).when(smsCodeService).useSmsCode(any());
+        AuthResetPasswordReqVO reqVO = new AuthResetPasswordReqVO();
+        reqVO.setMobile(MOBILE);
+        reqVO.setCode("000000");
+        reqVO.setPassword("newpass1");
+
+        assertServiceException(() -> authService.resetPassword(reqVO, "10.0.0.1"), SMS_CODE_NOT_FOUND);
+        assertThat(authService.authenticate("admin", "admin123").getId()).isEqualTo(userId);
+    }
+
     // ========== 工具 ==========
 
     private static com.ccloud.framework.common.exception.ServiceException exception(
@@ -420,6 +541,20 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
         AuthLoginReqVO reqVO = new AuthLoginReqVO();
         reqVO.setUsername(username);
         reqVO.setPassword(password);
+        return reqVO;
+    }
+
+    private static AuthSmsSendReqVO smsSendReqVO(String mobile, SmsSceneEnum scene) {
+        AuthSmsSendReqVO reqVO = new AuthSmsSendReqVO();
+        reqVO.setMobile(mobile);
+        reqVO.setScene(scene.getScene());
+        return reqVO;
+    }
+
+    private static AuthSmsLoginReqVO smsLoginReqVO(String code) {
+        AuthSmsLoginReqVO reqVO = new AuthSmsLoginReqVO();
+        reqVO.setMobile(MOBILE);
+        reqVO.setCode(code);
         return reqVO;
     }
 }

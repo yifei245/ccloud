@@ -7,6 +7,13 @@ import com.ccloud.framework.common.util.collection.CollectionUtils;
 import com.ccloud.framework.common.util.object.BeanUtils;
 import com.ccloud.framework.tenant.core.context.TenantContextHolder;
 import com.ccloud.framework.tenant.core.util.TenantUtils;
+import com.ccloud.module.system.api.sms.dto.SmsCodeSendReqDTO;
+import com.ccloud.module.system.api.sms.dto.SmsCodeUseReqDTO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthResetPasswordReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSmsLoginReqVO;
+import com.ccloud.module.system.controller.admin.auth.vo.AuthSmsSendReqVO;
+import com.ccloud.module.system.enums.sms.SmsSceneEnum;
+import com.ccloud.module.system.service.sms.SmsCodeService;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthLoginReqVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthLoginRespVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthPermissionInfoRespVO;
@@ -41,6 +48,7 @@ import java.time.Duration;
 import java.util.*;
 
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.invalidParamException;
 import static com.ccloud.module.system.enums.ErrorCodeConstants.*;
 
 @Service
@@ -71,6 +79,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     private CaptchaService captchaService;
     @Resource
     private LoginFailCountRedisDAO loginFailCountRedisDAO;
+    @Resource
+    private SmsCodeService smsCodeService;
 
     /**
      * 管理后台登录使用的 OAuth2 客户端
@@ -186,6 +196,78 @@ public class AdminAuthServiceImpl implements AdminAuthService {
                 .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setUsername(username)
                 .setResult(result.getResult()).setUserIp(userIp == null ? "" : userIp)
                 .setUserAgent(userAgent == null ? "" : userAgent));
+    }
+
+    // ========== 短信验证码 ==========
+
+    /**
+     * 管理后台可用的短信场景，会员场景由会员服务发送
+     */
+    private static final Set<Integer> ADMIN_SMS_SCENES = Set.of(SmsSceneEnum.ADMIN_MEMBER_LOGIN.getScene(),
+            SmsSceneEnum.ADMIN_MEMBER_RESET_PASSWORD.getScene());
+
+    @Override
+    public void sendSmsCode(AuthSmsSendReqVO reqVO, String userIp) {
+        if (!ADMIN_SMS_SCENES.contains(reqVO.getScene())) {
+            throw invalidParamException("不支持的短信场景({})", reqVO.getScene());
+        }
+        // 短信按条计费，匿名接口不设图形验证码会被用来批量发短信
+        if (captchaService.isEnabled()) {
+            captchaService.validate(reqVO.getCaptchaUuid(), reqVO.getCaptchaCode());
+        }
+        if (userService.getUserByMobile(reqVO.getMobile()) == null) {
+            throw exception(AUTH_MOBILE_NOT_EXISTS);
+        }
+        SmsCodeSendReqDTO sendReqDTO = new SmsCodeSendReqDTO();
+        sendReqDTO.setMobile(reqVO.getMobile());
+        sendReqDTO.setScene(reqVO.getScene());
+        sendReqDTO.setCreateIp(userIp);
+        smsCodeService.sendSmsCode(sendReqDTO);
+    }
+
+    @Override
+    public AuthLoginRespVO smsLogin(AuthSmsLoginReqVO reqVO, String userIp, String userAgent) {
+        try {
+            smsCodeService.useSmsCode(buildSmsCodeUseReqDTO(reqVO.getMobile(), reqVO.getCode(),
+                    SmsSceneEnum.ADMIN_MEMBER_LOGIN, userIp));
+        } catch (RuntimeException ex) {
+            createLoginLog(0L, reqVO.getMobile(), LoginLogTypeEnum.LOGIN_MOBILE, LoginResultEnum.CAPTCHA_CODE_ERROR,
+                    userIp, userAgent);
+            throw ex;
+        }
+        AdminUserDO user = userService.getUserByMobile(reqVO.getMobile());
+        if (user == null) {
+            throw exception(AUTH_MOBILE_NOT_EXISTS);
+        }
+        if (CommonStatusEnum.isDisable(user.getStatus())) {
+            createLoginLog(user.getId(), user.getUsername(), LoginLogTypeEnum.LOGIN_MOBILE,
+                    LoginResultEnum.USER_DISABLED, userIp, userAgent);
+            throw exception(AUTH_LOGIN_USER_DISABLED);
+        }
+        return createTokenAfterLoginSuccess(user, LoginLogTypeEnum.LOGIN_MOBILE, userIp, userAgent);
+    }
+
+    @Override
+    public void resetPassword(AuthResetPasswordReqVO reqVO, String userIp) {
+        smsCodeService.useSmsCode(buildSmsCodeUseReqDTO(reqVO.getMobile(), reqVO.getCode(),
+                SmsSceneEnum.ADMIN_MEMBER_RESET_PASSWORD, userIp));
+        AdminUserDO user = userService.getUserByMobile(reqVO.getMobile());
+        if (user == null) {
+            throw exception(AUTH_MOBILE_NOT_EXISTS);
+        }
+        userService.resetUserPassword(user.getId(), reqVO.getPassword());
+        // 忘记密码往往意味着密码可能已泄露，已登录的会话一并下线
+        oauth2TokenService.removeAccessTokensByUser(user.getId(), UserTypeEnum.ADMIN.getValue());
+    }
+
+    private static SmsCodeUseReqDTO buildSmsCodeUseReqDTO(String mobile, String code, SmsSceneEnum scene,
+                                                         String userIp) {
+        SmsCodeUseReqDTO reqDTO = new SmsCodeUseReqDTO();
+        reqDTO.setMobile(mobile);
+        reqDTO.setCode(code);
+        reqDTO.setScene(scene.getScene());
+        reqDTO.setUsedIp(userIp);
+        return reqDTO;
     }
 
     // ========== 注册 ==========

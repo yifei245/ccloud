@@ -1,5 +1,8 @@
 package com.ccloud.framework.web.config;
 
+import com.ccloud.framework.operatelog.core.aop.OperateLogAspect;
+import com.ccloud.framework.operatelog.core.service.LoggerOperateLogFrameworkServiceImpl;
+import com.ccloud.framework.operatelog.core.service.OperateLogFrameworkService;
 import com.ccloud.framework.apilog.core.filter.ApiAccessLogFilter;
 import com.ccloud.framework.apilog.core.service.*;
 import com.ccloud.framework.common.enums.WebFilterOrderEnum;
@@ -52,6 +55,17 @@ public class CcloudWebAutoConfiguration {
     @ConditionalOnMissingBean
     public ApiErrorLogFrameworkService apiErrorLogFrameworkService() {
         return new LoggerApiErrorLogFrameworkServiceImpl();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public OperateLogFrameworkService operateLogFrameworkService() {
+        return new LoggerOperateLogFrameworkServiceImpl();
+    }
+
+    @Bean
+    public OperateLogAspect operateLogAspect(OperateLogFrameworkService operateLogFrameworkService) {
+        return new OperateLogAspect(operateLogFrameworkService);
     }
 
     @Bean

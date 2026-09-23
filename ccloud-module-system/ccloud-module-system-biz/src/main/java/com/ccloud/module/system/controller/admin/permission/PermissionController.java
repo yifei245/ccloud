@@ -1,5 +1,7 @@
 package com.ccloud.module.system.controller.admin.permission;
 
+import com.ccloud.framework.apilog.core.enums.OperateTypeEnum;
+import com.ccloud.framework.operatelog.core.annotation.OperateLog;
 import cn.hutool.core.collection.CollUtil;
 import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.security.core.util.SecurityFrameworkUtils;
@@ -47,6 +49,7 @@ public class PermissionController {
         return success(permissionService.getRoleMenuListByRoleId(roleId));
     }
 
+    @OperateLog(type = "权限管理", subType = "分配角色菜单", bizId = "#reqVO.roleId", operateType = OperateTypeEnum.UPDATE)
     @PostMapping("/assign-role-menu")
     @Operation(summary = "赋予角色菜单", description = "超出当前租户套餐范围的菜单会被忽略")
     @PreAuthorize("@ss.hasPermission('system:permission:assign-role-menu')")
@@ -58,6 +61,7 @@ public class PermissionController {
         return success(true);
     }
 
+    @OperateLog(type = "权限管理", subType = "分配角色数据权限", bizId = "#reqVO.roleId", operateType = OperateTypeEnum.UPDATE)
     @PostMapping("/assign-role-data-scope")
     @Operation(summary = "赋予角色数据权限")
     @PreAuthorize("@ss.hasPermission('system:permission:assign-role-data-scope')")
@@ -74,6 +78,7 @@ public class PermissionController {
         return success(permissionService.getUserRoleIdListByUserId(userId));
     }
 
+    @OperateLog(type = "权限管理", subType = "分配用户角色", bizId = "#reqVO.userId", operateType = OperateTypeEnum.UPDATE)
     @PostMapping("/assign-user-role")
     @Operation(summary = "赋予用户角色", description = "只有超级管理员才能分配超级管理员角色")
     @PreAuthorize("@ss.hasPermission('system:permission:assign-user-role')")

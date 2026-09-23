@@ -92,7 +92,7 @@ class RpcApiIntegrationTest extends BaseSystemDbAndRedisUnitTest {
      */
     private static final Map<String, String> PENDING_APIS = Map.of(
             "SocialClientApi", "Task 38", "SocialUserApi", "Task 38",
-            "OperateLogApi", "Task 38", "I18nMessageApi", "Task 38");
+            "I18nMessageApi", "Task 38");
 
     @Resource
     private ApplicationContext applicationContext;

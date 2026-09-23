@@ -97,6 +97,10 @@ class SystemServerApplicationTest {
         assertThat(ctx.getBeansOfType(com.ccloud.framework.mq.outbox.core.OutboxMessageService.class)).hasSize(1);
         // 短信等异步发送依赖 Stream 消费者，缺了它消息只进不出
         assertThat(ctx.getBean(com.ccloud.framework.mq.redis.core.RedisStreamMessageConsumer.class).isRunning()).isTrue();
+        // @OperateLog 须写入数据库，而不是框架默认的只打日志
+        assertThat(ctx.getBean(com.ccloud.framework.operatelog.core.service.OperateLogFrameworkService.class))
+                .isInstanceOf(com.ccloud.module.system.service.logger.OperateLogFrameworkServiceImpl.class);
+        assertThat(ctx.getBeansOfType(com.ccloud.framework.operatelog.core.aop.OperateLogAspect.class)).hasSize(1);
         // 多实例部署下站内信等实时推送必须经 Redis 广播，否则连接在其他节点上的用户收不到
         assertThat(ctx.getBean(com.ccloud.framework.websocket.core.sender.WebSocketMessageSender.class))
                 .isInstanceOf(com.ccloud.framework.websocket.core.sender.RedisWebSocketMessageSender.class);

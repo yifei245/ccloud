@@ -1,5 +1,7 @@
 package com.ccloud.module.system.controller.admin.user;
 
+import com.ccloud.framework.apilog.core.enums.OperateTypeEnum;
+import com.ccloud.framework.operatelog.core.annotation.OperateLog;
 import cn.hutool.core.collection.CollUtil;
 import com.ccloud.framework.apilog.core.annotation.ApiAccessLog;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
@@ -46,6 +48,7 @@ public class UserController {
     @Resource
     private DeptService deptService;
 
+    @OperateLog(type = "用户管理", subType = "创建用户", bizId = "#_ret.data", operateType = OperateTypeEnum.CREATE)
     @PostMapping("/create")
     @Operation(summary = "新增用户")
     @PreAuthorize("@ss.hasPermission('system:user:create')")
@@ -53,6 +56,7 @@ public class UserController {
         return success(userService.createUser(reqVO));
     }
 
+    @OperateLog(type = "用户管理", subType = "修改用户", bizId = "#reqVO.id", operateType = OperateTypeEnum.UPDATE)
     @PutMapping("/update")
     @Operation(summary = "修改用户", description = "不修改密码，重置密码请使用 update-password")
     @PreAuthorize("@ss.hasPermission('system:user:update')")
@@ -61,6 +65,7 @@ public class UserController {
         return success(true);
     }
 
+    @OperateLog(type = "用户管理", subType = "删除用户", bizId = "#id", operateType = OperateTypeEnum.DELETE)
     @DeleteMapping("/delete")
     @Operation(summary = "删除用户")
     @Parameter(name = "id", description = "编号", required = true, example = "1024")
@@ -70,6 +75,7 @@ public class UserController {
         return success(true);
     }
 
+    @OperateLog(type = "用户管理", subType = "批量删除用户", operateType = OperateTypeEnum.DELETE)
     @DeleteMapping("/delete-list")
     @Operation(summary = "批量删除用户")
     @Parameter(name = "ids", description = "编号列表", required = true, example = "1024,2048")
@@ -79,6 +85,7 @@ public class UserController {
         return success(true);
     }
 
+    @OperateLog(type = "用户管理", subType = "重置用户密码", bizId = "#reqVO.id", operateType = OperateTypeEnum.UPDATE)
     @PutMapping("/update-password")
     @Operation(summary = "重置用户密码")
     @PreAuthorize("@ss.hasPermission('system:user:update-password')")
@@ -87,6 +94,7 @@ public class UserController {
         return success(true);
     }
 
+    @OperateLog(type = "用户管理", subType = "修改用户状态", bizId = "#reqVO.id", operateType = OperateTypeEnum.UPDATE)
     @PutMapping("/update-status")
     @Operation(summary = "修改用户状态")
     @PreAuthorize("@ss.hasPermission('system:user:update')")

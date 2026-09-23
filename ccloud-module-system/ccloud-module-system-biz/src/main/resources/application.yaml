@@ -113,6 +113,13 @@ xxl:
       log-retention-days: 30
 
 ccloud:
+  sms-code:
+    expire-times: 10m
+    send-frequency: 1m
+    send-maximum-quantity-per-day: 10
+    begin-code: 100000
+    end-code: 999999
+    max-validate-fail-times: 5
   system:
     auth:
       # 管理后台登录使用的 OAuth2 客户端

@@ -248,5 +248,7 @@ INSERT INTO `system_i18n_message` (`id`, `locale`, `code`, `content`, `source`, 
   (237, 'zh_CN', 'error.code.1001002006', '只有超级管理员才能分配超级管理员角色', 1, '1'),
   (238, 'en_US', 'error.code.1001002006', 'Only a super administrator can assign the super administrator role', 1, '1'),
   (239, 'zh_CN', 'error.code.1001001006', '菜单为全部租户共用，只有系统租户可以维护', 1, '1'),
-  (240, 'en_US', 'error.code.1001001006', 'Menus are shared by all tenants and can only be maintained by the system tenant', 1, '1');
+  (240, 'en_US', 'error.code.1001001006', 'Menus are shared by all tenants and can only be maintained by the system tenant', 1, '1'),
+  (241, 'zh_CN', 'error.code.1001014006', '验证码错误次数过多，请重新获取', 1, '1'),
+  (242, 'en_US', 'error.code.1001014006', 'Too many incorrect verification code attempts, please request a new code', 1, '1');
 

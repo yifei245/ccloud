@@ -6,6 +6,8 @@ import com.ccloud.framework.common.util.object.BeanUtils;
 import com.ccloud.module.system.controller.admin.sms.vo.template.SmsTemplatePageReqVO;
 import com.ccloud.module.system.controller.admin.sms.vo.template.SmsTemplateRespVO;
 import com.ccloud.module.system.controller.admin.sms.vo.template.SmsTemplateSaveReqVO;
+import com.ccloud.module.system.controller.admin.sms.vo.template.SmsTemplateSendReqVO;
+import com.ccloud.module.system.service.sms.SmsSendService;
 import com.ccloud.module.system.service.sms.SmsTemplateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,6 +19,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import static com.ccloud.framework.common.pojo.CommonResult.success;
+import static com.ccloud.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 
 @Tag(name = "管理后台 - 短信模板")
 @RestController
@@ -26,6 +29,8 @@ public class SmsTemplateController {
 
     @Resource
     private SmsTemplateService smsTemplateService;
+    @Resource
+    private SmsSendService smsSendService;
 
     @PostMapping("/create")
     @Operation(summary = "创建短信模板")
@@ -64,5 +69,13 @@ public class SmsTemplateController {
     @PreAuthorize("@ss.hasPermission('system:sms-template:query')")
     public CommonResult<PageResult<SmsTemplateRespVO>> getSmsTemplatePage(@Valid SmsTemplatePageReqVO pageReqVO) {
         return success(BeanUtils.toBean(smsTemplateService.getSmsTemplatePage(pageReqVO), SmsTemplateRespVO.class));
+    }
+
+    @PostMapping("/send-sms")
+    @Operation(summary = "发送测试短信", description = "按模板真实发送，返回短信日志编号")
+    @PreAuthorize("@ss.hasPermission('system:sms-template:send-sms')")
+    public CommonResult<Long> sendSms(@Valid @RequestBody SmsTemplateSendReqVO sendReqVO) {
+        return success(smsSendService.sendSingleSmsToAdmin(sendReqVO.getMobile(), getLoginUserId(),
+                sendReqVO.getTemplateCode(), sendReqVO.getTemplateParams()));
     }
 }

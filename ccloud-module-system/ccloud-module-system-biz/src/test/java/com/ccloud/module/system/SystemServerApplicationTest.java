@@ -95,6 +95,8 @@ class SystemServerApplicationTest {
         assertThat(ctx.getBeansOfType(com.ccloud.framework.security.core.service.PermissionCacheRefresher.class)).hasSize(1);
         // 本地消息表的投递以 Redis 为条件，自动配置顺序不对时会被静默跳过，业务发消息直接报找不到 Bean
         assertThat(ctx.getBeansOfType(com.ccloud.framework.mq.outbox.core.OutboxMessageService.class)).hasSize(1);
+        // 短信等异步发送依赖 Stream 消费者，缺了它消息只进不出
+        assertThat(ctx.getBean(com.ccloud.framework.mq.redis.core.RedisStreamMessageConsumer.class).isRunning()).isTrue();
     }
 
     @Test

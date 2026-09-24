@@ -159,6 +159,28 @@ class RpcApiIntegrationTest extends BaseSystemDbAndRedisUnitTest {
                 .andExpect(jsonPath("$.data").doesNotExist());
     }
 
+    @Test
+    void removeAccessTokensByUser_应作废该用户在所有客户端的令牌_不影响其他用户与其他用户类型() throws Exception {
+        String mine = tokenService.createAccessToken(9001L, UserTypeEnum.MEMBER.getValue(), CLIENT_ID, null)
+                .getAccessToken();
+        String sameIdAdmin = tokenService.createAccessToken(9001L, UserTypeEnum.ADMIN.getValue(), CLIENT_ID, null)
+                .getAccessToken();
+        String other = tokenService.createAccessToken(9002L, UserTypeEnum.MEMBER.getValue(), CLIENT_ID, null)
+                .getAccessToken();
+
+        mockMvc.perform(delete("/rpc-api/system/oauth2/token/remove-by-user")
+                        .param("userId", "9001").param("userType", UserTypeEnum.MEMBER.getValue().toString()))
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data").value(true));
+
+        mockMvc.perform(get("/rpc-api/system/oauth2/token/check").param("accessToken", mine))
+                .andExpect(jsonPath("$.code").value(401));
+        mockMvc.perform(get("/rpc-api/system/oauth2/token/check").param("accessToken", sameIdAdmin))
+                .andExpect(jsonPath("$.code").value(0));
+        mockMvc.perform(get("/rpc-api/system/oauth2/token/check").param("accessToken", other))
+                .andExpect(jsonPath("$.code").value(0));
+    }
+
     // ========== 权限 ==========
 
     @Test

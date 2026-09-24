@@ -12,14 +12,27 @@ import org.springframework.security.config.annotation.web.configurers.AuthorizeH
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfiguration {
 
+    static final String[] ANONYMOUS_AUTH_URLS = {
+            "/app-api/member/auth/login",
+            "/app-api/member/auth/sms-login",
+            "/app-api/member/auth/send-sms-code",
+            "/app-api/member/auth/reset-password",
+            "/app-api/member/auth/social-auth-redirect",
+            "/app-api/member/auth/social-login",
+            "/app-api/member/auth/weixin-mini-app-login",
+            "/app-api/member/auth/refresh-token",
+            "/app-api/member/auth/logout"
+    };
+
     @Bean("memberAuthorizeRequestsCustomizer")
     public AuthorizeRequestsCustomizer authorizeRequestsCustomizer() {
         return new AuthorizeRequestsCustomizer() {
             @Override
             public void customize(AuthorizeHttpRequestsConfigurer<HttpSecurity>
                                           .AuthorizationManagerRequestMatcherRegistry registry) {
-                // C 端登录、注册、短信验证码、社交登录、刷新令牌
-                registry.requestMatchers("/app-api/member/auth/**").permitAll();
+                // 只放行登录前就要调用的接口。修改密码、绑定社交账号、获取用户信息等必须登录，
+                // 不能整体放行 /auth/** 后再靠接口内判空兜底——漏判一处就是越权
+                registry.requestMatchers(ANONYMOUS_AUTH_URLS).permitAll();
             }
         };
     }

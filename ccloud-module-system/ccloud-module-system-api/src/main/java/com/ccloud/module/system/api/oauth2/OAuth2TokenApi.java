@@ -39,6 +39,14 @@ public interface OAuth2TokenApi {
     @Operation(summary = "移除访问令牌")
     CommonResult<OAuth2AccessTokenRespDTO> removeAccessToken(@RequestParam("accessToken") String accessToken);
 
+    /**
+     * 作废用户在所有客户端的令牌。改密码、重置密码、禁用账号后调用，否则泄露的令牌在过期前仍然有效
+     */
+    @DeleteMapping(PREFIX + "/remove-by-user")
+    @Operation(summary = "移除用户的全部访问令牌")
+    CommonResult<Boolean> removeAccessTokensByUser(@RequestParam("userId") Long userId,
+                                                   @RequestParam("userType") Integer userType);
+
     @PutMapping(PREFIX + "/refresh")
     @Operation(summary = "刷新访问令牌")
     CommonResult<OAuth2AccessTokenRespDTO> refreshAccessToken(@RequestParam("refreshToken") String refreshToken,

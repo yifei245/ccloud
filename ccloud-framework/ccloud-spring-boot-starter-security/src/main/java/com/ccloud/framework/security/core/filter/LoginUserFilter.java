@@ -5,6 +5,7 @@ import com.ccloud.framework.security.config.SecurityProperties;
 import com.ccloud.framework.security.core.LoginUser;
 import com.ccloud.framework.security.core.util.InternalSignUtils;
 import com.ccloud.framework.security.core.util.SecurityFrameworkUtils;
+import com.ccloud.framework.web.core.util.WebFrameworkUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -98,6 +99,14 @@ public class LoginUserFilter extends OncePerRequestFilter {
             // 二次校验过期时间：网关侧有缓存，被吊销的令牌可能在缓存期内仍被放行
             if (loginUser.isExpired()) {
                 log.debug("[parseLoginUser] 身份已过期，已忽略。userId={}", loginUser.getId());
+                return null;
+            }
+            // 管理员与会员是两套编号会重复的用户体系：管理员令牌访问 /app-api 若被接受，
+            // 就会以同编号会员的身份读写数据，反之亦然
+            Integer expectedUserType = WebFrameworkUtils.getUserTypeByUrl(request.getRequestURI());
+            if (expectedUserType != null && !expectedUserType.equals(loginUser.getUserType())) {
+                log.warn("[parseLoginUser] 身份的用户类型({})与接口({})不符，已忽略。userId={}",
+                        loginUser.getUserType(), request.getRequestURI(), loginUser.getId());
                 return null;
             }
             return loginUser;

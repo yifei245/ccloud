@@ -5299,7 +5299,11 @@ INSERT INTO `system_i18n_message` (`id`, `locale`, `code`, `content`, `source`, 
   (259, 'zh_CN', 'error.code.1004004000', '用户收件地址不存在', 1, '1'),
   (260, 'en_US', 'error.code.1004004000', 'The shipping address does not exist', 1, '1'),
   (261, 'zh_CN', 'error.code.1004011000', '用户等级不存在', 1, '1'),
-  (262, 'en_US', 'error.code.1004011000', 'The member level does not exist', 1, '1');
+  (262, 'en_US', 'error.code.1004011000', 'The member level does not exist', 1, '1'),
+  (263, 'zh_CN', 'error.code.1004003008', '该社交账号未绑定用户，请先用手机号登录后绑定', 1, '1'),
+  (264, 'en_US', 'error.code.1004003008', 'The social account is not bound, please log in with your mobile number and bind it first', 1, '1'),
+  (265, 'zh_CN', 'error.code.1004003009', '登录失败次数过多，账号已锁定，请 {} 分钟后再试', 1, '1'),
+  (266, 'en_US', 'error.code.1004003009', 'Too many failed login attempts, the account is locked, please try again in {} minutes', 1, '1');
 
 
 -- >>>>>>>>>> dml/07-demo.sql <<<<<<<<<<

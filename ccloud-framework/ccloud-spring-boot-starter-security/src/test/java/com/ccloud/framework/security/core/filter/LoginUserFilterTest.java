@@ -209,6 +209,44 @@ class LoginUserFilterTest {
     }
 
     @Test
+    @DisplayName("管理员身份访问用户端接口应被忽略：两套用户编号会重复，放行即可冒充同编号的会员")
+    void adminIdentityOnAppApi_shouldNotEstablishIdentity() throws Exception {
+        long ts = System.currentTimeMillis();
+        String payload = encode(newLoginUser());
+        MockHttpServletRequest request = request(payload, InternalSignUtils.sign(payload, ts, SECRET), ts);
+        request.setRequestURI("/app-api/member/user/get");
+
+        Captured captured = run(request);
+
+        assertThat(captured.loginUser()).isNull();
+        assertThat(captured.chainInvoked()).isTrue();
+    }
+
+    @Test
+    @DisplayName("会员身份访问管理端接口应被忽略")
+    void memberIdentityOnAdminApi_shouldNotEstablishIdentity() throws Exception {
+        LoginUser member = newLoginUser();
+        member.setUserType(UserTypeEnum.MEMBER.getValue());
+        long ts = System.currentTimeMillis();
+        String payload = encode(member);
+
+        assertThat(run(request(payload, InternalSignUtils.sign(payload, ts, SECRET), ts)).loginUser()).isNull();
+    }
+
+    @Test
+    @DisplayName("会员身份访问用户端接口应建立身份")
+    void memberIdentityOnAppApi_shouldEstablishIdentity() throws Exception {
+        LoginUser member = newLoginUser();
+        member.setUserType(UserTypeEnum.MEMBER.getValue());
+        long ts = System.currentTimeMillis();
+        String payload = encode(member);
+        MockHttpServletRequest request = request(payload, InternalSignUtils.sign(payload, ts, SECRET), ts);
+        request.setRequestURI("/app-api/member/user/get");
+
+        assertThat(run(request).loginUser()).isNotNull();
+    }
+
+    @Test
     @DisplayName("请求处理结束后必须清理上下文，避免容器线程复用时身份残留")
     void contextMustBeClearedAfterRequest() throws Exception {
         long ts = System.currentTimeMillis();

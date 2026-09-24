@@ -1,0 +1,4 @@
+# 本地开发：Nacos 不可用时 optional 导入会跳过，但路由依赖注册中心发现下游服务。
+logging:
+  level:
+    com.ccloud.gateway: debug

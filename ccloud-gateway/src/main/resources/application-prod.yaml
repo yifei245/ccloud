@@ -1,0 +1,11 @@
+# 生产环境：跨域来源必须显式配置，不提供默认值
+ccloud:
+  gateway:
+    cors:
+      allowed-origin-patterns: ${CCLOUD_CORS_ALLOWED_ORIGIN_PATTERNS}
+
+logging:
+  file:
+    name: ${user.home}/logs/${spring.application.name}.log
+  level:
+    com.ccloud: info

@@ -1,0 +1,57 @@
+# ccloud-gateway 基础配置。与环境无关的项放这里，环境相关项放 application-{profile}.yaml。
+# Nacos 中的 ccloud-common.yaml / ccloud-gateway.yaml 优先级高于本文件。
+# 路由规则在 RouteConfiguration 中以代码定义（便于测试与审查），不在配置中声明。
+server:
+  port: 48080
+
+spring:
+  application:
+    name: ccloud-gateway
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  main:
+    # 网关基于 WebFlux，classpath 上即使混入 Servlet 依赖也不能以 Servlet 方式启动
+    web-application-type: reactive
+  config:
+    import:
+      - optional:nacos:ccloud-common.yaml
+      - optional:nacos:${spring.application.name}.yaml
+  cloud:
+    nacos:
+      server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        metadata:
+          management.context-path: /actuator
+      config:
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 3000
+            response-timeout: 30s
+  jackson:
+    serialization:
+      write-dates-as-timestamps: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # 网关的 actuator 直接暴露在公网入口上，只开放健康检查与基本信息
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+ccloud:
+  gateway:
+    cors:
+      # 生产环境建议收窄为自己的前端域名，如 https://*.example.com
+      allowed-origin-patterns: ${CCLOUD_CORS_ALLOWED_ORIGIN_PATTERNS:*}

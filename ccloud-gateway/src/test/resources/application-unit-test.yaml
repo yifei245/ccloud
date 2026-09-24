@@ -11,3 +11,17 @@ spring:
     service-registry:
       auto-registration:
         enabled: false
+
+ccloud:
+  security:
+    internal-sign-secret: unit-test-secret
+  open:
+    apps:
+      - app-id: demo-app
+        app-secret: demo-secret
+        tenant-id: 7
+        enabled: true
+      - app-id: disabled-app
+        app-secret: disabled-secret
+        tenant-id: 7
+        enabled: false

@@ -12,7 +12,10 @@ import org.springframework.security.config.annotation.web.configurers.AuthorizeH
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfiguration {
 
-    static final String[] ANONYMOUS_AUTH_URLS = {
+    /**
+     * 可匿名访问的接口。网关的 ccloud.security.ignore-urls 须与此一致，由 GatewayWhitelistConsistencyTest 校验
+     */
+    public static final String[] ANONYMOUS_AUTH_URLS = {
             "/app-api/member/auth/login",
             "/app-api/member/auth/sms-login",
             "/app-api/member/auth/send-sms-code",

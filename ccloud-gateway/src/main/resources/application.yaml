@@ -39,6 +39,12 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: true
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      password: ${REDIS_PASSWORD:}
 
 management:
   endpoints:
@@ -51,6 +57,54 @@ management:
       show-details: never
 
 ccloud:
+  security:
+    # 与业务服务共享的内部签名密钥，缺失时网关启动失败
+    internal-sign-secret: ${CCLOUD_INTERNAL_SIGN_SECRET:}
+    # 可匿名访问的接口。须与各服务 SecurityConfiguration 的匿名接口一致（由 system、member 的一致性测试校验）：
+    # 少配则该接口经网关不可用，多配则网关失去一层保护。携带有效令牌时仍会下发身份
+    ignore-urls:
+      # ---- system ----
+      - /admin-api/system/auth/login
+      - /admin-api/system/auth/sms-login
+      - /admin-api/system/auth/send-sms-code
+      - /admin-api/system/auth/reset-password
+      - /admin-api/system/auth/register
+      - /admin-api/system/auth/refresh-token
+      - /admin-api/system/auth/logout
+      - /admin-api/system/auth/social-auth-redirect
+      - /admin-api/system/auth/social-login
+      - /admin-api/system/auth/social-bind-login
+      - /admin-api/system/captcha/**
+      - /admin-api/system/tenant/get-id-by-name
+      - /admin-api/system/tenant/get-by-website
+      - /admin-api/system/oauth2/token
+      - /admin-api/system/oauth2/check-token
+      - GET /admin-api/system/sso/authorize
+      - GET /admin-api/system/sso/logout
+      - /admin-api/system/dict-data/simple-list
+      # ---- member ----
+      - /app-api/member/auth/login
+      - /app-api/member/auth/sms-login
+      - /app-api/member/auth/send-sms-code
+      - /app-api/member/auth/reset-password
+      - /app-api/member/auth/social-auth-redirect
+      - /app-api/member/auth/social-login
+      - /app-api/member/auth/weixin-mini-app-login
+      - /app-api/member/auth/refresh-token
+      - /app-api/member/auth/logout
+      # ---- 接口文档（是否开放由各服务的 springdoc 开关决定） ----
+      - /doc.html
+      - /webjars/**
+      - /swagger-ui/**
+      - /v3/api-docs/**
+      - /*/v3/api-docs/**
+    # 登出后立即清除网关上该令牌的缓存
+    logout-urls:
+      - /admin-api/system/auth/logout
+      - /admin-api/system/sso/logout
+      - /app-api/member/auth/logout
+    token-cache-ttl: 60s
+    token-cache-max-size: 10000
   gateway:
     cors:
       # 生产环境建议收窄为自己的前端域名，如 https://*.example.com

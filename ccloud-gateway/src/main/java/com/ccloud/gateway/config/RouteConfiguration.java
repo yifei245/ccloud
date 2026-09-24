@@ -4,6 +4,7 @@ import com.ccloud.framework.common.exception.enums.GlobalErrorCodeConstants;
 import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.gateway.util.WebFrameworkUtils;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.OrderedGatewayFilter;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
@@ -56,8 +57,12 @@ public class RouteConfiguration {
         return "lb://ccloud-" + module + "-server";
     }
 
+    /**
+     * 排在所有全局过滤器之前：内部接口不论是否携带令牌都拒绝，不能先因为未登录返回 401
+     */
     private static GatewayFilter forbidden() {
-        return (exchange, chain) -> WebFrameworkUtils.writeJSON(exchange, HttpStatus.FORBIDDEN,
-                CommonResult.error(GlobalErrorCodeConstants.FORBIDDEN.getCode(), "禁止从外部访问内部接口"));
+        return new OrderedGatewayFilter((exchange, chain) -> WebFrameworkUtils.writeJSON(exchange, HttpStatus.FORBIDDEN,
+                CommonResult.error(GlobalErrorCodeConstants.FORBIDDEN.getCode(), "禁止从外部访问内部接口")),
+                Ordered.HIGHEST_PRECEDENCE);
     }
 }

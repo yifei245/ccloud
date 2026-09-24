@@ -16,39 +16,48 @@ import org.springframework.security.config.annotation.web.configurers.AuthorizeH
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfiguration {
 
+    /**
+     * 可匿名访问的接口（不限方法）。网关的 ccloud.security.ignore-urls 须与此一致，由 GatewayWhitelistConsistencyTest 校验
+     */
+    public static final String[] ANONYMOUS_URLS = {
+            // 登录、短信登录、发送验证码、忘记密码、注册、社交登录
+            "/admin-api/system/auth/login",
+            "/admin-api/system/auth/sms-login",
+            "/admin-api/system/auth/send-sms-code",
+            "/admin-api/system/auth/reset-password",
+            "/admin-api/system/auth/register",
+            "/admin-api/system/auth/refresh-token",
+            "/admin-api/system/auth/logout",
+            "/admin-api/system/auth/social-auth-redirect",
+            "/admin-api/system/auth/social-login",
+            "/admin-api/system/auth/social-bind-login",
+            "/admin-api/system/captcha/**",
+            // 登录页需要先按租户名或域名解析出租户编号
+            "/admin-api/system/tenant/get-id-by-name",
+            "/admin-api/system/tenant/get-by-website",
+            // OAuth2 令牌、校验端点由客户端凭据自行校验（授权端点 /authorize 仍要求用户登录）
+            "/admin-api/system/oauth2/token",
+            "/admin-api/system/oauth2/check-token",
+            // 字典数据在登录页也要用（性别、终端等下拉框）
+            "/admin-api/system/dict-data/simple-list"
+    };
+
+    /**
+     * 只有 GET 可匿名：SSO 授权检查（未登录返回 needLogin）与统一登出（幂等）；确认授权 POST /sso/authorize 仍要求登录
+     */
+    public static final String[] ANONYMOUS_GET_URLS = {
+            "/admin-api/system/sso/authorize",
+            "/admin-api/system/sso/logout"
+    };
+
     @Bean("systemAuthorizeRequestsCustomizer")
     public AuthorizeRequestsCustomizer authorizeRequestsCustomizer() {
         return new AuthorizeRequestsCustomizer() {
             @Override
             public void customize(AuthorizeHttpRequestsConfigurer<HttpSecurity>
                                           .AuthorizationManagerRequestMatcherRegistry registry) {
-                // 登录、短信登录、发送验证码、忘记密码、注册、社交登录
-                registry.requestMatchers(
-                        "/admin-api/system/auth/login",
-                        "/admin-api/system/auth/sms-login",
-                        "/admin-api/system/auth/send-sms-code",
-                        "/admin-api/system/auth/reset-password",
-                        "/admin-api/system/auth/register",
-                        "/admin-api/system/auth/refresh-token",
-                        "/admin-api/system/auth/logout",
-                        "/admin-api/system/auth/social-auth-redirect",
-                        "/admin-api/system/auth/social-login",
-                        "/admin-api/system/auth/social-bind-login",
-                        "/admin-api/system/captcha/**").permitAll();
-                // 登录页需要先按租户名或域名解析出租户编号
-                registry.requestMatchers(
-                        "/admin-api/system/tenant/get-id-by-name",
-                        "/admin-api/system/tenant/get-by-website").permitAll();
-                // OAuth2 令牌、撤销、校验端点由客户端凭据自行校验（授权端点 /authorize 仍要求用户登录）
-                registry.requestMatchers(
-                        "/admin-api/system/oauth2/token",
-                        "/admin-api/system/oauth2/check-token").permitAll();
-                // SSO 授权检查（未登录返回 needLogin）与统一登出（幂等）；确认授权 POST /sso/authorize 仍要求登录
-                registry.requestMatchers(HttpMethod.GET,
-                        "/admin-api/system/sso/authorize",
-                        "/admin-api/system/sso/logout").permitAll();
-                // 字典数据在登录页也要用（性别、终端等下拉框）
-                registry.requestMatchers("/admin-api/system/dict-data/simple-list").permitAll();
+                registry.requestMatchers(ANONYMOUS_URLS).permitAll();
+                registry.requestMatchers(HttpMethod.GET, ANONYMOUS_GET_URLS).permitAll();
             }
         };
     }

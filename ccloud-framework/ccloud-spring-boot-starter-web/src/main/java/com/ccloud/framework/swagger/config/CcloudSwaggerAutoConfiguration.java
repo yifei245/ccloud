@@ -11,7 +11,10 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springdoc.core.customizers.OpenApiBuilderCustomizer;
+import com.github.xiaoymin.knife4j.spring.configuration.Knife4jProperties;
+import com.github.xiaoymin.knife4j.spring.extension.Knife4jOpenApiCustomizer;
 import org.springdoc.core.models.GroupedOpenApi;
+import org.springdoc.core.properties.SpringDocConfigProperties;
 import org.springdoc.core.properties.SpringDocConfigProperties;
 import org.springdoc.core.providers.JavadocProvider;
 import org.springdoc.core.service.OpenAPIService;
@@ -32,7 +35,8 @@ import java.util.List;
  * <p>按接口族分组：admin / app / open / rpc。分组的意义在于，
  * 前端同学打开文档时只看自己那一组，不必在几百个接口里翻找。
  */
-@AutoConfiguration
+// 先于 Knife4j 的自动配置注册 knife4jOpenApiCustomizer，使其 @ConditionalOnMissingBean 不再创建原版
+@AutoConfiguration(beforeName = "com.github.xiaoymin.knife4j.spring.configuration.Knife4jAutoConfiguration")
 @ConditionalOnClass({OpenAPI.class})
 @EnableConfigurationProperties(SwaggerProperties.class)
 @ConditionalOnProperty(prefix = "springdoc.api-docs", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -67,6 +71,23 @@ public class CcloudSwaggerAutoConfiguration {
     }
 
     private static final String HttpHeaders_AUTHORIZATION = "Authorization";
+
+    /**
+     * 替换 Knife4j 4.5.0 的 {@link Knife4jOpenApiCustomizer}：它按旧版 springdoc 编译，调用的
+     * {@code SpringDocConfigProperties.getGroupConfigs()} 在 springdoc 2.9 中返回类型已由 List 改为 Set，
+     * 生成任何分组文档都会抛 NoSuchMethodError。该定制器只负责给标签加排序扩展，去掉不影响文档内容。
+     * Knife4j 发布兼容版本后可删除
+     */
+    @Bean
+    @ConditionalOnClass(Knife4jOpenApiCustomizer.class)
+    public Knife4jOpenApiCustomizer knife4jOpenApiCustomizer(SpringDocConfigProperties springDocConfigProperties) {
+        return new Knife4jOpenApiCustomizer(new Knife4jProperties(), springDocConfigProperties) {
+            @Override
+            public void customise(OpenAPI openApi) {
+                // 不做任何处理，见方法注释
+            }
+        };
+    }
 
     @Bean
     public GroupedOpenApi adminGroupedOpenApi(SwaggerProperties properties) {

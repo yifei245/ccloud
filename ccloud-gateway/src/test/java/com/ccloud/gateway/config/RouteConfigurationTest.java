@@ -135,6 +135,17 @@ class RouteConfigurationTest extends GatewayIntegrationTestSupport {
                 .expectBody().jsonPath("$.code").isEqualTo(503);
     }
 
+    /**
+     * 实例宕机或重启中：同属"服务暂不可用"，应与无实例一样返回 503，而不是 500 让人误以为是网关缺陷
+     */
+    @Test
+    void 下游实例连接失败应返回503的CommonResult() {
+        webClient.get().uri("/admin-api/trade/order/page").headers(h -> h.setBearerAuth(adminToken())).exchange()
+                .expectStatus().isEqualTo(503)
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody().jsonPath("$.code").isEqualTo(503);
+    }
+
     // ========== CORS ==========
 
     @Test

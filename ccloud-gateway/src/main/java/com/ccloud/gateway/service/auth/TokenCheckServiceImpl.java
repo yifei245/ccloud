@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 经 WebClient 直调 system 的令牌校验 RPC（不用 Feign：Feign 是阻塞式调用，会占住 WebFlux 的事件循环线程）。
@@ -57,8 +58,13 @@ public class TokenCheckServiceImpl implements TokenCheckService {
     }
 
     private Mono<Optional<LoginUser>> get(String accessToken) {
-        // suppressCancel：多个请求共享同一个 future，一个请求取消不能连带取消其他请求的校验
-        return Mono.fromFuture(() -> cache.get(accessToken, (token, executor) -> remoteCheck(token).toFuture()), true);
+        return Mono.defer(() -> {
+            CompletableFuture<Optional<LoginUser>> future =
+                    cache.get(accessToken, (token, executor) -> remoteCheck(token).toFuture());
+            // suppressCancel：多个请求共享同一个 future，一个请求取消不能连带取消其他请求的校验。
+            // 失败时立即移除：Caffeine 对异常结束的 future 是异步移除的，system 恢复后紧接着的请求仍可能拿到旧的失败结果
+            return Mono.fromFuture(future, true).doOnError(e -> cache.asMap().remove(accessToken, future));
+        });
     }
 
     private Mono<Optional<LoginUser>> remoteCheck(String accessToken) {

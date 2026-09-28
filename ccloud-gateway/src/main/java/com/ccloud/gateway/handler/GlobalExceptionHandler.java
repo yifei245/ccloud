@@ -33,10 +33,32 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
                     exchange.getRequest().getURI().getRawPath(), status);
             return WebFrameworkUtils.writeJSON(exchange, status, CommonResult.error(status.value(), message(status)));
         }
+        // 下游实例宕机、重启中或响应超时：与无可用实例一样属于"服务暂不可用"
+        HttpStatus downstreamStatus = downstreamFailureStatus(ex);
+        if (downstreamStatus != null) {
+            log.warn("[handle] {} {} 下游服务不可用：{}", exchange.getRequest().getMethod(),
+                    exchange.getRequest().getURI().getRawPath(), ex.toString());
+            return WebFrameworkUtils.writeJSON(exchange, downstreamStatus,
+                    CommonResult.error(downstreamStatus.value(), message(downstreamStatus)));
+        }
         log.error("[handle] {} {} 网关异常", exchange.getRequest().getMethod(),
                 exchange.getRequest().getURI().getRawPath(), ex);
         return WebFrameworkUtils.writeJSON(exchange, HttpStatus.INTERNAL_SERVER_ERROR,
                 CommonResult.error(GlobalErrorCodeConstants.INTERNAL_SERVER_ERROR));
+    }
+
+    private static HttpStatus downstreamFailureStatus(Throwable ex) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause() == cause ? null : cause.getCause()) {
+            if (cause instanceof java.net.ConnectException || cause instanceof java.net.NoRouteToHostException
+                    || cause instanceof java.net.UnknownHostException) {
+                return HttpStatus.SERVICE_UNAVAILABLE;
+            }
+            if (cause instanceof java.util.concurrent.TimeoutException
+                    || cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
+                return HttpStatus.GATEWAY_TIMEOUT;
+            }
+        }
+        return null;
     }
 
     /**

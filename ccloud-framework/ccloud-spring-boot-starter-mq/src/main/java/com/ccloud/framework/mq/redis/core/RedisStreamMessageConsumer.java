@@ -4,7 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.ccloud.framework.common.util.json.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
-import org.springframework.data.redis.RedisSystemException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -88,11 +88,22 @@ public class RedisStreamMessageConsumer implements SmartLifecycle {
         try {
             redisTemplate.execute(connection -> connection.streamCommands().xGroupCreate(
                     RedisSerializer.string().serialize(streamKey), group, ReadOffset.from("0"), true), true);
-        } catch (RedisSystemException e) {
-            if (!StrUtil.contains(String.valueOf(e.getMostSpecificCause().getMessage()), "BUSYGROUP")) {
+        } catch (DataAccessException e) {
+            // 消费组已存在（服务重启）。不同客户端包装方式不同：Lettuce 抛 RedisSystemException，
+            // Redisson 抛 InvalidDataAccessApiUsageException，只能按原因链中的 BUSYGROUP 判断
+            if (!isBusyGroup(e)) {
                 throw e;
             }
         }
+    }
+
+    private static boolean isBusyGroup(Throwable e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause() == cause ? null : cause.getCause()) {
+            if (StrUtil.contains(cause.getMessage(), "BUSYGROUP")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private <T> void dispatch(AbstractRedisStreamMessageListener<T> listener, MapRecord<String, String, String> record) {

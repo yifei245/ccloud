@@ -12,6 +12,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+import org.redisson.spring.data.connection.RedissonConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -138,6 +142,36 @@ class RedisStreamConsumerIntegrationTest {
         await().atMost(Duration.ofSeconds(10)).until(() -> listener.received.size() == 1);
         assertThat(listener.messageIds).containsExactly("good");
         await().atMost(Duration.ofSeconds(5)).until(() -> pendingCount("demo.poison") == 0);
+    }
+
+    /**
+     * 服务重启时消费组已存在。应用实际使用 Redisson 的连接工厂，它抛出的异常类型与 Lettuce 不同
+     * （InvalidDataAccessApiUsageException 而非 RedisSystemException），只按 Lettuce 判断会让服务第二次启动失败
+     */
+    @Test
+    void 使用Redisson连接时消费组已存在也应正常启动_服务重启场景() {
+        Config config = new Config();
+        config.useSingleServer().setAddress("redis://" + REDIS.getHost() + ":" + REDIS.getMappedPort(6379));
+        RedissonClient redisson = Redisson.create(config);
+        try {
+            StringRedisTemplate redissonTemplate = new StringRedisTemplate(new RedissonConnectionFactory(redisson));
+            RecordingListener listener = new RecordingListener("demo.restart", 0);
+
+            RedisStreamMessageConsumer first = new RedisStreamMessageConsumer(redissonTemplate, GROUP, List.of(listener));
+            first.start();
+            first.stop();
+            RedisStreamMessageConsumer second = new RedisStreamMessageConsumer(redissonTemplate, GROUP, List.of(listener));
+            second.start();
+            try {
+                new RedisStreamMessageSender(redissonTemplate).send("demo.restart", "m1",
+                        JsonUtils.toJsonString(new DemoMessage(6L, "restart")));
+                await().atMost(Duration.ofSeconds(10)).until(() -> listener.received.size() == 1);
+            } finally {
+                second.stop();
+            }
+        } finally {
+            redisson.shutdown();
+        }
     }
 
     private void start(AbstractRedisStreamMessageListener<?> listener) {

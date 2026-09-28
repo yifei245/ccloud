@@ -57,6 +57,8 @@ public abstract class GatewayIntegrationTestSupport {
                 .forEach((service, server) -> registry.add(
                         "spring.cloud.discovery.client.simple.instances." + service + "[0].uri",
                         () -> "http://127.0.0.1:" + server.port()));
+        // 已注册但端口不通：模拟下游实例宕机、重启中
+        registry.add("spring.cloud.discovery.client.simple.instances.ccloud-trade-server[0].uri", () -> "http://127.0.0.1:1");
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
     }

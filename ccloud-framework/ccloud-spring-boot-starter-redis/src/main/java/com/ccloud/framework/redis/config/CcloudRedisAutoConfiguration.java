@@ -4,6 +4,8 @@ import com.ccloud.framework.common.util.json.JsonUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.redisson.config.BaseConfig;
+import org.redisson.spring.starter.RedissonAutoConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -52,5 +54,32 @@ public class CcloudRedisAutoConfiguration {
     @Bean
     public StringRedisSerializer stringRedisSerializer() {
         return new StringRedisSerializer();
+    }
+
+    /**
+     * 配置文件常写 {@code password: ${REDIS_PASSWORD:}}，未设置环境变量时绑定为空串。
+     * Lettuce 把空串当作无密码，Redisson 却会发送 {@code AUTH ""}，无密码的 Redis 直接拒绝、服务启动失败。
+     * 在 Redisson 建立连接前把空白的密码与用户名清空
+     */
+    @Bean
+    public RedissonAutoConfigurationCustomizer blankRedisPasswordCustomizer() {
+        return config -> {
+            if (config.isClusterConfig()) {
+                clearBlankCredentials(config.useClusterServers());
+            } else if (config.isSentinelConfig()) {
+                clearBlankCredentials(config.useSentinelServers());
+            } else if (config.isSingleConfig()) {
+                clearBlankCredentials(config.useSingleServer());
+            }
+        };
+    }
+
+    private static void clearBlankCredentials(BaseConfig<?> serverConfig) {
+        if (serverConfig.getPassword() != null && serverConfig.getPassword().isBlank()) {
+            serverConfig.setPassword(null);
+        }
+        if (serverConfig.getUsername() != null && serverConfig.getUsername().isBlank()) {
+            serverConfig.setUsername(null);
+        }
     }
 }

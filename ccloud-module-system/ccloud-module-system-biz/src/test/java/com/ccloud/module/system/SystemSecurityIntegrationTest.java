@@ -160,6 +160,23 @@ class SystemSecurityIntegrationTest {
         assertThat(ctx.getBeansOfType(DictFrameworkService.class)).as("Excel 字典翻译").hasSize(1);
     }
 
+    // ========== 接口文档 ==========
+
+    /**
+     * 网关文档聚合页按分组拉取各服务的 /v3/api-docs/{分组}。Knife4j 与 springdoc 版本不匹配时
+     * 生成文档会抛 NoSuchMethodError，只有真正请求该端点才能发现
+     */
+    @Test
+    void 各分组接口文档应可生成() throws Exception {
+        for (String group : new String[]{"admin", "app", "open"}) {
+            mockMvc.perform(get("/v3/api-docs/" + group))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                    .andExpect(jsonPath("$.openapi").exists());
+        }
+        mockMvc.perform(get("/v3/api-docs/admin"))
+                .andExpect(jsonPath("$.paths['/admin-api/system/user/page']").exists());
+    }
+
     private MockHttpServletRequestBuilder asUser(MockHttpServletRequestBuilder builder, long userId, long tenantId) {
         return asUser(builder, userId, tenantId, tenantId);
     }

@@ -16,7 +16,11 @@ import org.springframework.context.annotation.Bean;
 @ConditionalOnProperty(prefix = "xxl.job", value = "enabled", matchIfMissing = true)
 public class CcloudJobAutoConfiguration {
 
-    @Bean(initMethod = "start", destroyMethod = "destroy")
+    /**
+     * 不声明 initMethod / destroyMethod：XxlJobSpringExecutor 在 afterSingletonsInstantiated 中登记任务处理器后
+     * 自行 start，并实现 DisposableBean 自行 destroy。重复声明会让内嵌服务启动两次（第二次端口冲突）
+     */
+    @Bean
     public XxlJobSpringExecutor xxlJobSpringExecutor(XxlJobProperties properties) {
         XxlJobSpringExecutor executor = new XxlJobSpringExecutor();
         executor.setAdminAddresses(properties.getAdmin().getAddresses());

@@ -1,7 +1,9 @@
 package com.ccloud.gateway.util;
 
+import com.ccloud.gateway.filter.security.LoginUser;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.web.server.ServerWebExchange;
 
 /**
  * 网关（WebFlux）侧的安全工具
@@ -10,7 +12,20 @@ public final class SecurityFrameworkUtils {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
+    /**
+     * 已通过令牌校验的登录用户，供后续过滤器（如限流按用户计数）读取
+     */
+    private static final String LOGIN_USER_ATTRIBUTE = "ccloud.login_user";
+
     private SecurityFrameworkUtils() {
+    }
+
+    public static void setLoginUser(ServerWebExchange exchange, LoginUser loginUser) {
+        exchange.getAttributes().put(LOGIN_USER_ATTRIBUTE, loginUser);
+    }
+
+    public static LoginUser getLoginUser(ServerWebExchange exchange) {
+        return exchange.getAttribute(LOGIN_USER_ATTRIBUTE);
     }
 
     /**

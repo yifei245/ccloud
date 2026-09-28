@@ -21,7 +21,17 @@ ccloud:
         app-secret: demo-secret
         tenant-id: 7
         enabled: true
+      - app-id: limited-app
+        app-secret: limited-secret
+        tenant-id: 7
+        rate-limit: 1
       - app-id: disabled-app
         app-secret: disabled-secret
         tenant-id: 7
         enabled: false
+  gateway:
+    rate-limit:
+      routes:
+        promotion:
+          replenish-rate: 1
+          burst-capacity: 2

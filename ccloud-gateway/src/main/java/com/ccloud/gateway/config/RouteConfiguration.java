@@ -29,7 +29,7 @@ public class RouteConfiguration {
     /**
      * 业务模块，对应服务名 {@code ccloud-{模块}-server}。新增模块在此登记
      */
-    static final List<String> MODULES = List.of("system", "infra", "member", "open",
+    public static final List<String> MODULES = List.of("system", "infra", "member", "open",
             "pay", "bpm", "product", "trade", "promotion", "ai");
 
     static final String RPC_API_PATTERN = "/rpc-api/**";
@@ -53,7 +53,7 @@ public class RouteConfiguration {
         return routes.build();
     }
 
-    static String serviceUri(String module) {
+    public static String serviceUri(String module) {
         return "lb://ccloud-" + module + "-server";
     }
 

@@ -46,6 +46,11 @@ public class OpenApiSignatureFilter implements GlobalFilter, Ordered {
     public static final String HEADER_NONCE = "X-Open-Nonce";
     public static final String HEADER_SIGN = "X-Open-Sign";
 
+    /**
+     * 验签通过的应用，供限流按应用计数
+     */
+    public static final String OPEN_APP_ATTRIBUTE = "ccloud.open_app";
+
     private static final String OPEN_API_PREFIX = "/open-api/";
     private static final String NONCE_KEY = "ccloud:open:nonce:%s:%s";
 
@@ -121,7 +126,9 @@ public class OpenApiSignatureFilter implements GlobalFilter, Ordered {
                                     headers.set(InternalHeaderWriter.HEADER_TENANT_ID, String.valueOf(app.getTenantId()));
                                 }
                             }).build();
-                            yield chain.filter(exchange.mutate().request(forwarded).build());
+                            ServerWebExchange verified = exchange.mutate().request(forwarded).build();
+                            verified.getAttributes().put(OPEN_APP_ATTRIBUTE, app);
+                            yield chain.filter(verified);
                         }
                     });
         });

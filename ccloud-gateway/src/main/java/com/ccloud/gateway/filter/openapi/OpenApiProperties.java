@@ -35,5 +35,9 @@ public class OpenApiProperties {
          */
         private Long tenantId;
         private boolean enabled = true;
+        /**
+         * 每秒请求数上限，同时作为令牌桶容量。P2 改为取自 open_app.rate_limit
+         */
+        private int rateLimit = 50;
     }
 }

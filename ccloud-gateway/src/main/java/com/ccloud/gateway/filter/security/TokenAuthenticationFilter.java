@@ -76,6 +76,7 @@ public class TokenAuthenticationFilter implements GlobalFilter, Ordered {
                     if (outcome.user() != null) {
                         ServerWebExchange authenticated = exchange.mutate().request(InternalHeaderWriter.write(
                                 exchange.getRequest(), outcome.user(), securityProperties.getInternalSignSecret())).build();
+                        SecurityFrameworkUtils.setLoginUser(authenticated, outcome.user());
                         return afterLogout(chain.filter(authenticated), path, token);
                     }
                     if (anonymousAllowed) {

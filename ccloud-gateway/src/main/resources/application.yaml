@@ -39,6 +39,10 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: true
+  web:
+    resources:
+      # 不按默认规则暴露 classpath 静态资源：文档页由 SwaggerAggregationConfiguration 按开关显式注册
+      add-mappings: false
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
@@ -57,6 +61,9 @@ management:
       show-details: never
 
 ccloud:
+  swagger:
+    # 接口文档聚合页 /doc.html，生产环境关闭
+    enable: true
   security:
     # 与业务服务共享的内部签名密钥，缺失时网关启动失败
     internal-sign-secret: ${CCLOUD_INTERNAL_SIGN_SECRET:}
@@ -92,12 +99,8 @@ ccloud:
       - /app-api/member/auth/weixin-mini-app-login
       - /app-api/member/auth/refresh-token
       - /app-api/member/auth/logout
-      # ---- 接口文档（是否开放由各服务的 springdoc 开关决定） ----
-      - /doc.html
-      - /webjars/**
-      - /swagger-ui/**
-      - /v3/api-docs/**
-      - /*/v3/api-docs/**
+      # ---- 接口文档转发路由（ccloud.swagger.enable=false 时不注册） ----
+      - /*/v3/api-docs/*
     # 登出后立即清除网关上该令牌的缓存
     logout-urls:
       - /admin-api/system/auth/logout
@@ -106,6 +109,14 @@ ccloud:
     token-cache-ttl: 60s
     token-cache-max-size: 10000
   gateway:
+    rate-limit:
+      enabled: true
+      # Redis 令牌桶，多个网关实例共享。已登录按用户、未登录按客户端 IP 计数；开放接口按应用计数（ccloud.open.apps[].rate-limit）
+      defaults:
+        replenish-rate: 100
+        burst-capacity: 200
+      # 按路由单独配置，路由编号见 RouteConfiguration（system、member、open-api-pay 等）
+      routes: {}
     cors:
       # 生产环境建议收窄为自己的前端域名，如 https://*.example.com
       allowed-origin-patterns: ${CCLOUD_CORS_ALLOWED_ORIGIN_PATTERNS:*}

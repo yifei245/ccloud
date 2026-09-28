@@ -34,6 +34,10 @@ public abstract class GatewayIntegrationTestSupport {
     protected static final StubServer SYSTEM = new StubServer("system");
     protected static final StubServer MEMBER = new StubServer("member");
     protected static final StubServer PAY = new StubServer("pay");
+    /**
+     * promotion 路由在测试配置中限流阈值很低，专供限流测试使用
+     */
+    protected static final StubServer PROMOTION = new StubServer("promotion");
 
     @SuppressWarnings("resource")
     private static final GenericContainer<?> REDIS = startRedis();
@@ -46,7 +50,10 @@ public abstract class GatewayIntegrationTestSupport {
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        Map.of("ccloud-system-server", SYSTEM, "ccloud-member-server", MEMBER, "ccloud-pay-server", PAY)
+        Map.of("ccloud-system-server", SYSTEM, "ccloud-member-server", MEMBER, "ccloud-pay-server", PAY,
+                        "ccloud-promotion-server", PROMOTION,
+                        // 注册中心里的非业务服务、未登记路由的服务：文档聚合不应列出
+                        "ccloud-gateway", SYSTEM, "ccloud-unknown-server", SYSTEM)
                 .forEach((service, server) -> registry.add(
                         "spring.cloud.discovery.client.simple.instances." + service + "[0].uri",
                         () -> "http://127.0.0.1:" + server.port()));
@@ -64,6 +71,7 @@ public abstract class GatewayIntegrationTestSupport {
         SYSTEM.reset();
         MEMBER.reset();
         PAY.reset();
+        PROMOTION.reset();
     }
 
     /**

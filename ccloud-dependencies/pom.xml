@@ -230,6 +230,12 @@
                 <artifactId>knife4j-gateway-spring-boot-starter</artifactId>
                 <version>${knife4j.version}</version>
             </dependency>
+            <!-- 网关只用 Knife4j 的静态页面，聚合配置由网关自己按路由规则生成 -->
+            <dependency>
+                <groupId>com.github.xiaoymin</groupId>
+                <artifactId>knife4j-openapi3-ui</artifactId>
+                <version>${knife4j.version}</version>
+            </dependency>
 
             <!-- ==================== 任务调度 ==================== -->
             <dependency>

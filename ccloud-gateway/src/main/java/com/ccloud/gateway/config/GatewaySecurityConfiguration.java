@@ -1,5 +1,6 @@
 package com.ccloud.gateway.config;
 
+import com.ccloud.gateway.filter.limiter.RateLimitProperties;
 import com.ccloud.gateway.filter.openapi.OpenApiProperties;
 import com.ccloud.gateway.filter.security.SecurityProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -9,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties({SecurityProperties.class, OpenApiProperties.class})
+@EnableConfigurationProperties({SecurityProperties.class, OpenApiProperties.class, RateLimitProperties.class})
 public class GatewaySecurityConfiguration {
 
     /**

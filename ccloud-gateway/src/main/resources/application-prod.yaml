@@ -1,5 +1,7 @@
 # 生产环境：跨域来源必须显式配置，不提供默认值
 ccloud:
+  swagger:
+    enable: false
   gateway:
     cors:
       allowed-origin-patterns: ${CCLOUD_CORS_ALLOWED_ORIGIN_PATTERNS}

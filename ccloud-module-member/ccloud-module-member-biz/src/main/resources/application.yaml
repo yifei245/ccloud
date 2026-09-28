@@ -51,8 +51,12 @@ spring:
   boot:
     admin:
       client:
-        enabled: ${SBA_ENABLED:true}
+        # 监控面板（ccloud-monitor）从 Nacos 发现本服务，默认不再主动注册：两种方式同时开启会出现两个相同实例，
+        # 且面板要求登录，未配置账号的主动注册会被拒绝。无注册中心的环境可设 SBA_CLIENT_ENABLED=true 并配置账号
+        enabled: ${SBA_CLIENT_ENABLED:false}
         url: http://${SBA_HOST:127.0.0.1}:48182
+        username: admin
+        password: ${CCLOUD_MONITOR_PASSWORD:ccloud123}
         instance:
           prefer-ip: true
 

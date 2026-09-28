@@ -1,0 +1,27 @@
+# 监控面板测试配置：不连 Nacos，被监控的服务由 simple discovery 注入
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+    service-registry:
+      auto-registration:
+        enabled: false
+    discovery:
+      client:
+        simple:
+          instances:
+            ccloud-system-server:
+              - uri: http://127.0.0.1:1
+            ccloud-monitor:
+              - uri: http://127.0.0.1:2
+            nacos-console:
+              - uri: http://127.0.0.1:3
+
+ccloud:
+  monitor:
+    password: unit-test-password

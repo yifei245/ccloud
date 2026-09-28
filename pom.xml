@@ -27,6 +27,7 @@
         <module>ccloud-module-system</module>
         <module>ccloud-module-member</module>
         <module>ccloud-gateway</module>
+        <module>ccloud-monitor</module>
     </modules>
 
     <properties>

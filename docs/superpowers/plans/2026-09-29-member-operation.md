@@ -863,7 +863,7 @@ git commit -m "feat(member): 经验与等级变动、等级与经验记录、内
 
 `MemberPointRecordDO`（`member_point_record`）：`id, userId, bizId, bizType, title, description, point, totalPoint`。Mapper 提供与经验记录同形的 `selectByBiz(userId, bizType, bizId)`。
 
-- [ ] **Step 1: 写失败测试** `MemberPointServiceImplTest extends BaseMemberDbUnitTest`，`@Import(MemberPointServiceImpl.class)`；前置插入积分 100 的会员 `userId`。
+- [x] **Step 1: 写失败测试** `MemberPointServiceImplTest extends BaseMemberDbUnitTest`，`@Import(MemberPointServiceImpl.class)`；前置插入积分 100 的会员 `userId`。
 
 ```java
     @Test
@@ -948,12 +948,12 @@ git commit -m "feat(member): 经验与等级变动、等级与经验记录、内
 - 管理端分页无权限返回 403；
 - `/rpc-api/member/point/reduce` 余额不足时返回 `code = 1004001003`。
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `mvn -o -q -pl ccloud-module-member/ccloud-module-member-biz -am test -Dtest='MemberPointServiceImplTest,MemberPointConcurrencyTest,AppMemberPointControllerTest,RpcApiCoverageTest' -Dsurefire.failIfNoSpecifiedTests=false`
 Expected: 编译失败。
 
-- [ ] **Step 3: 实现**（`MemberPointServiceImpl`）
+- [x] **Step 3: 实现**（`MemberPointServiceImpl`）
 
 ```java
     @Override
@@ -1032,16 +1032,16 @@ Expected: 编译失败。
 
 `MemberPointApiImpl` 两个方法直接委托给 `addPoint` / `reducePoint`，返回 `success(true)`。从 `PENDING_APIS` 删除 `MemberPointApi`。
 
-- [ ] **Step 4: 运行确认通过**。Run: 同 Step 2，再跑会员模块全部测试。Expected: PASS。
+- [x] **Step 4: 运行确认通过**。Run: 同 Step 2，再跑会员模块全部测试。Expected: PASS。
 
-- [ ] **Step 5: 变异检查**：
+- [x] **Step 5: 变异检查**：
   - 去掉查重；
   - `total < 0` 改为 `total < -1`；
   - 去掉 `FOR UPDATE`（并发测试应失败）；
   - `type.isAdd() != add` 改为 `false`；
   - 收入筛选的 `gt` 改为 `ge`。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A ccloud-module-member

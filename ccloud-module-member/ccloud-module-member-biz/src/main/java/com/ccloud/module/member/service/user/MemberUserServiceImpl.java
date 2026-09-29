@@ -4,8 +4,10 @@ import cn.hutool.core.util.StrUtil;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateMobileReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateReqVO;
+import com.ccloud.module.member.dal.dataobject.level.MemberLevelDO;
 import com.ccloud.module.member.dal.dataobject.user.MemberUserDO;
 import com.ccloud.module.member.dal.mysql.user.MemberUserMapper;
+import com.ccloud.module.member.service.level.MemberLevelService;
 import com.ccloud.module.system.api.sms.SmsCodeApi;
 import com.ccloud.module.system.api.sms.dto.SmsCodeUseReqDTO;
 import com.ccloud.module.system.enums.sms.SmsSceneEnum;
@@ -35,6 +37,8 @@ public class MemberUserServiceImpl implements MemberUserService {
     private PasswordEncoder passwordEncoder;
     @Resource
     private SmsCodeApi smsCodeApi;
+    @Resource
+    private MemberLevelService levelService;
 
     @Override
     public MemberUserDO getUser(Long id) {
@@ -68,6 +72,9 @@ public class MemberUserServiceImpl implements MemberUserService {
                 // 昵称会展示给其他用户（评价、拼团），不能直接用手机号
                 .setNickname("用户" + StrUtil.subSuf(mobile, mobile.length() - 4))
                 .setAvatar("");
+        // 新会员按 0 经验定初始等级
+        MemberLevelDO level = levelService.calculateLevel(0);
+        user.setPoint(0).setExperience(0).setLevelId(level == null ? null : level.getId());
         try {
             memberUserMapper.insert(user);
             return user;

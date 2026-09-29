@@ -9,6 +9,7 @@ import com.ccloud.module.member.controller.app.auth.vo.*;
 import com.ccloud.module.member.dal.dataobject.user.MemberUserDO;
 import com.ccloud.module.member.dal.mysql.user.MemberUserMapper;
 import com.ccloud.module.member.dal.redis.auth.MemberLoginFailCountRedisDAO;
+import com.ccloud.module.member.service.level.MemberLevelServiceImpl;
 import com.ccloud.module.member.service.user.MemberUserServiceImpl;
 import com.ccloud.module.member.test.BaseMemberDbAndRedisUnitTest;
 import com.ccloud.module.system.api.logger.LoginLogApi;
@@ -52,7 +53,8 @@ import static org.mockito.Mockito.*;
  * 会员认证。system 侧的令牌、验证码、社交能力以 RPC 桩替代：这里验证的是 member 的判断逻辑
  * 与传给 system 的参数；令牌本身的签发、刷新、作废语义由 system 的测试覆盖
  */
-@Import({MemberAuthServiceImpl.class, MemberUserServiceImpl.class, MemberLoginFailCountRedisDAO.class})
+@Import({MemberAuthServiceImpl.class, MemberUserServiceImpl.class, MemberLevelServiceImpl.class,
+        MemberLoginFailCountRedisDAO.class})
 @TestPropertySource(properties = {
         "ccloud.member.auth.login-fail-limit=3",
         "ccloud.member.auth.login-fail-lock-minutes=10",

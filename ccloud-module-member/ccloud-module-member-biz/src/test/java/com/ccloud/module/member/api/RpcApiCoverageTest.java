@@ -23,8 +23,7 @@ class RpcApiCoverageTest {
      * 随对应任务提供实现。实现落地后须从此处移除，否则本测试失败
      */
     private static final Map<String, String> PENDING_APIS = Map.of(
-            "MemberAddressApi", "P2 商城", "MemberLevelApi", "P2 商城",
-            "MemberExperienceApi", "P2 商城", "MemberPointApi", "P2 商城");
+            "MemberAddressApi", "P2 会员运营", "MemberPointApi", "P2 会员运营");
 
     @Test
     void 每个Feign接口都已实现或登记为待实现() throws Exception {

@@ -543,7 +543,7 @@ default MemberExperienceRecordDO selectByBiz(Long userId, Integer bizType, Strin
 }
 ```
 
-- [ ] **Step 1: 写失败测试**，在 `MemberLevelServiceImplTest` 追加。测试前置用 Task 2 的 `level(...)` 建青铜（1, 0）、白银（2, 1000）、黄金（3, 5000）三级，插入一个经验 0、等级青铜的会员 `userId`。
+- [x] **Step 1: 写失败测试**，在 `MemberLevelServiceImplTest` 追加。测试前置用 Task 2 的 `level(...)` 建青铜（1, 0）、白银（2, 1000）、黄金（3, 5000）三级，插入一个经验 0、等级青铜的会员 `userId`。
 
 ```java
     @Test
@@ -672,12 +672,12 @@ default MemberExperienceRecordDO selectByBiz(Long userId, Integer bizType, Strin
 
 `MemberUserServiceImplTest` 追加：`createUserIfAbsent` 新会员的 `levelId` 等于 `MemberLevelService.calculateLevel(0)` 的结果。在该测试中用 `@MockitoBean MemberLevelService` 打桩，返回编号为 7 的等级，断言新会员 `levelId == 7`；打桩返回 null 时 `levelId` 为 null。
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `mvn -o -q -pl ccloud-module-member/ccloud-module-member-biz -am test -Dtest='MemberLevelServiceImplTest,MemberExperienceConcurrencyTest,AppMemberLevelControllerTest,MemberUserServiceImplTest,RpcApiCoverageTest' -Dsurefire.failIfNoSpecifiedTests=false`
 Expected: 编译失败。
 
-- [ ] **Step 3: 实现经验与等级**（`MemberLevelServiceImpl`）
+- [x] **Step 3: 实现经验与等级**（`MemberLevelServiceImpl`）
 
 ```java
     @Override
@@ -787,14 +787,14 @@ Expected: 编译失败。
 - `ADMIN` 经验类型的描述模板是"管理员调整获得 {} 经验"，扣减时文案不准确。管理员调整的描述改为按正负号生成：`(experience >= 0 ? "管理员调整增加 " : "管理员调整扣减 ") + Math.abs(experience) + " 经验"`，在 `insertExperienceRecord` 中对 `ADMIN` 类型特判。
 - 为此补一个测试：管理员把会员从黄金改到青铜，经验记录描述为"管理员调整扣减 5000 经验"。
 
-- [ ] **Step 4: 注册时定初始等级**。`MemberUserServiceImpl` 注入 `MemberLevelService`，`createUserIfAbsent` 在构造新会员时加：
+- [x] **Step 4: 注册时定初始等级**。`MemberUserServiceImpl` 注入 `MemberLevelService`，`createUserIfAbsent` 在构造新会员时加：
 
 ```java
         MemberLevelDO level = levelService.calculateLevel(0);
         user.setPoint(0).setExperience(0).setLevelId(level == null ? null : level.getId());
 ```
 
-- [ ] **Step 5: 实现管理端记录分页、用户端等级接口、内部接口**。内部接口实现：
+- [x] **Step 5: 实现管理端记录分页、用户端等级接口、内部接口**。内部接口实现：
 
 ```java
 @RestController
@@ -820,21 +820,23 @@ public class MemberExperienceApiImpl implements MemberExperienceApi {
 
 `MemberLevelApiImpl.getMemberLevel(id)` 返回 `BeanUtils.toBean(levelService.getLevel(id), MemberLevelRespDTO.class)`。最后从 `RpcApiCoverageTest.PENDING_APIS` 删除这两项。
 
-- [ ] **Step 6: 运行确认通过**。Run: 同 Step 2。Expected: PASS。然后跑会员模块全部测试：`mvn -o -q -pl ccloud-module-member/ccloud-module-member-biz -am test`，确认全部通过。
+- [x] **Step 6: 运行确认通过**。Run: 同 Step 2。Expected: PASS。然后跑会员模块全部测试：`mvn -o -q -pl ccloud-module-member/ccloud-module-member-biz -am test`，确认全部通过。
 
-- [ ] **Step 7: 变异检查**（每处改坏→运行 Step 2 命令→确认失败→还原并 `touch`）：
+- [x] **Step 7: 变异检查**（每处改坏→运行 Step 2 命令→确认失败→还原并 `touch`）：
   - 去掉 `selectByBiz` 查重；
   - `Math.max(0, ...)` 改为不截断；
   - 去掉 `selectByIdForUpdate` 的 `.last("FOR UPDATE")`，并发测试应失败（可多跑两次确认）；
   - `updateUserLevel` 去掉停用检查；
   - `updateUserExperienceAndLevel` 中升降判断取反。
 
-- [ ] **Step 8: 提交**
+- [x] **Step 8: 提交**
 
 ```bash
 git add -A ccloud-module-member
 git commit -m "feat(member): 经验与等级变动、等级与经验记录、内部接口与用户端等级"
 ```
+
+> 执行记录：经验与等级的用例单独放在 `MemberLevelExperienceTest`（需要三级等级的固定前置，与 Task 2 的配置用例冲突）；`MemberAuthServiceImplTest` 的 `@Import` 加入真实的 `MemberLevelServiceImpl`。
 
 ---
 

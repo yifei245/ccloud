@@ -7,7 +7,9 @@ import com.ccloud.framework.tenant.core.util.TenantUtils;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateMobileReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateReqVO;
 import com.ccloud.module.member.dal.dataobject.user.MemberUserDO;
+import com.ccloud.module.member.dal.dataobject.level.MemberLevelDO;
 import com.ccloud.module.member.dal.mysql.user.MemberUserMapper;
+import com.ccloud.module.member.service.level.MemberLevelService;
 import com.ccloud.module.member.test.BaseMemberDbUnitTest;
 import com.ccloud.module.system.api.sms.SmsCodeApi;
 import com.ccloud.module.system.api.sms.dto.SmsCodeUseReqDTO;
@@ -38,6 +40,25 @@ class MemberUserServiceImplTest extends BaseMemberDbUnitTest {
 
     @MockitoBean
     private SmsCodeApi smsCodeApi;
+    @MockitoBean
+    private MemberLevelService levelService;
+
+    @Test
+    void createUserIfAbsent_新会员按0经验定初始等级_积分经验为0() {
+        when(levelService.calculateLevel(0)).thenReturn(new MemberLevelDO().setId(7L));
+        MemberUserDO user = userService.createUserIfAbsent("13911110101", "10.0.0.1", null);
+        MemberUserDO saved = userMapper.selectById(user.getId());
+        assertThat(saved.getLevelId()).isEqualTo(7L);
+        assertThat(saved.getPoint()).isZero();
+        assertThat(saved.getExperience()).isZero();
+    }
+
+    @Test
+    void createUserIfAbsent_没有满足的等级时等级为空() {
+        when(levelService.calculateLevel(0)).thenReturn(null);
+        MemberUserDO user = userService.createUserIfAbsent("13911110102", "10.0.0.1", null);
+        assertThat(userMapper.selectById(user.getId()).getLevelId()).isNull();
+    }
 
     @Test
     void createUserIfAbsent_新手机号应注册_记录注册IP与终端_昵称不暴露完整手机号_无密码() {

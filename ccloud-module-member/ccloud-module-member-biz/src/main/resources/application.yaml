@@ -1,5 +1,5 @@
 # ccloud-member-server 基础配置。与环境无关的项放这里，环境相关项放 application-{profile}.yaml。
-# Nacos 中的 ccloud-common.yaml / ccloud-datasource.yaml / ccloud-member-server.yaml 优先级高于本文件。
+# Nacos 配置（ccloud-common.yaml / ccloud-datasource.yaml / ccloud-member-server.yaml）在各 application-{profile}.yaml 中导入，优先级高于本文件与 profile 文件。
 server:
   port: 48083
 
@@ -10,11 +10,6 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:local}
   main:
     allow-circular-references: false
-  config:
-    import:
-      - optional:nacos:ccloud-common.yaml
-      - optional:nacos:ccloud-datasource.yaml
-      - optional:nacos:${spring.application.name}.yaml
   cloud:
     nacos:
       server-addr: ${NACOS_ADDR:127.0.0.1:8848}

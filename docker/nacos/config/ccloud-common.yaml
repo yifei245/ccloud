@@ -1,0 +1,24 @@
+# ccloud 各服务共享的可调配置（system、member、gateway、monitor 均导入）
+#
+# 约定：
+#   1. 本文件与各服务的 dataId 优先级高于服务包内的 application.yaml 与 application-{profile}.yaml；
+#   2. 只放与环境无关、需要在运行期调整的项。数据库、Redis 等连接地址与一切密钥由各环境的 profile 与环境变量提供，
+#      不得写入这里（scripts/verify-nacos.sh 会拒绝）——同一份配置包会导入每个环境的 Nacos；
+#   3. 标注"即时生效"的项在控制台修改发布后即生效，其余需重启服务。
+
+ccloud:
+  security:
+    # 内部身份头时间戳允许的滞后量，业务服务验签时使用（即时生效）
+    internal-sign-tolerance: 5m
+  tenant:
+    # 经 RPC 校验租户的服务（member 等）本地缓存校验结果的时长，期间租户停用不会立即生效（需重启）
+    valid-cache-duration: 1m
+  i18n:
+    # 国际化文案的兜底刷新间隔；文案变更时另有广播即时刷新（需重启）
+    refresh-interval: 5m
+  mq:
+    redis:
+      # Redis Stream 消息处理失败后的最大重投次数，超过后丢弃并记录日志（需重启）
+      max-retry: 5
+      # 消息超过该时长仍未确认视为处理失败，由重投任务捞回（需重启）
+      pending-idle-timeout: 5m

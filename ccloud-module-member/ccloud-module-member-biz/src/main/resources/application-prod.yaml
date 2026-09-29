@@ -1,5 +1,12 @@
 # 生产环境：不提供任何密码默认值，缺失即启动失败；关闭接口文档。
 spring:
+  config:
+    # 在 profile 文件中导入：导入的配置优先于导入它的文件。写在 application.yaml 里时，
+    # profile 文件会反过来覆盖 Nacos，控制台改的值对 profile 中已有的键不生效
+    import:
+      - optional:nacos:ccloud-common.yaml
+      - optional:nacos:ccloud-datasource.yaml
+      - optional:nacos:${spring.application.name}.yaml
   datasource:
     dynamic:
       druid:

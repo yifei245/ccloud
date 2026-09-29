@@ -1,0 +1,19 @@
+# ccloud-system-server 的可调配置
+
+ccloud:
+  system:
+    auth:
+      # 管理员密码登录连续失败达到次数后锁定账号，锁定时长单位分钟（需重启）
+      login-fail-limit: 5
+      login-fail-lock-minutes: 10
+  # 短信验证码（即时生效）。开放注册开关 ccloud.system.auth.register-enabled 由环境变量 CCLOUD_REGISTER_ENABLED 控制，
+  # 不在这里配置，否则会覆盖环境变量
+  sms-code:
+    # 有效期
+    expire-times: 10m
+    # 同一手机号同一场景的最小发送间隔
+    send-frequency: 1m
+    # 同一手机号同一场景每日最多发送条数
+    send-maximum-quantity-per-day: 10
+    # 同一条验证码允许输错的次数，达到后须重新获取
+    max-validate-fail-times: 5

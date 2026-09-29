@@ -1,4 +1,12 @@
 # 本地开发：Nacos 不可用时 optional 导入会跳过，但路由依赖注册中心发现下游服务。
+spring:
+  config:
+    # 在 profile 文件中导入：导入的配置优先于导入它的文件。写在 application.yaml 里时，
+    # profile 文件会反过来覆盖 Nacos，控制台改的值对 profile 中已有的键不生效
+    import:
+      - optional:nacos:ccloud-common.yaml
+      - optional:nacos:${spring.application.name}.yaml
+
 ccloud:
   security:
     # 与 system、member 的 local 配置一致，否则下游验签失败、所有请求都变成匿名

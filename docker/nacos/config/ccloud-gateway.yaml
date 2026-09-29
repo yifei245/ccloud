@@ -1,0 +1,35 @@
+# ccloud-gateway 的可调配置
+#
+# 注意：匿名接口白名单 ccloud.security.ignore-urls 不在这里配置——它须与各服务的匿名接口一致，
+# 由 system、member 的一致性测试对照网关包内的 application.yaml 校验；在此覆盖会绕过校验，且列表是整体替换而非追加。
+
+ccloud:
+  gateway:
+    rate-limit:
+      # 限流开关与阈值（即时生效）。已登录按用户、未登录按客户端 IP 计数，多个网关实例共享配额
+      enabled: true
+      defaults:
+        # 每秒补充的令牌数，即持续 QPS 上限
+        replenish-rate: 100
+        # 桶容量，即允许的瞬时突发
+        burst-capacity: 200
+      # 按路由编号单独配置，编号见 RouteConfiguration（system、member、open-api-pay 等），例如：
+      #   member:
+      #     replenish-rate: 50
+      #     burst-capacity: 100
+      routes: {}
+  security:
+    # 令牌校验结果本地缓存时长（需重启）。期间在其他网关实例登出、改密码吊销的令牌仍会被放行
+    token-cache-ttl: 60s
+    token-cache-max-size: 10000
+  open:
+    # 请求时间戳允许的偏差（即时生效）
+    timestamp-tolerance: 5m
+    # 开放平台应用（即时生效）。P1 阶段 open 服务尚未实现，应用在此登记；应用密钥属于机密，
+    # 只在各环境的 Nacos 控制台中填写，不要提交到仓库。格式：
+    #   - app-id: demo-app
+    #     app-secret: （在控制台填写）
+    #     tenant-id: 1
+    #     rate-limit: 50
+    #     enabled: true
+    apps: []

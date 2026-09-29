@@ -1,0 +1,10 @@
+# ccloud-member-server 的可调配置
+
+ccloud:
+  member:
+    auth:
+      # 会员密码登录连续失败达到次数后锁定该手机号，锁定时长单位分钟（需重启）
+      login-fail-limit: 5
+      login-fail-lock-minutes: 10
+      # 已开通的 C 端功能，经 /app-api/member/auth/get-permission-info 下发，前端据此显示入口（需重启）
+      features: point,sign-in,address

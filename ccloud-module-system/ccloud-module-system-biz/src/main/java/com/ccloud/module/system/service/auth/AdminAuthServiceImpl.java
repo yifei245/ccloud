@@ -265,9 +265,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         if (user == null) {
             throw exception(AUTH_MOBILE_NOT_EXISTS);
         }
+        // 重置密码会一并下线该用户已登录的会话
         userService.resetUserPassword(user.getId(), reqVO.getPassword());
-        // 忘记密码往往意味着密码可能已泄露，已登录的会话一并下线
-        oauth2TokenService.removeAccessTokensByUser(user.getId(), UserTypeEnum.ADMIN.getValue());
     }
 
     private static SmsCodeUseReqDTO buildSmsCodeUseReqDTO(String mobile, String code, SmsSceneEnum scene,

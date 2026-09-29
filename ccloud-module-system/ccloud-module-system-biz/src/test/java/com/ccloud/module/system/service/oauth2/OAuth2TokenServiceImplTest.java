@@ -213,6 +213,47 @@ class OAuth2TokenServiceImplTest extends BaseSystemDbAndRedisUnitTest {
         assertServiceException(() -> tokenService.checkAccessToken(b.getAccessToken()), UNAUTHORIZED);
     }
 
+    @Test
+    void removeAccessTokensByUser_访问令牌已过期被清理后_其刷新令牌也应作废() {
+        OAuth2AccessTokenDO token = createToken();
+        // 访问令牌过期后在校验时被删除，只剩刷新令牌
+        redisDAO.delete(token.getAccessToken());
+        OAuth2AccessTokenDO db = selectAccessToken(token.getAccessToken());
+        accessTokenMapper.updateById(new OAuth2AccessTokenDO().setId(db.getId())
+                .setExpiresTime(LocalDateTime.now().minusSeconds(1)));
+        assertServiceException(() -> tokenService.checkAccessToken(token.getAccessToken()), UNAUTHORIZED);
+
+        tokenService.removeAccessTokensByUser(1L, UserTypeEnum.ADMIN.getValue());
+
+        assertServiceException(() -> tokenService.refreshAccessToken(token.getRefreshToken(), CLIENT_ID),
+                OAUTH2_REFRESH_TOKEN_NOT_EXISTS);
+    }
+
+    @Test
+    void removeAccessTokensByUser_在其他租户上下文中调用也应作废() {
+        OAuth2AccessTokenDO token = createToken();
+        TenantContextHolder.setTenantId(999L);
+
+        tokenService.removeAccessTokensByUser(1L, UserTypeEnum.ADMIN.getValue());
+
+        assertServiceException(() -> tokenService.checkAccessToken(token.getAccessToken()), UNAUTHORIZED);
+        assertServiceException(() -> tokenService.refreshAccessToken(token.getRefreshToken(), CLIENT_ID),
+                OAUTH2_REFRESH_TOKEN_NOT_EXISTS);
+    }
+
+    @Test
+    void removeAccessTokensByUser_不影响其他用户与同编号的其他用户类型() {
+        OAuth2AccessTokenDO otherUser = tokenService.createAccessToken(2L, UserTypeEnum.ADMIN.getValue(), CLIENT_ID, List.of());
+        OAuth2AccessTokenDO member = tokenService.createAccessToken(1L, UserTypeEnum.MEMBER.getValue(), CLIENT_ID, List.of());
+
+        tokenService.removeAccessTokensByUser(1L, UserTypeEnum.ADMIN.getValue());
+
+        assertThat(tokenService.checkAccessToken(otherUser.getAccessToken())).isNotNull();
+        assertThat(tokenService.checkAccessToken(member.getAccessToken())).isNotNull();
+        assertThat(tokenService.refreshAccessToken(otherUser.getRefreshToken(), CLIENT_ID)).isNotNull();
+        assertThat(tokenService.refreshAccessToken(member.getRefreshToken(), CLIENT_ID)).isNotNull();
+    }
+
     private OAuth2AccessTokenDO createToken() {
         return tokenService.createAccessToken(1L, UserTypeEnum.ADMIN.getValue(), CLIENT_ID, List.of("user.read"));
     }

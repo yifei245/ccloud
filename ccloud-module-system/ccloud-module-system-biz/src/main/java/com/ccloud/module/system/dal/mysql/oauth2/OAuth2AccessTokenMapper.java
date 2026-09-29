@@ -29,10 +29,13 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
         TenantUtils.executeIgnore(() -> deleteById(id));
     }
 
-    default List<OAuth2AccessTokenDO> selectListByUserIdAndUserType(Long userId, Integer userType) {
-        return selectList(new LambdaQueryWrapperX<OAuth2AccessTokenDO>()
+    /**
+     * 同一用户类型的用户编号全局唯一，忽略租户，避免从其他租户上下文作废时漏掉
+     */
+    default List<OAuth2AccessTokenDO> selectListByUserIdAndUserTypeIgnoreTenant(Long userId, Integer userType) {
+        return TenantUtils.executeIgnore(() -> selectList(new LambdaQueryWrapperX<OAuth2AccessTokenDO>()
                 .eq(OAuth2AccessTokenDO::getUserId, userId)
-                .eq(OAuth2AccessTokenDO::getUserType, userType));
+                .eq(OAuth2AccessTokenDO::getUserType, userType)));
     }
 
     default PageResult<OAuth2AccessTokenDO> selectPage(OAuth2AccessTokenPageReqVO reqVO) {

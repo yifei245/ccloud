@@ -1,6 +1,7 @@
 package com.ccloud.module.system.service.user;
 
 import com.ccloud.framework.common.enums.CommonStatusEnum;
+import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.pojo.PageResult;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdatePasswordReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdateReqVO;
@@ -18,6 +19,7 @@ import com.ccloud.module.system.dal.mysql.dept.UserPostMapper;
 import com.ccloud.module.system.dal.mysql.user.AdminUserMapper;
 import com.ccloud.module.system.service.dept.DeptServiceImpl;
 import com.ccloud.module.system.service.dept.PostServiceImpl;
+import com.ccloud.module.system.service.oauth2.OAuth2TokenService;
 import com.ccloud.module.system.service.permission.PermissionService;
 import com.ccloud.module.system.service.permission.PermissionServiceImpl;
 import com.ccloud.module.system.service.tenant.TenantInfoHandler;
@@ -37,7 +39,11 @@ import java.util.Set;
 import static com.ccloud.module.system.enums.ErrorCodeConstants.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @Import({AdminUserServiceImpl.class, DeptServiceImpl.class, PostServiceImpl.class, PermissionServiceImpl.class,
         LocalValidatorFactoryBean.class})
@@ -61,6 +67,8 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
 
     @MockitoBean
     private TenantService tenantService;
+    @MockitoBean
+    private OAuth2TokenService oauth2TokenService;
 
     // ========== 创建 ==========
 
@@ -226,6 +234,8 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         AdminUserDO user = userMapper.selectById(id);
         assertThat(userService.isPasswordMatch("newpass", user.getPassword())).isTrue();
         assertThat(userService.isPasswordMatch("pass123", user.getPassword())).isFalse();
+        // 本人改密码也下线全部会话（含当前会话），需重新登录
+        verify(oauth2TokenService).removeAccessTokensByUser(id, UserTypeEnum.ADMIN.getValue());
     }
 
     @Test
@@ -235,6 +245,7 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         reqVO.setOldPassword("wrong");
         reqVO.setNewPassword("newpass");
         assertServiceException(() -> userService.updateUserPassword(id, reqVO), USER_PASSWORD_FAILED);
+        verify(oauth2TokenService, never()).removeAccessTokensByUser(anyLong(), anyInt());
     }
 
     @Test
@@ -242,6 +253,7 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         Long id = userService.createUser(newReqVO("reset", null, null));
         userService.resetUserPassword(id, "reset456");
         assertThat(passwordEncoder.matches("reset456", userMapper.selectById(id).getPassword())).isTrue();
+        verify(oauth2TokenService).removeAccessTokensByUser(id, UserTypeEnum.ADMIN.getValue());
     }
 
     @Test
@@ -249,7 +261,15 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         Long id = userService.createUser(newReqVO("status", null, null));
         userService.updateUserStatus(id, CommonStatusEnum.DISABLE.getStatus());
         assertThat(userMapper.selectById(id).getStatus()).isEqualTo(CommonStatusEnum.DISABLE.getStatus());
+        verify(oauth2TokenService).removeAccessTokensByUser(id, UserTypeEnum.ADMIN.getValue());
         assertServiceException(() -> userService.updateUserStatus(-1L, 0), USER_NOT_EXISTS);
+    }
+
+    @Test
+    void updateUserStatus_启用时不作废令牌() {
+        Long id = userService.createUser(newReqVO("enable", null, null));
+        userService.updateUserStatus(id, CommonStatusEnum.ENABLE.getStatus());
+        verify(oauth2TokenService, never()).removeAccessTokensByUser(anyLong(), anyInt());
     }
 
     // ========== 删除 ==========
@@ -267,6 +287,7 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         assertThat(userMapper.selectById(id)).isNull();
         assertThat(permissionService.getUserRoleIdListByUserId(id)).isEmpty();
         assertThat(userPostMapper.selectListByUserId(id)).isEmpty();
+        verify(oauth2TokenService).removeAccessTokensByUser(id, UserTypeEnum.ADMIN.getValue());
     }
 
     @Test
@@ -280,6 +301,8 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         Long b = userService.createUser(newReqVO("delb", null, null));
         userService.deleteUserList(List.of(a, b));
         assertThat(userMapper.selectCount()).isZero();
+        verify(oauth2TokenService).removeAccessTokensByUser(a, UserTypeEnum.ADMIN.getValue());
+        verify(oauth2TokenService).removeAccessTokensByUser(b, UserTypeEnum.ADMIN.getValue());
     }
 
     // ========== 查询 ==========

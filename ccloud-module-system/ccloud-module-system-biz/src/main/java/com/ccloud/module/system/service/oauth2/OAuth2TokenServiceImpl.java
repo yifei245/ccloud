@@ -173,10 +173,9 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeAccessTokensByUser(Long userId, Integer userType) {
-        List<OAuth2AccessTokenDO> tokens = accessTokenMapper.selectListByUserIdAndUserType(userId, userType);
-        removeAccessTokens(tokens);
-        tokens.stream().map(OAuth2AccessTokenDO::getRefreshToken).filter(token -> !token.isEmpty()).distinct()
-                .forEach(refreshTokenMapper::deleteByRefreshToken);
+        removeAccessTokens(accessTokenMapper.selectListByUserIdAndUserTypeIgnoreTenant(userId, userType));
+        // 按用户删除刷新令牌，而不是只删仍有访问令牌的那些：访问令牌过期后会被清理，其刷新令牌仍可换出新令牌
+        refreshTokenMapper.deleteByUserIdAndUserTypeIgnoreTenant(userId, userType);
     }
 
     private void removeAccessTokens(List<OAuth2AccessTokenDO> tokens) {

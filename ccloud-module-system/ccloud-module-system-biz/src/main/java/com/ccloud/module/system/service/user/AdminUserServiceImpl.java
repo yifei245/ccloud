@@ -3,6 +3,7 @@ package com.ccloud.module.system.service.user;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
+import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.exception.ServiceException;
 import com.ccloud.framework.common.pojo.PageResult;
 import com.ccloud.framework.common.util.collection.CollectionUtils;
@@ -22,6 +23,7 @@ import com.ccloud.module.system.dal.mysql.dept.UserPostMapper;
 import com.ccloud.module.system.dal.mysql.user.AdminUserMapper;
 import com.ccloud.module.system.service.dept.DeptService;
 import com.ccloud.module.system.service.dept.PostService;
+import com.ccloud.module.system.service.oauth2.OAuth2TokenService;
 import com.ccloud.module.system.service.permission.PermissionService;
 import com.ccloud.module.system.service.tenant.TenantService;
 import jakarta.annotation.Resource;
@@ -59,6 +61,8 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Resource
     @Lazy
     private TenantService tenantService;
+    @Resource
+    private OAuth2TokenService oauth2TokenService;
     @Resource
     private PasswordEncoder passwordEncoder;
     @Resource
@@ -132,25 +136,43 @@ public class AdminUserServiceImpl implements AdminUserService {
         userMapper.updateById(BeanUtils.toBean(reqVO, AdminUserDO.class).setId(id));
     }
 
+    /**
+     * 本人修改密码也作废全部令牌（含当前会话）：改密码往往是怀疑密码泄露，其他设备上的会话必须下线
+     */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateUserPassword(Long id, UserProfileUpdatePasswordReqVO reqVO) {
         AdminUserDO user = validateUserExists(id);
         if (!isPasswordMatch(reqVO.getOldPassword(), user.getPassword())) {
             throw exception(USER_PASSWORD_FAILED);
         }
         userMapper.updateById(new AdminUserDO().setId(id).setPassword(encodePassword(reqVO.getNewPassword())));
+        removeUserTokens(id);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void resetUserPassword(Long id, String password) {
         validateUserExists(id);
         userMapper.updateById(new AdminUserDO().setId(id).setPassword(encodePassword(password)));
+        removeUserTokens(id);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateUserStatus(Long id, Integer status) {
         validateUserExists(id);
         userMapper.updateById(new AdminUserDO().setId(id).setStatus(status));
+        if (CommonStatusEnum.isDisable(status)) {
+            removeUserTokens(id);
+        }
+    }
+
+    /**
+     * 作废用户的全部访问令牌与刷新令牌。网关缓存令牌校验结果，已缓存的令牌最多还能用一个缓存周期
+     */
+    private void removeUserTokens(Long id) {
+        oauth2TokenService.removeAccessTokensByUser(id, UserTypeEnum.ADMIN.getValue());
     }
 
     // ========== 删除 ==========
@@ -162,6 +184,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         userMapper.deleteById(id);
         permissionService.processUserDeleted(id);
         userPostMapper.deleteByUserId(id);
+        removeUserTokens(id);
     }
 
     @Override

@@ -1,0 +1,118 @@
+# ccloud-gateway 基础配置。与环境无关的项放这里，环境相关项放 application-{profile}.yaml。
+# Nacos 配置（ccloud-common.yaml / ccloud-gateway.yaml）在各 application-{profile}.yaml 中导入，优先级高于本文件与 profile 文件。
+# 路由规则在 RouteConfiguration 中以代码定义（便于测试与审查），不在配置中声明。
+server:
+  port: 48080
+
+spring:
+  application:
+    name: ccloud-gateway
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  main:
+    # 网关基于 WebFlux，classpath 上即使混入 Servlet 依赖也不能以 Servlet 方式启动
+    web-application-type: reactive
+  cloud:
+    nacos:
+      server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        metadata:
+          management.context-path: /actuator
+      config:
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 3000
+            response-timeout: 30s
+  jackson:
+    serialization:
+      write-dates-as-timestamps: true
+  web:
+    resources:
+      # 不按默认规则暴露 classpath 静态资源：文档页由 SwaggerAggregationConfiguration 按开关显式注册
+      add-mappings: false
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      password: ${REDIS_PASSWORD:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # 网关的 actuator 直接暴露在公网入口上，只开放健康检查与基本信息
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+ccloud:
+  swagger:
+    # 接口文档聚合页 /doc.html，生产环境关闭
+    enable: true
+  security:
+    # 与业务服务共享的内部签名密钥，缺失时网关启动失败
+    internal-sign-secret: ${CCLOUD_INTERNAL_SIGN_SECRET:}
+    # 可匿名访问的接口。须与各服务 SecurityConfiguration 的匿名接口一致（由 system、member 的一致性测试校验）：
+    # 少配则该接口经网关不可用，多配则网关失去一层保护。携带有效令牌时仍会下发身份
+    ignore-urls:
+      # ---- system ----
+      - /admin-api/system/auth/login
+      - /admin-api/system/auth/sms-login
+      - /admin-api/system/auth/send-sms-code
+      - /admin-api/system/auth/reset-password
+      - /admin-api/system/auth/register
+      - /admin-api/system/auth/refresh-token
+      - /admin-api/system/auth/logout
+      - /admin-api/system/auth/social-auth-redirect
+      - /admin-api/system/auth/social-login
+      - /admin-api/system/auth/social-bind-login
+      - /admin-api/system/captcha/**
+      - /admin-api/system/tenant/get-id-by-name
+      - /admin-api/system/tenant/get-by-website
+      - /admin-api/system/oauth2/token
+      - /admin-api/system/oauth2/check-token
+      - GET /admin-api/system/sso/authorize
+      - GET /admin-api/system/sso/logout
+      - /admin-api/system/dict-data/simple-list
+      # ---- member ----
+      - /app-api/member/auth/login
+      - /app-api/member/auth/sms-login
+      - /app-api/member/auth/send-sms-code
+      - /app-api/member/auth/reset-password
+      - /app-api/member/auth/social-auth-redirect
+      - /app-api/member/auth/social-login
+      - /app-api/member/auth/weixin-mini-app-login
+      - /app-api/member/auth/refresh-token
+      - /app-api/member/auth/logout
+      # ---- 接口文档转发路由（ccloud.swagger.enable=false 时不注册） ----
+      - /*/v3/api-docs/*
+    # 登出后立即清除网关上该令牌的缓存
+    logout-urls:
+      - /admin-api/system/auth/logout
+      - /admin-api/system/sso/logout
+      - /app-api/member/auth/logout
+    token-cache-ttl: 60s
+    token-cache-max-size: 10000
+  gateway:
+    rate-limit:
+      enabled: true
+      # Redis 令牌桶，多个网关实例共享。已登录按用户、未登录按客户端 IP 计数；开放接口按应用计数（ccloud.open.apps[].rate-limit）
+      defaults:
+        replenish-rate: 100
+        burst-capacity: 200
+      # 按路由单独配置，路由编号见 RouteConfiguration（system、member、open-api-pay 等）
+      routes: {}
+    cors:
+      # 生产环境建议收窄为自己的前端域名，如 https://*.example.com
+      allowed-origin-patterns: ${CCLOUD_CORS_ALLOWED_ORIGIN_PATTERNS:*}

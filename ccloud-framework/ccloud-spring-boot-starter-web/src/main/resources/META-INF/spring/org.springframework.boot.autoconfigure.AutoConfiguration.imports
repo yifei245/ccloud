@@ -1,0 +1,3 @@
+com.ccloud.framework.web.config.CcloudWebAutoConfiguration
+com.ccloud.framework.swagger.config.CcloudSwaggerAutoConfiguration
+com.ccloud.framework.xss.config.CcloudXssAutoConfiguration

@@ -1,0 +1,3 @@
+com.ccloud.framework.signature.config.CcloudApiSignatureAutoConfiguration
+com.ccloud.framework.idempotent.config.CcloudIdempotentAutoConfiguration
+com.ccloud.framework.ratelimiter.config.CcloudRateLimiterAutoConfiguration

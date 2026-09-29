@@ -1,0 +1,18 @@
+package com.ccloud.module.system.controller.admin.sms.vo.channel;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+
+@Schema(description = "管理后台 - 短信渠道精简信息 Response VO")
+@Data
+public class SmsChannelSimpleRespVO {
+
+    @Schema(description = "渠道编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
+    private Long id;
+
+    @Schema(description = "短信签名", requiredMode = Schema.RequiredMode.REQUIRED, example = "ccloud")
+    private String signature;
+
+    @Schema(description = "渠道编码", requiredMode = Schema.RequiredMode.REQUIRED, example = "ALIYUN")
+    private String code;
+}

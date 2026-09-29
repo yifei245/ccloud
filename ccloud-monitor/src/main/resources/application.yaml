@@ -1,0 +1,50 @@
+# ccloud-monitor：服务健康面板（Spring Boot Admin Server）
+server:
+  port: 48182
+
+spring:
+  application:
+    name: ccloud-monitor
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  cloud:
+    nacos:
+      server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+      config:
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+  security:
+    user:
+      name: admin
+      password: ${ccloud.monitor.password}
+  boot:
+    admin:
+      ui:
+        title: ccloud 服务监控
+      # 从 Nacos 发现被监控的服务（各服务不再主动注册，避免同一实例出现两次）；
+      # actuator 路径取自服务注册时的元数据 management.context-path
+      discovery:
+        services:
+          - ccloud-*
+        ignored-services:
+          - ${spring.application.name}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+ccloud:
+  monitor:
+    # 面板账号 admin 的密码。生产环境 profile 不提供默认值
+    password: ${CCLOUD_MONITOR_PASSWORD:ccloud123}

@@ -1,0 +1,2 @@
+com.ccloud.framework.mybatis.config.CcloudMybatisAutoConfiguration
+com.ccloud.framework.mybatis.config.CcloudConfigPropsEndpointAutoConfiguration

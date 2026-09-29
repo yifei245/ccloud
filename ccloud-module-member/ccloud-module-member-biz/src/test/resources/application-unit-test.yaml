@@ -1,0 +1,38 @@
+# member 模块测试配置。与 starter-test 的同名文件互斥（本文件优先），因此需自包含。
+# 与框架默认不同：Redis 不排除，由 Testcontainers 提供真实实例（protection 等 starter 无条件依赖 Redis）。
+spring:
+  datasource:
+    dynamic:
+      primary: master
+      datasource:
+        master:
+          url: jdbc:h2:mem:ccloud_member_ut;MODE=MYSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+          driver-class-name: org.h2.Driver
+          username: sa
+          password: ""
+  boot:
+    admin:
+      client:
+        enabled: false
+
+management:
+  tracing:
+    enabled: false
+  zipkin:
+    tracing:
+      export:
+        enabled: false
+
+xxl:
+  job:
+    enabled: false
+
+ccloud:
+  mybatis:
+    encrypt-key: ccloud1234567890
+  security:
+    internal-sign-secret: unit-test-secret
+
+logging:
+  level:
+    com.ccloud: debug

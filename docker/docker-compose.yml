@@ -1,0 +1,115 @@
+# ccloud 全量编排：中间件 + gateway / system / member / monitor。
+# 启动：scripts/docker-up.sh（会先 mvn package 再构建镜像）；也可在打包后执行 docker compose up -d --build
+name: ccloud
+
+include:
+  - docker-compose.middleware.yml
+
+x-app-env: &app-env
+  SPRING_PROFILES_ACTIVE: dev
+  TZ: Asia/Shanghai
+  JAVA_OPTS: ${JAVA_OPTS}
+  NACOS_ADDR: ccloud-nacos:8848
+  NACOS_USERNAME: ${NACOS_USERNAME}
+  NACOS_PASSWORD: ${NACOS_PASSWORD}
+  MYSQL_HOST: ccloud-mysql
+  MYSQL_PORT: 3306
+  MYSQL_USERNAME: root
+  MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+  REDIS_HOST: ccloud-redis
+  REDIS_PORT: 6379
+  CCLOUD_INTERNAL_SIGN_SECRET: ${CCLOUD_INTERNAL_SIGN_SECRET}
+  CCLOUD_ENCRYPT_KEY: ${CCLOUD_ENCRYPT_KEY}
+  CCLOUD_MONITOR_PASSWORD: ${CCLOUD_MONITOR_PASSWORD}
+  XXL_JOB_ENABLED: "true"
+  XXL_JOB_HOST: ccloud-xxl-job
+  XXL_JOB_ACCESS_TOKEN: ${XXL_JOB_ACCESS_TOKEN}
+  ZIPKIN_HOST: ccloud-zipkin
+
+x-app-depends: &app-depends
+  ccloud-mysql:
+    condition: service_healthy
+  ccloud-redis:
+    condition: service_healthy
+  ccloud-nacos-init:
+    condition: service_completed_successfully
+
+services:
+  ccloud-system:
+    build: ../ccloud-module-system/ccloud-module-system-biz
+    image: ccloud/ccloud-system-server:1.0.0
+    container_name: ccloud-system
+    restart: unless-stopped
+    environment: *app-env
+    ports:
+      - "127.0.0.1:${SYSTEM_PORT}:48081"
+    depends_on:
+      <<: *app-depends
+      # 任务执行器启动时向调度中心注册
+      ccloud-xxl-job:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:48081/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
+  ccloud-member:
+    build: ../ccloud-module-member/ccloud-module-member-biz
+    image: ccloud/ccloud-member-server:1.0.0
+    container_name: ccloud-member
+    restart: unless-stopped
+    environment: *app-env
+    ports:
+      - "127.0.0.1:${MEMBER_PORT}:48083"
+    depends_on:
+      <<: *app-depends
+      # 启动时经 RPC 从 system 加载文案等数据
+      ccloud-system:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:48083/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
+  ccloud-gateway:
+    build: ../ccloud-gateway
+    image: ccloud/ccloud-gateway:1.0.0
+    container_name: ccloud-gateway
+    restart: unless-stopped
+    environment: *app-env
+    # 网关是唯一对外入口
+    ports:
+      - "${GATEWAY_PORT}:48080"
+    depends_on:
+      ccloud-redis:
+        condition: service_healthy
+      ccloud-nacos-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:48080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  ccloud-monitor:
+    build: ../ccloud-monitor
+    image: ccloud/ccloud-monitor:1.0.0
+    container_name: ccloud-monitor
+    restart: unless-stopped
+    environment: *app-env
+    ports:
+      - "127.0.0.1:${MONITOR_PORT}:48182"
+    depends_on:
+      ccloud-nacos-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:48182/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s

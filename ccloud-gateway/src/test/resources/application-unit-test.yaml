@@ -1,0 +1,37 @@
+# 网关测试配置：不连 Nacos，下游实例由测试经 simple discovery 注入
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+    service-registry:
+      auto-registration:
+        enabled: false
+
+ccloud:
+  security:
+    internal-sign-secret: unit-test-secret
+  open:
+    apps:
+      - app-id: demo-app
+        app-secret: demo-secret
+        tenant-id: 7
+        enabled: true
+      - app-id: limited-app
+        app-secret: limited-secret
+        tenant-id: 7
+        rate-limit: 1
+      - app-id: disabled-app
+        app-secret: disabled-secret
+        tenant-id: 7
+        enabled: false
+  gateway:
+    rate-limit:
+      routes:
+        promotion:
+          replenish-rate: 1
+          burst-capacity: 2

@@ -1,0 +1,17 @@
+# ccloud 数据源连接池的通用配置（system、member 导入）
+#
+# 只放与环境无关的连接池行为；连接地址、账号、密码与池大小随环境变化，由各环境的 profile 与环境变量提供。
+# 本文件的修改需重启服务才生效。
+
+spring:
+  datasource:
+    dynamic:
+      druid:
+        # 空闲时校验连接有效性，借出、归还时不校验：兼顾可靠性与性能
+        validation-query: SELECT 1
+        test-while-idle: true
+        test-on-borrow: false
+        test-on-return: false
+        # 每分钟检查一次空闲连接，空闲超过 5 分钟的连接回收
+        time-between-eviction-runs-millis: 60000
+        min-evictable-idle-time-millis: 300000

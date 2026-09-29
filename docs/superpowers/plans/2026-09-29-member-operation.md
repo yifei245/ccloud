@@ -100,7 +100,7 @@ void validateGroupEnabled(Long id);                          // 不存在 GROUP_
 **Interfaces:**
 - Produces: 下表错误码；`MemberUserMapper.selectByIdForUpdate(Long)`；`BaseMemberWebIntegrationTest`。
 
-- [ ] **Step 1: 在 `ErrorCodeConstants` 追加错误码**（写在对应段落下）
+- [x] **Step 1: 在 `ErrorCodeConstants` 追加错误码**（写在对应段落下）
 
 ```java
     // ========== 收件地址 1-004-004-000 ==========
@@ -135,12 +135,12 @@ void validateGroupEnabled(Long id);                          // 不存在 GROUP_
     ErrorCode EXPERIENCE_BIZ_TYPE_INVALID = new ErrorCode(1_004_013_000, "经验业务类型与操作不符");
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `mvn -o -q -pl ccloud-module-member/ccloud-module-member-api -am test -Dtest=ErrorCodeConstantsTest -Dsurefire.failIfNoSpecifiedTests=false`
 Expected: FAIL，`everyCodeShouldHaveBothTranslations` 报 17 个错误码缺少中文与英文文案。
 
-- [ ] **Step 3: 在 `06-i18n.sql` 末尾追加文案**。把原最后一行的 `;` 改为 `,`，接着写：
+- [x] **Step 3: 在 `06-i18n.sql` 末尾追加文案**。把原最后一行的 `;` 改为 `,`，接着写：
 
 ```sql
   (267, 'zh_CN', 'error.code.1004004001', '收件地址最多 {} 个', 1, '1'),
@@ -179,7 +179,7 @@ Expected: FAIL，`everyCodeShouldHaveBothTranslations` 报 17 个错误码缺少
   (300, 'en_US', 'error.code.1004013000', 'The experience business type does not match the operation', 1, '1');
 ```
 
-- [ ] **Step 4: 演示会员补等级**。`01-tenant-and-user.sql` 的 `member_user` 插入语句列表在 `experience` 后加 `level_id`，值加 `1`（青铜会员，门槛 0）：
+- [x] **Step 4: 演示会员补等级**。`01-tenant-and-user.sql` 的 `member_user` 插入语句列表在 `experience` 后加 `level_id`，值加 `1`（青铜会员，门槛 0）：
 
 ```sql
 INSERT INTO `member_user` (`id`, `mobile`, `password`, `status`, `register_ip`, `register_terminal`, `nickname`, `avatar`, `sex`, `point`, `experience`, `level_id`, `tenant_id`, `creator`) VALUES
@@ -188,12 +188,12 @@ INSERT INTO `member_user` (`id`, `mobile`, `password`, `status`, `register_ip`, 
 
 然后执行 `scripts/build-sql.sh`。
 
-- [ ] **Step 5: 运行确认通过**
+- [x] **Step 5: 运行确认通过**
 
 Run: 同 Step 2。Expected: PASS。
 Run: `scripts/verify-sql.sh`。Expected: 以"校验通过"结束，"错误码中英文文案条数一致"为 OK。
 
-- [ ] **Step 6: 新增 `selectByIdForUpdate`**（代码见"共享约定"），并在 `MemberUserMapper` 加以下查询，供 Task 2、7、8 判断"是否仍有会员在用"：
+- [x] **Step 6: 新增 `selectByIdForUpdate`**（代码见"共享约定"），并在 `MemberUserMapper` 加以下查询，供 Task 2、7、8 判断"是否仍有会员在用"：
 
 ```java
 default Long selectCountByLevelId(Long levelId) {
@@ -209,7 +209,7 @@ default Long selectCountByTagId(Long tagId) {
 }
 ```
 
-- [ ] **Step 7: 抽取 Web 测试基类**。把 `MemberSecurityIntegrationTest` 中的以下内容原样移入 `BaseMemberWebIntegrationTest`（抽象类，保留全部注解）：
+- [x] **Step 7: 抽取 Web 测试基类**。把 `MemberSecurityIntegrationTest` 中的以下内容原样移入 `BaseMemberWebIntegrationTest`（抽象类，保留全部注解）：
   - `@SpringBootTest`、`@AutoConfigureMockMvc`、`@ActiveProfiles`；
   - Redis 容器与 `@DynamicPropertySource`；
   - `MockMvc`、`JdbcTemplate`；
@@ -246,12 +246,12 @@ default Long selectCountByTagId(Long tagId) {
 
   `asUser` 改为 `protected`，内容不变。`MemberSecurityIntegrationTest` 改为 `extends BaseMemberWebIntegrationTest`，只保留它自己的 `setUp`、`cleanUp` 与用例；其中对 `tenantApi.validTenant` 的重复打桩删掉。
 
-- [ ] **Step 8: 运行会员模块全部测试**
+- [x] **Step 8: 运行会员模块全部测试**
 
 Run: `mvn -o -q -pl ccloud-module-member/ccloud-module-member-biz -am test`
 Expected: PASS，测试数与改动前相同（63 个）。
 
-- [ ] **Step 9: 提交**
+- [x] **Step 9: 提交**
 
 ```bash
 git add -A ccloud-module-member sql

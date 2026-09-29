@@ -1079,7 +1079,7 @@ DO：
 
 规则保存校验：`day @NotNull @Min(1)`、`point @NotNull @Min(0)`、`experience @NotNull @Min(0)`、`status @InEnum`；天数重复报 `SIGN_IN_CONFIG_DAY_EXISTS`；修改或删除不存在的规则报 `SIGN_IN_CONFIG_NOT_EXISTS`。
 
-- [ ] **Step 1: 写失败测试** `MemberSignInRecordServiceImplTest extends BaseMemberDbUnitTest`：
+- [x] **Step 1: 写失败测试** `MemberSignInRecordServiceImplTest extends BaseMemberDbUnitTest`：
   - `@Import({MemberSignInRecordServiceImpl.class, MemberSignInConfigServiceImpl.class, MemberPointServiceImpl.class, MemberLevelServiceImpl.class})`；
   - 前置：插入会员 `userId`（积分 0、经验 0）；规则为第 1 天 (2 积分, 1 经验)、第 3 天 (6, 3)、第 7 天 (14, 7)。
   - 辅助方法 `insertRecord(int day, LocalDateTime createTime)` 直接写入签到记录。`createTime` 非空时填充器不会覆盖。
@@ -1180,12 +1180,12 @@ DO：
   - 未登录签到返回 401；
   - 管理端签到规则接口无权限返回 403。
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `mvn -o -q -pl ccloud-module-member/ccloud-module-member-biz -am test -Dtest='MemberSignIn*Test,AppMemberSignInControllerTest' -Dsurefire.failIfNoSpecifiedTests=false`
 Expected: 编译失败。
 
-- [ ] **Step 3: 实现**（`MemberSignInRecordServiceImpl`）
+- [x] **Step 3: 实现**（`MemberSignInRecordServiceImpl`）
 
 ```java
     @Override
@@ -1246,20 +1246,22 @@ Expected: 编译失败。
 
 `selectLastByUserId`：`selectOne(new LambdaQueryWrapperX<MemberSignInRecordDO>().eq(userId).orderByDesc(MemberSignInRecordDO::getCreateTime).orderByDesc(MemberSignInRecordDO::getId).last("LIMIT 1"))`。`getSignInConfigList(Integer status)`：status 为 null 时返回全部，均按 `day` 升序。
 
-- [ ] **Step 4: 运行确认通过**。Run: 同 Step 2，再跑会员模块全部测试。Expected: PASS。
+- [x] **Step 4: 运行确认通过**。Run: 同 Step 2，再跑会员模块全部测试。Expected: PASS。
 
-- [ ] **Step 5: 变异检查**：
+- [x] **Step 5: 变异检查**：
   - `config.getDay() <= day` 改为 `==`；
   - `minusDays(1)` 改为 `minusDays(2)`；
   - 去掉会员行锁（并发测试应失败）；
   - 概况中 `continuing` 恒为 true。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A ccloud-module-member
 git commit -m "feat(member): 签到规则与签到，连续签到奖励积分与经验"
 ```
+
+> 执行记录：签到规则改为物理删除（`MemberSignInConfigMapper.deleteByIdPhysically`）。唯一索引 `uk_day` 含 `deleted` 列，逻辑删除后同一天数的规则第二次删除会撞唯一索引；已补"反复删除后重建"与"物理删除受租户隔离"两个用例。
 
 ---
 

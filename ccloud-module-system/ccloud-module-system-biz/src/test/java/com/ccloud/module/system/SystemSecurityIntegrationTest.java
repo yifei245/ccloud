@@ -47,7 +47,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "spring.cloud.nacos.config.enabled=false",
                 "spring.cloud.nacos.config.import-check.enabled=false",
                 "spring.cloud.nacos.discovery.enabled=false",
-                "spring.cloud.service-registry.auto-registration.enabled=false"
+                "spring.cloud.service-registry.auto-registration.enabled=false",
+                // 连接池耗尽时快速失败，而不是默认等 60 秒：连接泄露类缺陷才会表现为断言失败而非测试挂起
+                "spring.datasource.dynamic.druid.max-wait=3000"
         })
 @AutoConfigureMockMvc
 @ActiveProfiles("unit-test")
@@ -175,6 +177,29 @@ class SystemSecurityIntegrationTest {
         }
         mockMvc.perform(get("/v3/api-docs/admin"))
                 .andExpect(jsonPath("$.paths['/admin-api/system/user/page']").exists());
+    }
+
+    // ========== 监控端点 ==========
+
+    /**
+     * 监控面板的"配置属性"页面调用 /actuator/configprops。该端点用 Jackson 序列化配置属性 bean，
+     * 若其中含 Druid 数据源，会调用 getConnection() 借出连接且永不归还，访问几次即耗尽连接池、服务不可用
+     */
+    @Test
+    void 访问配置属性端点不应占用数据库连接() throws Exception {
+        long before = activeConnections();
+        String body = null;
+        for (int i = 0; i < 3; i++) {
+            body = mockMvc.perform(get("/actuator/configprops")).andReturn().getResponse().getContentAsString();
+        }
+        assertThat(activeConnections()).as("访问后的活跃连接数").isEqualTo(before);
+        // 端点仍然可用：业务配置照常展示，供监控面板查看与校验配置是否生效
+        assertThat(body).contains("ccloud.sms-code").contains("sendFrequency");
+    }
+
+    private static long activeConnections() {
+        return com.alibaba.druid.stat.DruidDataSourceStatManager.getDruidDataSourceInstances().stream()
+                .mapToLong(ds -> ((com.alibaba.druid.pool.DruidDataSource) ds).getActiveCount()).sum();
     }
 
     private MockHttpServletRequestBuilder asUser(MockHttpServletRequestBuilder builder, long userId, long tenantId) {

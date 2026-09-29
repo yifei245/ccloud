@@ -33,6 +33,6 @@ INSERT INTO `system_user_post` (`id`, `user_id`, `post_id`, `tenant_id`, `creato
   (1, 1, 1, 1, '1'),
   (2, 2, 2, 1, '1');
 
-INSERT INTO `member_user` (`id`, `mobile`, `password`, `status`, `register_ip`, `register_terminal`, `nickname`, `avatar`, `sex`, `point`, `experience`, `tenant_id`, `creator`) VALUES
-  (1, '13800138000', '$2a$04$M0ie1r3Ux77ugXGaO9gfXe4SSHx6RARZ.QhcWXDUb9ErN8o5.sefi', 0, '127.0.0.1', 31, '演示会员', '', 0, 100, 0, 1, '1');
+INSERT INTO `member_user` (`id`, `mobile`, `password`, `status`, `register_ip`, `register_terminal`, `nickname`, `avatar`, `sex`, `point`, `experience`, `level_id`, `tenant_id`, `creator`) VALUES
+  (1, '13800138000', '$2a$04$M0ie1r3Ux77ugXGaO9gfXe4SSHx6RARZ.QhcWXDUb9ErN8o5.sefi', 0, '127.0.0.1', 31, '演示会员', '', 0, 100, 0, 1, 1, '1');
 

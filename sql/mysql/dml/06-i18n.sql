@@ -1,6 +1,6 @@
 -- ----------------------------------------------------------------------------
 -- 初始化数据：国际化文案
--- 错误码文案，key 为 error.code.{错误码}。全局 13 条、system 模块 105 条，zh_CN 与 en_US 各一份
+-- 错误码文案，key 为 error.code.{错误码}。全局 13 条、system 模块 105 条、member 模块 29 条，zh_CN 与 en_US 各一份
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -274,5 +274,39 @@ INSERT INTO `system_i18n_message` (`id`, `locale`, `code`, `content`, `source`, 
   (263, 'zh_CN', 'error.code.1004003008', '该社交账号未绑定用户，请先用手机号登录后绑定', 1, '1'),
   (264, 'en_US', 'error.code.1004003008', 'The social account is not bound, please log in with your mobile number and bind it first', 1, '1'),
   (265, 'zh_CN', 'error.code.1004003009', '登录失败次数过多，账号已锁定，请 {} 分钟后再试', 1, '1'),
-  (266, 'en_US', 'error.code.1004003009', 'Too many failed login attempts, the account is locked, please try again in {} minutes', 1, '1');
+  (266, 'en_US', 'error.code.1004003009', 'Too many failed login attempts, the account is locked, please try again in {} minutes', 1, '1'),
+  (267, 'zh_CN', 'error.code.1004004001', '收件地址最多 {} 个', 1, '1'),
+  (268, 'en_US', 'error.code.1004004001', 'At most {} shipping addresses are allowed', 1, '1'),
+  (269, 'zh_CN', 'error.code.1004006000', '用户标签不存在', 1, '1'),
+  (270, 'en_US', 'error.code.1004006000', 'The member tag does not exist', 1, '1'),
+  (271, 'zh_CN', 'error.code.1004006001', '用户标签已经存在', 1, '1'),
+  (272, 'en_US', 'error.code.1004006001', 'The member tag already exists', 1, '1'),
+  (273, 'zh_CN', 'error.code.1004006002', '用户标签下存在用户，无法删除', 1, '1'),
+  (274, 'en_US', 'error.code.1004006002', 'The member tag is in use and cannot be deleted', 1, '1'),
+  (275, 'zh_CN', 'error.code.1004008000', '积分业务类型与操作不符', 1, '1'),
+  (276, 'en_US', 'error.code.1004008000', 'The point business type does not match the operation', 1, '1'),
+  (277, 'zh_CN', 'error.code.1004009000', '签到规则不存在', 1, '1'),
+  (278, 'en_US', 'error.code.1004009000', 'The sign-in rule does not exist', 1, '1'),
+  (279, 'zh_CN', 'error.code.1004009001', '签到天数规则已存在', 1, '1'),
+  (280, 'en_US', 'error.code.1004009001', 'A sign-in rule for this day already exists', 1, '1'),
+  (281, 'zh_CN', 'error.code.1004010000', '今日已签到，请勿重复签到', 1, '1'),
+  (282, 'en_US', 'error.code.1004010000', 'Already signed in today', 1, '1'),
+  (283, 'zh_CN', 'error.code.1004011002', '用户等级值已被使用', 1, '1'),
+  (284, 'en_US', 'error.code.1004011002', 'The level value is already in use', 1, '1'),
+  (285, 'zh_CN', 'error.code.1004011003', '等级越高，升级所需经验必须越多', 1, '1'),
+  (286, 'en_US', 'error.code.1004011003', 'A higher level must require more experience', 1, '1'),
+  (287, 'zh_CN', 'error.code.1004011004', '用户等级下存在用户，无法删除', 1, '1'),
+  (288, 'en_US', 'error.code.1004011004', 'The member level is in use and cannot be deleted', 1, '1'),
+  (289, 'zh_CN', 'error.code.1004011005', '用户等级已停用', 1, '1'),
+  (290, 'en_US', 'error.code.1004011005', 'The member level is disabled', 1, '1'),
+  (291, 'zh_CN', 'error.code.1004012000', '用户分组不存在', 1, '1'),
+  (292, 'en_US', 'error.code.1004012000', 'The member group does not exist', 1, '1'),
+  (293, 'zh_CN', 'error.code.1004012001', '用户分组已经存在', 1, '1'),
+  (294, 'en_US', 'error.code.1004012001', 'The member group already exists', 1, '1'),
+  (295, 'zh_CN', 'error.code.1004012002', '用户分组下存在用户，无法删除', 1, '1'),
+  (296, 'en_US', 'error.code.1004012002', 'The member group is in use and cannot be deleted', 1, '1'),
+  (297, 'zh_CN', 'error.code.1004012003', '用户分组已停用', 1, '1'),
+  (298, 'en_US', 'error.code.1004012003', 'The member group is disabled', 1, '1'),
+  (299, 'zh_CN', 'error.code.1004013000', '经验业务类型与操作不符', 1, '1'),
+  (300, 'en_US', 'error.code.1004013000', 'The experience business type does not match the operation', 1, '1');
 

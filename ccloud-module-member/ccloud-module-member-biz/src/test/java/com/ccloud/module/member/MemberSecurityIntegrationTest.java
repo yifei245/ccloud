@@ -3,108 +3,36 @@ package com.ccloud.module.member;
 import com.ccloud.framework.common.enums.TerminalEnum;
 import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.pojo.CommonResult;
-import com.ccloud.framework.common.util.json.JsonUtils;
-import com.ccloud.framework.security.core.LoginUser;
-import com.ccloud.framework.security.core.filter.LoginUserFilter;
-import com.ccloud.framework.security.core.util.InternalSignUtils;
-import com.ccloud.framework.test.core.ut.MySqlTestContainer;
-import com.ccloud.module.system.api.logger.LoginLogApi;
-import com.ccloud.module.system.api.oauth2.OAuth2TokenApi;
+import com.ccloud.module.member.test.BaseMemberWebIntegrationTest;
 import com.ccloud.module.system.api.oauth2.dto.OAuth2AccessTokenCreateReqDTO;
 import com.ccloud.module.system.api.oauth2.dto.OAuth2AccessTokenRespDTO;
-import com.ccloud.module.system.api.sms.SmsCodeApi;
-import com.ccloud.module.system.api.tenant.TenantApi;
 import com.ccloud.module.system.enums.oauth2.OAuth2ClientConstants;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.testcontainers.containers.GenericContainer;
-
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 /**
- * 从 HTTP 入口验证 C 端的鉴权边界：哪些接口可匿名、身份的用户类型、请求头的解析。
- * system 的 RPC 以桩替代；身份头按网关的方式签名
+ * 从 HTTP 入口验证 C 端的鉴权边界：哪些接口可匿名、身份的用户类型、请求头的解析
  */
-@SpringBootTest(classes = MemberServerApplication.class,
-        properties = {
-                "spring.cloud.nacos.config.enabled=false",
-                "spring.cloud.nacos.config.import-check.enabled=false",
-                "spring.cloud.nacos.discovery.enabled=false",
-                "spring.cloud.service-registry.auto-registration.enabled=false"
-        })
-@AutoConfigureMockMvc
-@ActiveProfiles("unit-test")
-class MemberSecurityIntegrationTest {
+class MemberSecurityIntegrationTest extends BaseMemberWebIntegrationTest {
 
-    private static final String SECRET = "unit-test-secret";
-    private static final long TENANT = 1L;
     private static final long MEMBER_ID = 90101L;
-
-    @SuppressWarnings("resource")
-    private static final GenericContainer<?> REDIS = startRedis();
-
-    private static GenericContainer<?> startRedis() {
-        GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
-        redis.start();
-        return redis;
-    }
-
-    @DynamicPropertySource
-    static void properties(DynamicPropertyRegistry registry) {
-        var mysql = MySqlTestContainer.get();
-        registry.add("spring.datasource.dynamic.datasource.master.url", mysql::getJdbcUrl);
-        registry.add("spring.datasource.dynamic.datasource.master.username", mysql::getUsername);
-        registry.add("spring.datasource.dynamic.datasource.master.password", mysql::getPassword);
-        registry.add("spring.datasource.dynamic.datasource.master.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
-        registry.add("ccloud.security.internal-sign-secret", () -> SECRET);
-    }
-
-    @Autowired
-    private MockMvc mockMvc;
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    @MockitoBean
-    private TenantApi tenantApi;
-    @MockitoBean
-    private OAuth2TokenApi oauth2TokenApi;
-    @MockitoBean
-    private SmsCodeApi smsCodeApi;
-    @MockitoBean
-    private LoginLogApi loginLogApi;
 
     @BeforeEach
     void setUp() {
         cleanUp();
         jdbcTemplate.update("INSERT INTO member_user (id, mobile, password, status, register_ip, nickname, tenant_id) "
                 + "VALUES (?, '13933330001', '$2a$04$hash', 0, '127.0.0.1', '会员甲', ?)", MEMBER_ID, TENANT);
-        when(tenantApi.validTenant(anyLong())).thenReturn(CommonResult.success(true));
         when(smsCodeApi.useSmsCode(any())).thenReturn(CommonResult.success(true));
         when(loginLogApi.createLoginLog(any())).thenReturn(CommonResult.success(true));
         when(oauth2TokenApi.createAccessToken(any())).thenAnswer(invocation -> {
@@ -214,21 +142,5 @@ class MemberSecurityIntegrationTest {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.nickname").value("会员甲"))
                 .andExpect(jsonPath("$.data.password").doesNotExist());
-    }
-
-    private MockHttpServletRequestBuilder asUser(MockHttpServletRequestBuilder builder, long userId,
-                                                 UserTypeEnum userType) {
-        LoginUser loginUser = new LoginUser();
-        loginUser.setId(userId);
-        loginUser.setUserType(userType.getValue());
-        loginUser.setTenantId(TENANT);
-        loginUser.setExpiresTime(LocalDateTime.now().plusHours(1));
-        String payload = Base64.getEncoder().encodeToString(
-                JsonUtils.toJsonString(loginUser).getBytes(StandardCharsets.UTF_8));
-        long timestamp = System.currentTimeMillis();
-        return builder.header(LoginUserFilter.HEADER_LOGIN_USER, payload)
-                .header(LoginUserFilter.HEADER_LOGIN_USER_SIGN, InternalSignUtils.sign(payload, timestamp, SECRET))
-                .header(LoginUserFilter.HEADER_TIMESTAMP, String.valueOf(timestamp))
-                .header("X-Tenant-Id", TENANT);
     }
 }

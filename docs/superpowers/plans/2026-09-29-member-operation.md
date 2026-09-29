@@ -294,7 +294,7 @@ git commit -m "feat(member): 会员运营错误码与文案、演示会员等级
 
 `MemberLevelPageReqVO`：`name`（模糊）、`status`。
 
-- [ ] **Step 1: 写失败测试** `MemberLevelServiceImplTest extends BaseMemberDbUnitTest`，`@Import(MemberLevelServiceImpl.class)`。本任务先写配置与 `calculateLevel` 的用例：
+- [x] **Step 1: 写失败测试** `MemberLevelServiceImplTest extends BaseMemberDbUnitTest`，`@Import(MemberLevelServiceImpl.class)`。本任务先写配置与 `calculateLevel` 的用例：
 
 ```java
     @Test
@@ -400,12 +400,12 @@ git commit -m "feat(member): 会员运营错误码与文案、演示会员等级
     }
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `mvn -o -q -pl ccloud-module-member/ccloud-module-member-biz -am test -Dtest='MemberLevelServiceImplTest,MemberLevelControllerTest' -Dsurefire.failIfNoSpecifiedTests=false`
 Expected: 编译失败（类不存在）。
 
-- [ ] **Step 3: 实现**。Mapper：
+- [x] **Step 3: 实现**。Mapper：
 
 ```java
 @Mapper
@@ -486,14 +486,14 @@ Service 配置部分的要点：
 
 `validateLevelExists` 不存在时抛 `LEVEL_NOT_EXISTS`。Controller 按上表实现，写法与 system 的 `PostController` 相同：`BeanUtils.toBean` 转 VO，`success(...)` 包装。
 
-- [ ] **Step 4: 运行确认通过**。Run: 同 Step 2。Expected: PASS。
+- [x] **Step 4: 运行确认通过**。Run: 同 Step 2。Expected: PASS。
 
-- [ ] **Step 5: 变异检查**，逐一改坏后跑 Step 2 的命令，确认有用例失败，然后还原并 `touch`：
+- [x] **Step 5: 变异检查**，逐一改坏后跑 Step 2 的命令，确认有用例失败，然后还原并 `touch`：
   - 把 `experience <= other.getExperience()` 改为 `<`；
   - 删掉 `deleteLevel` 的在用检查；
   - 在 `calculateLevel` 中把 `<=` 改为 `<`。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A ccloud-module-member

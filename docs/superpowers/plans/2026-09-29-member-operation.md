@@ -1528,7 +1528,7 @@ git commit -m "feat(member): 会员收件地址与内部接口"
 
 分页 VO：`name`（模糊）、`status`、`createTime[]`。
 
-- [ ] **Step 1: 写失败测试**：
+- [x] **Step 1: 写失败测试**：
   - 名称重复（新增与修改）；
   - 有会员在用时删除报 `GROUP_HAS_USER`；
   - `validateGroupEnabled`：不存在报 `GROUP_NOT_EXISTS`，停用报 `GROUP_DISABLED`，启用通过；
@@ -1553,13 +1553,13 @@ git commit -m "feat(member): 会员收件地址与内部接口"
     }
 ```
 
-- [ ] **Step 2: 运行确认失败**。Run: `-Dtest='MemberGroupServiceImplTest,MemberGroupControllerTest'`。
-- [ ] **Step 3: 实现**，写法同 Task 7，多一个状态字段。
-- [ ] **Step 4: 运行确认通过**，再跑会员模块全部测试。
-- [ ] **Step 5: 变异检查**：
+- [x] **Step 2: 运行确认失败**。Run: `-Dtest='MemberGroupServiceImplTest,MemberGroupControllerTest'`。
+- [x] **Step 3: 实现**，写法同 Task 7，多一个状态字段。
+- [x] **Step 4: 运行确认通过**，再跑会员模块全部测试。
+- [x] **Step 5: 变异检查**：
   - 去掉停用检查；
   - 去掉在用检查。
-- [ ] **Step 6: 提交** `git commit -m "feat(member): 会员分组管理"`
+- [x] **Step 6: 提交** `git commit -m "feat(member): 会员分组管理"`
 
 ---
 

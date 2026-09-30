@@ -7,15 +7,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG_DIR="$ROOT/docker/nacos/config"
+# shellcheck source=lib/local-middleware.sh
+source "$ROOT/scripts/lib/local-middleware.sh"
 cd "$ROOT/docker"
-while IFS='=' read -r key value; do
-  [[ -z "$key" || "$key" == \#* ]] && continue
-  [ -z "${!key+x}" ] && export "$key=$value"
-done < .env
 
 FULL=false
 [ "${1:-}" = "--full" ] && FULL=true
-NACOS="http://127.0.0.1:${NACOS_PORT}/nacos"
 
 fail() { echo "FAIL $*"; exit 1; }
 
@@ -27,24 +24,18 @@ leaks=$(grep -nEi '^[[:space:]]*-?[[:space:]]*[a-z0-9_.-]*(password|secret|token
 [ -z "$leaks" ] || fail "配置包含连接地址或密钥，这些应由各环境的 profile 与环境变量提供：
 $leaks"
 
-echo "==> 启动 MySQL 与 Nacos"
-docker compose -f docker-compose.middleware.yml up -d --wait --wait-timeout 300 ccloud-mysql ccloud-nacos 2>/dev/null
-# 一次性任务单独运行：up --wait 指定服务时会把它的正常退出当作失败
-docker compose -f docker-compose.middleware.yml run --rm ccloud-nacos-init >/dev/null 2>&1 \
-  || fail "ccloud-nacos-init 执行失败"
-
-echo "==> 导入配置（覆盖已有内容）"
+echo "==> 导入配置到本机 Nacos 的命名空间 $NACOS_NAMESPACE（覆盖已有内容）"
 bash "$ROOT/scripts/nacos-import.sh" --overwrite
 
 echo "==> 逐个读回校验"
-token=$(curl -s -X POST "$NACOS/v3/auth/user/login" --data-urlencode "username=${NACOS_USERNAME}" \
-  --data-urlencode "password=${NACOS_PASSWORD}" | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+token=$(nacos_token)
 [ -n "$token" ] || fail "Nacos 登录失败"
 count=0
 for file in "$CONFIG_DIR"/*.yaml; do
   data_id=$(basename "$file")
   remote=$(curl -s -G "$NACOS/v3/admin/cs/config" -H "accessToken: $token" \
-    --data-urlencode "dataId=$data_id" --data-urlencode "groupName=DEFAULT_GROUP")
+    --data-urlencode "dataId=$data_id" --data-urlencode "groupName=DEFAULT_GROUP" \
+    --data-urlencode "namespaceId=$NACOS_NAMESPACE")
   # 用 python 解析 JSON 并与文件逐字比较，避免 shell 处理换行与转义出错
   if python3 - "$file" "$remote" <<'PY'
 import json, sys
@@ -95,7 +86,7 @@ PY
   [ "$modified" != "$(cat "$CONFIG_DIR/ccloud-gateway.yaml")" ] || fail "未找到默认限流阈值，无法校验"
   curl -s -X POST "$NACOS/v3/admin/cs/config" -H "accessToken: $token" \
     --data-urlencode "dataId=ccloud-gateway.yaml" --data-urlencode "groupName=DEFAULT_GROUP" \
-    --data-urlencode "type=yaml" --data-urlencode "content=$modified" | grep -q '"code":0' || fail "发布修改失败"
+    --data-urlencode "namespaceId=$NACOS_NAMESPACE" --data-urlencode "type=yaml" --data-urlencode "content=$modified" | grep -q '"code":0' || fail "发布修改失败"
   refreshed=false
   for _ in $(seq 1 15); do
     sleep 2

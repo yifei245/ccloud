@@ -4,10 +4,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-while IFS='=' read -r key value; do
-  [[ -z "$key" || "$key" == \#* ]] && continue
-  [ -z "${!key+x}" ] && export "$key=$value"
-done < "$ROOT/docker/.env"
+# shellcheck source=lib/local-middleware.sh
+source "$ROOT/scripts/lib/local-middleware.sh"
 
 GW="http://127.0.0.1:${GATEWAY_PORT}"
 TENANT='X-Tenant-Id: 1'
@@ -156,14 +154,21 @@ until curl -s "http://127.0.0.1:${ZIPKIN_PORT}/api/v2/services" | jq -e 'index("
   sleep 5
 done
 ok "Zipkin 收到链路"
-APPS=$(curl -s -u "admin:${CCLOUD_MONITOR_PASSWORD}" -H 'Accept: application/json' "http://127.0.0.1:${MONITOR_PORT}/applications")
-for app in ccloud-gateway ccloud-system-server ccloud-member-server; do
-  echo "$APPS" | jq -e --arg n "$app" 'map(select(.name == $n and .status == "UP")) | length == 1' >/dev/null \
-    || die "监控面板中 $app 不是 UP"
+# 服务刚重启时（如 verify-nacos.sh --full 重启了 system），监控面板要过一个检查周期才标为 UP，最多等 60 秒
+deadline=$((SECONDS + 60))
+while true; do
+  APPS=$(curl -s -u "admin:${CCLOUD_MONITOR_PASSWORD}" -H 'Accept: application/json' "http://127.0.0.1:${MONITOR_PORT}/applications")
+  down=""
+  for app in ccloud-gateway ccloud-system-server ccloud-member-server; do
+    echo "$APPS" | jq -e --arg n "$app" 'map(select(.name == $n and .status == "UP")) | length == 1' >/dev/null || down="$down $app"
+  done
+  [ -z "$down" ] && break
+  [ $SECONDS -lt $deadline ] || die "监控面板中$down 不是 UP"
+  sleep 5
 done
 ok "监控面板显示 gateway、system、member 均为 UP"
-JOBS=$(docker exec ccloud-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -e \
-  "SELECT COUNT(DISTINCT executor_handler) FROM xxl_job.xxl_job_log WHERE handle_code = 200" 2>/dev/null)
+JOBS=$(lq "SELECT COUNT(DISTINCT executor_handler) FROM xxl_job.xxl_job_log l JOIN xxl_job.xxl_job_group g ON l.job_group = g.id
+  WHERE g.app_name = 'ccloud-system-server' AND l.handle_code = 200")
 [ "${JOBS:-0}" -ge 2 ] || die "XXL-Job 两个重投任务尚未成功执行（成功的任务数 ${JOBS:-0}），任务每分钟调度一次，可稍后重试"
 ok "XXL-Job 消息重投任务已按时执行"
 

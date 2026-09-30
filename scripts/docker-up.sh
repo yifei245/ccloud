@@ -1,17 +1,43 @@
 #!/usr/bin/env bash
-# 启动 ccloud 的 docker 编排（本地开发与联调）。
+# 启动 ccloud 的应用编排（本地开发与联调）。中间件使用本机已有的实例，ccloud 只启动自己的 4 个应用。
 # 用法：
-#   scripts/docker-up.sh              打包全部应用、构建镜像，启动中间件与应用
-#   scripts/docker-up.sh middleware   只启动中间件（应用在 IDE 中运行时使用）
-# 本机端口冲突时可临时覆盖 .env 中的端口，例如：MYSQL_PORT=13306 NACOS_PORT=18848 NACOS_GRPC_PORT=19848 scripts/docker-up.sh
+#   scripts/docker-up.sh               检查本机中间件，初始化 ccloud 库、XXL-Job 任务与 Nacos 配置，打包、构建镜像并启动应用
+#   scripts/docker-up.sh init          只做初始化，不启动应用（在 IDE 中运行应用时使用）
+#   scripts/docker-up.sh --reset-db    重新导入 ccloud 库（会清空 ccloud 库中的数据，仅影响 ccloud 库）
+# 本机中间件的约定见 scripts/lib/local-middleware.sh；Nacos 账号写在 ~/.ccloud/middleware.env
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT/docker"
+# shellcheck source=lib/local-middleware.sh
+source "$ROOT/scripts/lib/local-middleware.sh"
 
-if [ "${1:-}" = "middleware" ]; then
-  docker compose -f docker-compose.middleware.yml up -d --wait --wait-timeout 300
-  echo "中间件已就绪：MySQL / Redis / Nacos / Zipkin / XXL-Job"
+MODE="${1:-all}"
+
+echo "==> 初始化 ccloud 库"
+if [ "$MODE" = "--reset-db" ] || [ "$(lq "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='ccloud'")" = "0" ]; then
+  lmysql < "$ROOT/sql/mysql/ccloud.sql" 2>&1 | { grep -v "Using a password" || true; }
+  echo "    已导入 sql/mysql/ccloud.sql"
+else
+  echo "    ccloud 库已存在，保留现有数据（重新导入请加 --reset-db）"
+fi
+
+echo "==> 初始化 XXL-Job 执行器与任务"
+if [ "$(lq "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='xxl_job'")" = "0" ]; then
+  lmysql < "$ROOT/docker/mysql/init/03-xxl-job.sql" 2>&1 | { grep -v "Using a password" || true; }
+fi
+if [ "$(lq "SELECT COUNT(*) FROM xxl_job.xxl_job_group WHERE app_name='ccloud-system-server'")" = "0" ]; then
+  docker cp "$ROOT/docker/mysql/init/04-ccloud-init.sh" "$MYSQL_CONTAINER:/tmp/04-ccloud-init.sh"
+  docker exec -e XXL_JOB_ADMIN_PASSWORD="$XXL_JOB_ADMIN_PASSWORD" "$MYSQL_CONTAINER" bash /tmp/04-ccloud-init.sh 2>&1 \
+    | { grep -v "Using a password" || true; }
+else
+  echo "    已登记，跳过"
+fi
+
+echo "==> 导入 Nacos 配置到命名空间 $NACOS_NAMESPACE"
+bash "$ROOT/scripts/nacos-import.sh"
+
+if [ "$MODE" = "init" ]; then
+  echo "==> 初始化完成，未启动应用"
   exit 0
 fi
 
@@ -20,19 +46,21 @@ echo "==> 打包应用"
 (cd "$ROOT" && mvn -q -DskipTests clean package \
   -pl ccloud-gateway,ccloud-monitor,ccloud-module-system/ccloud-module-system-biz,ccloud-module-member/ccloud-module-member-biz -am)
 
-echo "==> 构建镜像并启动（等待全部服务健康，最多 8 分钟）"
-docker compose up -d --build --wait --wait-timeout 480
+echo "==> 构建镜像并启动（等待全部应用健康，最多 8 分钟）"
+(cd "$ROOT/docker" && docker compose up -d --build --wait --wait-timeout 480)
 
-# 与 docker compose 一致：环境变量优先于 .env
-while IFS='=' read -r key value; do
-  [[ -z "$key" || "$key" == \#* ]] && continue
-  [ -z "${!key+x}" ] && export "$key=$value"
-done < .env
+# 调度中心按执行器注册的容器地址回调执行器，须接入 ccloud 的网络；docker-down.sh 会断开
+NETWORK="${COMPOSE_PROJECT_NAME}_default"
+if ! docker inspect "$XXL_JOB_CONTAINER" --format '{{json .NetworkSettings.Networks}}' | grep -q "\"$NETWORK\""; then
+  docker network connect "$NETWORK" "$XXL_JOB_CONTAINER"
+  echo "==> 已将 $XXL_JOB_CONTAINER 接入网络 $NETWORK"
+fi
+
 cat <<INFO
 ==> 已启动
   网关            http://127.0.0.1:${GATEWAY_PORT}      （接口文档 /doc.html）
   服务监控        http://127.0.0.1:${MONITOR_PORT}      admin / CCLOUD_MONITOR_PASSWORD
-  Nacos 控制台    http://127.0.0.1:${NACOS_CONSOLE_PORT}      ${NACOS_USERNAME} / NACOS_PASSWORD
+  Nacos 控制台    本机 Nacos，命名空间 ${NACOS_NAMESPACE}
   XXL-Job 控制台  http://127.0.0.1:${XXL_JOB_PORT}/xxl-job-admin      admin / XXL_JOB_ADMIN_PASSWORD
   Zipkin          http://127.0.0.1:${ZIPKIN_PORT}
 INFO

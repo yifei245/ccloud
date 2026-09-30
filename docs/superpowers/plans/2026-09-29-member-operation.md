@@ -1832,7 +1832,7 @@ Controller 的 `page` 与 `get`：
 **Interfaces:**
 - Consumes: Task 1～10 交付的全部接口；docker 环境中 member 服务端口 `127.0.0.1:${MEMBER_PORT}`（内部接口直连，不经网关）。
 
-- [ ] **Step 1: 在 `verify-e2e.sh` 插入**（`$MT` 为 C 端 App 令牌；此时 `$TOKEN` 已登出，重新登录取管理员令牌）：
+- [x] **Step 1: 在 `verify-e2e.sh` 插入**（`$MT` 为 C 端 App 令牌；此时 `$TOKEN` 已登出，重新登录取管理员令牌）：
 
 ```bash
 echo "==> 会员运营"
@@ -1883,16 +1883,16 @@ CODE=$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$GW/rpc-api/member/point/a
 
 同时把脚本首行注释改为"P1 与 P2 端到端验收"，结尾的输出改为"端到端验收全部通过"。
 
-- [ ] **Step 2: 更新文档**：
+- [x] **Step 2: 更新文档**：
   - `docs/模块说明.md`：member 行职责改为"会员用户与 C 端认证；收件地址、标签、分组、等级与经验、积分、签到、会员配置"，删除"后续阶段"表中的"`ccloud-module-member` 运营功能"一行。
   - `docs/接口鉴权说明.md`：用户端 app-api 表格补充地址、积分记录、等级、签到接口各一行（按功能合并，例如 "`/app-api/member/address/*` 收件地址增删改查与默认地址"）。
 
-- [ ] **Step 3: 全量测试**
+- [x] **Step 3: 全量测试**
 
 Run: `mvn -o test`
 Expected: BUILD SUCCESS，member 模块测试数明显增加，其他模块与改动前一致（system 419、gateway 56、monitor 7）。
 
-- [ ] **Step 4: 全量验收**。需先确认本机 3306、8848 等端口的占用情况，按 P1 的做法用端口覆盖变量：
+- [x] **Step 4: 全量验收**。需先确认本机 3306、8848 等端口的占用情况，按 P1 的做法用端口覆盖变量：
 
 ```bash
 MYSQL_PORT=13306 REDIS_PORT=16379 NACOS_PORT=18848 NACOS_GRPC_PORT=19848 NACOS_CONSOLE_PORT=18849 scripts/verify-all.sh
@@ -1900,9 +1900,11 @@ MYSQL_PORT=13306 REDIS_PORT=16379 NACOS_PORT=18848 NACOS_GRPC_PORT=19848 NACOS_C
 
 Expected: 7 个步骤全部通过，e2e 输出"会员运营"一节全部 OK。数据卷里是旧的初始化数据（演示会员无等级）时，先 `scripts/docker-down.sh --purge` 再执行。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add scripts docs
 git commit -m "test: 会员运营端到端验收与文档"
 ```
+
+> 执行记录：按用户要求，部署与验收改为连接本机已有的中间件（mysql、redis、nacos 3.1.2、zipkin，以及为 ccloud 新装的 xxl-job-admin），ccloud 只启动自己的 4 个应用；Redis 用 1 号库，Nacos 用 `ccloud` 命名空间，Nacos 账号在 `~/.ccloud/middleware.env`。验收中发现并修复两处脚本问题：载入 .env 的循环在最后一个键被环境变量覆盖时让 `set -e` 静默退出；监控面板在服务刚重启时尚未标为 UP，改为最多等待 60 秒。

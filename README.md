@@ -69,20 +69,22 @@ ccloud
 
 ## 快速开始
 
-需要 JDK 21、Maven 3.9+、Docker（含 compose v2）。三种方式，详见 [docs/快速开始.md](docs/快速开始.md)：
+需要 JDK 21、Maven 3.9+、Docker（含 compose v2），以及本机已有的 MySQL、Redis、Nacos、Zipkin、XXL-Job 调度中心
+（ccloud 直接连接它们，不再自带一套，约定见 [docs/快速开始.md](docs/快速开始.md#本机中间件)）。三种方式：
 
-1. **一键启动全部**（中间件 + 网关 + system + member + monitor）：
+1. **一键启动全部**（网关 + system + member + monitor，连接本机中间件）：
 
    ```bash
    scripts/docker-up.sh
    ```
 
-   首次启动会打包、构建镜像并自动初始化数据库与 Nacos，约需 5–10 分钟。停止用 `scripts/docker-down.sh`（加 `--purge` 同时删除数据）。
+   首次启动会在本机中间件中初始化 `ccloud` 库、XXL-Job 任务与 Nacos 的 `ccloud` 命名空间，再打包、构建镜像并启动，约需 5–10 分钟。
+   停止用 `scripts/docker-down.sh`，只停 ccloud 的应用，本机中间件不受影响。
 
-2. **只启动中间件，在 IDE 中运行服务**：
+2. **只初始化，在 IDE 中运行服务**：
 
    ```bash
-   scripts/docker-up.sh middleware
+   scripts/docker-up.sh init
    ```
 
    然后以 `local` profile 依次运行 `SystemServerApplication`、`MemberServerApplication`、`GatewayServerApplication`。
@@ -95,7 +97,7 @@ ccloud
 
    可执行 jar 位于各应用模块的 `target/` 下；`mvn test` 运行全部测试（连接本机已有的 MySQL 与 Redis，配置见 [快速开始](docs/快速开始.md#方式三从源码构建)）。
 
-端口与密码集中在 `docker/.env`。本机端口被占用时可临时覆盖，例如 `MYSQL_PORT=13306 scripts/docker-up.sh`。
+端口、库编号与命名空间在 `docker/.env`；MySQL、Redis 密码取自本机容器配置，Nacos 账号写在 `~/.ccloud/middleware.env`。
 
 ## 登录账号
 
@@ -107,20 +109,20 @@ ccloud
 | 管理端 | `ccloud` | `ccloud123` | 普通管理员，仅查询与导出类权限，演示按钮级权限差异 |
 | C 端 | `13800138000` | `member123` | 会员，租户 1 |
 | 开放 API | AppKey `ccloud-open-demo` | `ccloud-open-demo-secret` | 数据见 `sql/mysql/dml/07-demo.sql`；P1 阶段须先在 Nacos 登记，见[接口与鉴权](#接口与鉴权) |
-| Nacos | `nacos` | `nacos` | `docker/.env` 的 `NACOS_PASSWORD` |
-| XXL-Job | `admin` | `ccloud123` | `docker/.env` 的 `XXL_JOB_ADMIN_PASSWORD` |
+| Nacos | 本机 Nacos 的账号 | | 写在 `~/.ccloud/middleware.env`；ccloud 使用 `ccloud` 命名空间 |
+| XXL-Job | `admin` | `ccloud123` | `docker/.env` 的 `XXL_JOB_ADMIN_PASSWORD`（首次登记 ccloud 任务时写入） |
 | 服务监控 | `admin` | `ccloud123` | `docker/.env` 的 `CCLOUD_MONITOR_PASSWORD` |
 
 ## 访问地址
 
-docker compose 默认端口（见 `docker/.env`）。除网关外，所有端口只绑定本机 127.0.0.1。
+ccloud 应用的端口见 `docker/.env`，除网关外只绑定本机 127.0.0.1；中间件为本机已有的实例。
 
 | 服务 | 地址 | 说明 |
 |---|---|---|
 | 网关 | http://127.0.0.1:48080 | 唯一对外入口，前端与第三方都经网关访问 |
 | 接口文档 | http://127.0.0.1:48080/doc.html | 聚合各服务的管理端、用户端、开放接口三组文档；生产环境关闭 |
 | 服务监控 | http://127.0.0.1:48182 | Spring Boot Admin，从 Nacos 发现全部服务 |
-| Nacos 控制台 | http://127.0.0.1:8849 | 服务列表与配置管理（服务端 API 为 http://127.0.0.1:8848） |
+| Nacos | http://127.0.0.1:8848/nacos | 本机 Nacos，ccloud 的服务与配置在 `ccloud` 命名空间 |
 | XXL-Job 控制台 | http://127.0.0.1:48180/xxl-job-admin | 已登记 system 的执行器与两个消息重投任务 |
 | Zipkin | http://127.0.0.1:9411 | 链路追踪 |
 | system / member | http://127.0.0.1:48081 、 http://127.0.0.1:48083 | 仅供本机调试，前端不要直连 |
@@ -165,14 +167,13 @@ P1 阶段开放平台服务尚未交付：应用在 Nacos 的 `ccloud-gateway.ya
 - 库名 `ccloud`，字符集 `utf8mb4`，排序规则 `utf8mb4_0900_ai_ci`；所有模块共用一个库，业务表带 `tenant_id` 行级隔离。
 - 全量脚本 `sql/mysql/ccloud.sql`（建库 + 全部建表 + 初始化数据），由 `sql/mysql/ddl/`（按模块建表）与 `sql/mysql/dml/`（初始化数据）拼装生成，**不要手工编辑**。
   修改 `ddl/`、`dml/` 后执行 `scripts/build-sql.sh` 重新生成，`scripts/verify-sql.sh` 校验。
-- docker compose 首次启动时自动导入 `ccloud` 库，以及 Nacos、XXL-Job 各自的库（`docker/mysql/init/`）。
-  需要重新初始化时执行 `scripts/docker-down.sh --purge` 删除数据卷后再启动。
+- `scripts/docker-up.sh` 在本机 MySQL 中没有 `ccloud` 库时自动导入；需要重新初始化时执行 `scripts/docker-up.sh --reset-db`（只影响 `ccloud` 库）。
+  XXL-Job 调度中心的库 `xxl_job` 按 `docker/mysql/init/` 的脚本初始化。
 
 ## 常见问题
 
-**启动时端口被占用。** 端口都在 `docker/.env` 中，可用环境变量临时覆盖，例如
-`MYSQL_PORT=13306 NACOS_PORT=18848 NACOS_GRPC_PORT=19848 NACOS_CONSOLE_PORT=18849 REDIS_PORT=16379 scripts/docker-up.sh`。
-改 Nacos 端口时 gRPC 端口须同步为"服务端口 + 1000"。
+**提示本机中间件容器未运行。** 先 `docker start mysql redis nacos zipkin xxl-job-admin`；容器名不同时用 `CCLOUD_MYSQL_CONTAINER` 等环境变量指定，
+端口不同时用 `docker/.env` 中的同名环境变量覆盖。
 
 **Apple 芯片上 XXL-Job 启动很慢。** 官方镜像只提供 amd64，经模拟运行，首次启动约需 1 分钟，属正常现象。
 

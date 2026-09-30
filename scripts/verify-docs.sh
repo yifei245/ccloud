@@ -44,7 +44,7 @@ for path in sys.argv[1:]:
         if not os.path.exists(script):
             print(f"  FAIL {path} 提到不存在的脚本：{script}"); ok = False
 readme = open("README.md", encoding="utf-8").read()
-for key in ("GATEWAY_PORT", "MONITOR_PORT", "XXL_JOB_PORT", "NACOS_CONSOLE_PORT", "NACOS_PORT", "ZIPKIN_PORT"):
+for key in ("GATEWAY_PORT", "MONITOR_PORT", "XXL_JOB_PORT", "NACOS_PORT", "ZIPKIN_PORT"):
     if f"127.0.0.1:{env[key]}" not in readme:
         print(f"  FAIL README 访问地址缺少 {key}={env[key]}（与 docker/.env 不一致）"); ok = False
 # XXL-Job 管理员密码由 .env 设置，不再是上游的 123456

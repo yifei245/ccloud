@@ -1584,7 +1584,7 @@ git commit -m "feat(member): 会员收件地址与内部接口"
 - `pointTradeDeductMaxPrice`：`@Min(0)`，可空；
 - `pointTradeGivePoint`：`@Min(0)`，可空。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```java
     @Test
@@ -1606,10 +1606,10 @@ git commit -m "feat(member): 会员收件地址与内部接口"
   Controller 测试：
   - 无权限保存返回 403；
   - 有权限保存后再读取，值一致。
-- [ ] **Step 2: 运行确认失败**。
-- [ ] **Step 3: 实现**：`getConfig()` 为 `configMapper.selectOne(new LambdaQueryWrapperX<>())`（租户拦截器自动加租户条件）；`saveConfig` 查到则按编号更新，否则新增。
-- [ ] **Step 4: 运行确认通过**，再跑会员模块全部测试。
-- [ ] **Step 5: 提交** `git commit -m "feat(member): 会员配置"`
+- [x] **Step 2: 运行确认失败**。
+- [x] **Step 3: 实现**：`getConfig()` 为 `configMapper.selectOne(new LambdaQueryWrapperX<>())`（租户拦截器自动加租户条件）；`saveConfig` 查到则按编号更新，否则新增。
+- [x] **Step 4: 运行确认通过**，再跑会员模块全部测试。
+- [x] **Step 5: 提交** `git commit -m "feat(member): 会员配置"`
 
 ---
 

@@ -119,13 +119,13 @@ ccloud 应用的端口见 `docker/.env`，除网关外只绑定本机 127.0.0.1�
 
 | 服务 | 地址 | 说明 |
 |---|---|---|
-| 网关 | http://127.0.0.1:48080 | 唯一对外入口，前端与第三方都经网关访问 |
-| 接口文档 | http://127.0.0.1:48080/doc.html | 聚合各服务的管理端、用户端、开放接口三组文档；生产环境关闭 |
-| 服务监控 | http://127.0.0.1:48182 | Spring Boot Admin，从 Nacos 发现全部服务 |
+| 网关 | http://127.0.0.1:28080 | 唯一对外入口，前端与第三方都经网关访问 |
+| 接口文档 | http://127.0.0.1:28080/doc.html | 聚合各服务的管理端、用户端、开放接口三组文档；生产环境关闭 |
+| 服务监控 | http://127.0.0.1:28182 | Spring Boot Admin，从 Nacos 发现全部服务 |
 | Nacos | http://127.0.0.1:8848/nacos | 本机 Nacos，ccloud 的服务与配置在 `ccloud` 命名空间 |
 | XXL-Job 控制台 | http://127.0.0.1:48180/xxl-job-admin | 已登记 system 的执行器与两个消息重投任务 |
 | Zipkin | http://127.0.0.1:9411 | 链路追踪 |
-| system / member | http://127.0.0.1:48081 、 http://127.0.0.1:48083 | 仅供本机调试，前端不要直连 |
+| system / member | http://127.0.0.1:28081 、 http://127.0.0.1:28083 | 仅供本机调试，前端不要直连 |
 
 ## 接口与鉴权
 
@@ -143,12 +143,12 @@ ccloud 应用的端口见 `docker/.env`，除网关外只绑定本机 127.0.0.1�
 管理端登录示例：
 
 ```bash
-curl -s -X POST http://127.0.0.1:48080/admin-api/system/auth/login \
+curl -s -X POST http://127.0.0.1:28080/admin-api/system/auth/login \
   -H 'Content-Type: application/json' -H 'X-Tenant-Id: 1' \
   -d '{"username":"admin","password":"admin123"}'
 # 返回 {"code":0,"data":{"accessToken":"...","refreshToken":"...",...}}
 
-curl -s 'http://127.0.0.1:48080/admin-api/system/user/page?pageNo=1&pageSize=10' \
+curl -s 'http://127.0.0.1:28080/admin-api/system/user/page?pageNo=1&pageSize=10' \
   -H 'Authorization: Bearer {accessToken}'
 ```
 

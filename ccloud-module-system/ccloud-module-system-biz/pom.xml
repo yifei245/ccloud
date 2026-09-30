@@ -12,7 +12,7 @@
     <artifactId>ccloud-module-system-biz</artifactId>
     <packaging>jar</packaging>
     <name>${project.artifactId}</name>
-    <description>system 服务实现，可执行应用，端口 48081。不被任何模块依赖</description>
+    <description>system 服务实现，可执行应用，端口 28081。不被任何模块依赖</description>
 
     <dependencies>
         <dependency>

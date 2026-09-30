@@ -12,7 +12,7 @@
     <artifactId>ccloud-gateway</artifactId>
     <packaging>jar</packaging>
     <name>${project.artifactId}</name>
-    <description>API 网关，端口 48080：路由、CORS、鉴权与内部身份头下发、限流、接口文档聚合</description>
+    <description>API 网关，端口 28080：路由、CORS、鉴权与内部身份头下发、限流、接口文档聚合</description>
 
     <dependencies>
         <!-- 只依赖 common：网关基于 WebFlux，不能引入任何 Servlet 系的 starter -->

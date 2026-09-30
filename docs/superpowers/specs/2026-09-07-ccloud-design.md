@@ -205,20 +205,24 @@ docker/
 
 | 服务 | 端口 | 服务 | 端口 |
 |---|---|---|---|
-| gateway | 48080 | product | 48087 |
-| system | 48081 | trade | 48088 |
-| infra | 48082 | promotion | 48089 |
-| member | 48083 | ai | 48090 |
-| open | 48084 | XXL-Job Admin | 48180 |
-| pay | 48085 | Sentinel Dashboard | 48181 |
-| bpm | 48086 | Spring Boot Admin | 48182 |
+| gateway | 28080 | product | 28087 |
+| system | 28081 | trade | 28088 |
+| infra | 28082 | promotion | 28089 |
+| member | 28083 | ai | 28090 |
+| open | 28084 | XXL-Job Admin | 48180 |
+| pay | 28085 | Sentinel Dashboard | 28181 |
+| bpm | 28086 | Spring Boot Admin | 28182 |
 
 中间件：MySQL 3306、Redis 6379、Nacos 8848/9848、Zipkin 9411
+
+> 2026-09-30 调整：应用端口由 48xxx 整体平移到 28xxx。原先沿用参考项目的 48xxx 约定，与本机同样参照该项目的 aicloud
+> （system 48081、infra 48082、member 48087 等）冲突，两个项目无法同时运行。选 28xxx 是因为它低于 macOS（49152 起）
+> 与 Linux 默认（32768 起）的临时端口范围，不会被出站连接随机占用。XXL-Job Admin 为本机共用的中间件，保持 48180。
 
 ## 10. API 文档
 
 - 每服务 `springdoc` + `Knife4j`，按 `admin-api / app-api / open-api` 分组
-- 网关聚合：`http://localhost:48080/doc.html`，从 Nacos 服务列表动态发现下游文档
+- 网关聚合：`http://localhost:28080/doc.html`，从 Nacos 服务列表动态发现下游文档
 - 生产环境通过配置关闭
 
 ## 11. 交付分期

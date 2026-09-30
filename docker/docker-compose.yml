@@ -40,9 +40,9 @@ services:
     environment: *app-env
     extra_hosts: *app-hosts
     ports:
-      - "127.0.0.1:${SYSTEM_PORT}:48081"
+      - "127.0.0.1:${SYSTEM_PORT}:28081"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:48081/actuator/health | grep -q UP"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:28081/actuator/health | grep -q UP"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -56,13 +56,13 @@ services:
     environment: *app-env
     extra_hosts: *app-hosts
     ports:
-      - "127.0.0.1:${MEMBER_PORT}:48083"
+      - "127.0.0.1:${MEMBER_PORT}:28083"
     depends_on:
       # 启动时经 RPC 从 system 加载文案等数据
       ccloud-system:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:48083/actuator/health | grep -q UP"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:28083/actuator/health | grep -q UP"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -77,9 +77,9 @@ services:
     extra_hosts: *app-hosts
     # 网关是唯一对外入口
     ports:
-      - "${GATEWAY_PORT}:48080"
+      - "${GATEWAY_PORT}:28080"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:48080/actuator/health | grep -q UP"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:28080/actuator/health | grep -q UP"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -93,9 +93,9 @@ services:
     environment: *app-env
     extra_hosts: *app-hosts
     ports:
-      - "127.0.0.1:${MONITOR_PORT}:48182"
+      - "127.0.0.1:${MONITOR_PORT}:28182"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:48182/actuator/health | grep -q UP"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:28182/actuator/health | grep -q UP"]
       interval: 10s
       timeout: 5s
       retries: 30

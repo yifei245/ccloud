@@ -2,7 +2,7 @@
 # Nacos 配置（ccloud-common.yaml / ccloud-gateway.yaml）在各 application-{profile}.yaml 中导入，优先级高于本文件与 profile 文件。
 # 路由规则在 RouteConfiguration 中以代码定义（便于测试与审查），不在配置中声明。
 server:
-  port: 48080
+  port: 28080
 
 spring:
   application:

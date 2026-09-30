@@ -1300,7 +1300,7 @@ git commit -m "feat(member): 签到规则与签到，连续签到奖励积分与
 
 修改 VO 在此基础上多一个 `@NotNull id`。
 
-- [ ] **Step 1: 写失败测试** `MemberAddressServiceImplTest`（常量 `MemberAddressServiceImpl.MAX_COUNT = 20`）
+- [x] **Step 1: 写失败测试** `MemberAddressServiceImplTest`（常量 `MemberAddressServiceImpl.MAX_COUNT = 20`）
 
 ```java
     @Test
@@ -1362,12 +1362,12 @@ git commit -m "feat(member): 签到规则与签到，连续签到奖励积分与
 - `/rpc-api/member/address/get` 传错 `userId` 返回 `data = null`；
 - 未登录返回 401。
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `mvn -o -q -pl ccloud-module-member/ccloud-module-member-biz -am test -Dtest='MemberAddressServiceImplTest,AppMemberAddressControllerTest,RpcApiCoverageTest' -Dsurefire.failIfNoSpecifiedTests=false`
 Expected: 编译失败。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```java
     public static final int MAX_COUNT = 20;
@@ -1415,14 +1415,14 @@ Mapper 新增：
 
 `validateAddressExists(userId, id)` 通过 `getAddress` 查不到时抛 `ADDRESS_NOT_EXISTS`。`MemberAddressApiImpl.getAddress(id, userId)` 与 `getDefaultAddress(userId)` 转成 `MemberAddressRespDTO` 返回。最后 `PENDING_APIS` 改为 `Map.of()`。
 
-- [ ] **Step 4: 运行确认通过**，再跑会员模块全部测试。Expected: PASS。
+- [x] **Step 4: 运行确认通过**，再跑会员模块全部测试。Expected: PASS。
 
-- [ ] **Step 5: 变异检查**：
+- [x] **Step 5: 变异检查**：
   - 去掉 `count == 0 ||`；
   - `getAddress` 去掉 `userId` 条件；
   - `>=` 改为 `>`。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A ccloud-module-member

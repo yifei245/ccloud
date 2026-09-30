@@ -1662,7 +1662,7 @@ VO：
 - `MemberUserUpdatePointReqVO`：`id @NotNull`、`point @NotNull`。
 - `MemberUserUpdateLevelReqVO`：`id @NotNull`、`levelId @NotNull`、`reason`（`@NotBlank`，最长 255）。
 
-- [ ] **Step 1: 写失败测试**（`MemberUserServiceImplTest` 追加；`@MockitoBean` 注入 `MemberTagService`、`MemberGroupService`、`OAuth2TokenApi`）
+- [x] **Step 1: 写失败测试**（`MemberUserServiceImplTest` 追加；`@MockitoBean` 注入 `MemberTagService`、`MemberGroupService`、`OAuth2TokenApi`）
 
 ```java
     @Test
@@ -1736,11 +1736,11 @@ VO：
 - 会员身份访问返回 401；
 - `get` 响应不含 `password`。
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `-Dtest='MemberUserServiceImplTest,MemberUserControllerTest'`。Expected: 编译失败。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```java
     @Override
@@ -1813,12 +1813,12 @@ Controller 的 `page` 与 `get`：
 
 `update-point` 调用 `pointService.updateUserPointByAdmin(id, point)`，`update-level` 调用 `levelService.updateUserLevel(id, levelId, reason)`。
 
-- [ ] **Step 4: 运行确认通过**，再跑会员模块全部测试。Expected: PASS。
-- [ ] **Step 5: 变异检查**：
+- [x] **Step 4: 运行确认通过**，再跑会员模块全部测试。Expected: PASS。
+- [x] **Step 5: 变异检查**：
   - 去掉禁用时的作废令牌；
   - 去掉删除时的作废令牌；
   - 标签筛选的 `or()` 改为 `and`。
-- [ ] **Step 6: 提交** `git commit -m "feat(member): 管理端会员用户管理，禁用与删除时作废会员令牌"`
+- [x] **Step 6: 提交** `git commit -m "feat(member): 管理端会员用户管理，禁用与删除时作废会员令牌"`
 
 ---
 

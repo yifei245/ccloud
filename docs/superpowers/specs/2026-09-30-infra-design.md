@@ -50,7 +50,7 @@
 | `ConfigApi` | `getConfigValueByKey(String key)`：返回参数值，不存在返回 null | system |
 | `FileApi` | `createFile(FileCreateReqDTO{name, content(byte[])})`：按主配置存储，返回访问地址 | system、member（头像） |
 
-API 日志的消息主题常量与消息体（`ApiAccessLogMessage`、`ApiErrorLogMessage`）也放在 `infra-api`。
+API 日志的消息主题常量（`ApiLogTopics`）放在 `infra-api`；消息体直接使用 starter-web 中已有的 `ApiAccessLog` / `ApiErrorLog`（补充 `tenantId` 字段），发送方与 infra 本就共用该 starter，不再另建一套字段相同的消息类。
 
 ## 3. 参数配置
 
@@ -152,6 +152,13 @@ API 日志的消息主题常量与消息体（`ApiAccessLogMessage`、`ApiErrorL
   - 每批物理删除 1 万条，直到删完。
 
 ## 6. 消息死信
+
+现状：P1 的本地消息表超过重试上限只把状态置为 3，Redis Stream 消费超过重投上限只打错误日志后丢弃，`infra_message_dead_letter` 从未被写入。本期先在 starter-mq 中补齐写入：
+
+- 本地消息转为死信状态时，同时写一条死信（租户取原消息的租户）；
+- Stream 消息重投次数达到上限被丢弃前，写一条死信（租户记 0，失败原因为"消费重试 N 次仍失败"）。
+
+管理端：
 
 - 管理端 `/admin-api/infra/message-dead-letter`：`page`（权限 `infra:message-dead-letter:query`）；`update-handled`、`resend`（权限 `infra:message-dead-letter:update`）。
 - `resend`：用原消息编号把死信发回其主题的 Redis Stream，然后标记为已处理。消费侧已按消息编号幂等。

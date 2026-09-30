@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# P1 端到端验收：全部经网关调用，对照设计文档 P1 的完成标志。
+# 端到端验收（P1 基础平台 + P2 会员运营）：除会员内部接口外全部经网关调用。
 # 前置：scripts/docker-up.sh 已启动全部服务。端口取自 docker/.env，可用同名环境变量覆盖。
 set -euo pipefail
 
@@ -96,6 +96,53 @@ curl -s -X POST "$GW/admin-api/system/auth/logout" -H "Authorization: Bearer $TO
 CODE=$(curl -s -o /dev/null -w '%{http_code}' "$GW/admin-api/system/auth/get-permission-info" -H "Authorization: Bearer $TOKEN")
 [ "$CODE" = "401" ] || die "登出后令牌仍可用，返回 $CODE"; ok "登出后令牌立即失效"
 
+echo "==> 会员运营"
+AT=$(admin_login admin admin123 | jq -r '.data.accessToken')
+MEMBER_ID=$(curl -s "$GW/admin-api/member/user/page?pageNo=1&pageSize=1&mobile=13800138000" -H "Authorization: Bearer $AT" \
+  | jq -r '.data.list[0].id // empty')
+[ -n "$MEMBER_ID" ] || die "管理端查不到演示会员"; ok "管理端查询会员"
+member_point() { curl -s "$GW/admin-api/member/user/get?id=$MEMBER_ID" -H "Authorization: Bearer $AT" | jq -r '.data.point'; }
+P0=$(member_point)
+R=$(curl -s -X PUT "$GW/admin-api/member/user/update-point" -H "Authorization: Bearer $AT" -H "$JSON" \
+  -d "{\"id\":$MEMBER_ID,\"point\":10}" | jq -r '.code')
+[ "$R" = "0" ] || die "管理员加积分返回 $R"
+P1=$(member_point)
+[ "$P1" = "$((P0 + 10))" ] || die "加积分后为 $P1，期望 $((P0 + 10))"; ok "管理员修改积分"
+R=$(curl -s -X PUT "$GW/admin-api/member/user/update-level" -H "Authorization: Bearer $AT" -H "$JSON" \
+  -d "{\"id\":$MEMBER_ID,\"levelId\":2,\"reason\":\"e2e\"}" | jq -r '.code')
+[ "$R" = "0" ] || die "管理员修改等级返回 $R"
+[ "$(curl -s "$GW/admin-api/member/user/get?id=$MEMBER_ID" -H "Authorization: Bearer $AT" | jq -r '.data.levelName')" = "白银会员" ] \
+  || die "修改等级后等级名称不是白银会员"; ok "管理员修改等级"
+# 同一天重复执行脚本时已签到，两种结果都接受
+R=$(curl -s -X POST "$GW/app-api/member/sign-in/record/create" -H "Authorization: Bearer $MT" | jq -r '.code')
+[ "$R" = "0" ] || [ "$R" = "1004010000" ] || die "会员签到返回 $R"
+curl -s "$GW/app-api/member/sign-in/record/get-summary" -H "Authorization: Bearer $MT" \
+  | jq -e '.data.todaySignIn == true' >/dev/null || die "签到后概况显示今日未签到"; ok "会员签到"
+curl -s "$GW/app-api/member/point/record/page?pageNo=1&pageSize=10" -H "Authorization: Bearer $MT" \
+  | jq -e '.data.total > 0' >/dev/null || die "会员积分记录为空"; ok "会员查询积分记录"
+curl -s "$GW/admin-api/member/level-record/page?pageNo=1&pageSize=10&userId=$MEMBER_ID" -H "Authorization: Bearer $AT" \
+  | jq -e '.data.total > 0' >/dev/null || die "等级变更记录为空"; ok "管理端查询等级变更记录"
+ADDR=$(curl -s -X POST "$GW/app-api/member/address/create" -H "Authorization: Bearer $MT" -H "$JSON" \
+  -d '{"name":"张三","mobile":"13800138000","areaId":440305,"detailAddress":"科技园 1 号","defaultStatus":true}' | jq -r '.data // empty')
+[ -n "$ADDR" ] || die "新增收件地址失败"
+curl -s "$GW/app-api/member/address/list" -H "Authorization: Bearer $MT" \
+  | jq -e --argjson id "$ADDR" 'any(.data[]; .id == $id)' >/dev/null || die "收件地址列表中没有新地址"
+curl -s -X DELETE "$GW/app-api/member/address/delete?id=$ADDR" -H "Authorization: Bearer $MT" >/dev/null
+ok "会员收件地址"
+# 内部接口不经网关，直连 member 服务
+MS="http://127.0.0.1:${MEMBER_PORT}"
+BIZ="e2e-$(date +%s)"
+BEFORE=$(member_point)
+for _ in 1 2; do
+  R=$(curl -s -X PUT "$MS/rpc-api/member/point/add?userId=$MEMBER_ID&point=5&bizType=10&bizId=$BIZ" -H "$TENANT" | jq -r '.code')
+  [ "$R" = "0" ] || die "内部接口加积分返回 $R"
+done
+AFTER=$(member_point)
+[ "$AFTER" = "$((BEFORE + 5))" ] || die "同一业务编号加积分两次后为 $AFTER，期望 $((BEFORE + 5))"
+ok "内部接口加积分，同一业务编号只生效一次"
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$GW/rpc-api/member/point/add?userId=$MEMBER_ID&point=5&bizType=10&bizId=x")
+[ "$CODE" = "403" ] || die "经网关可访问会员内部接口，返回 $CODE"; ok "会员内部接口经网关已阻断"
+
 echo "==> 文档、链路追踪、监控、定时任务"
 curl -sf -o /dev/null "$GW/doc.html" || die "接口文档聚合页不可访问"
 curl -s "$GW/system/v3/api-docs/admin" | jq -e '.paths | length > 0' >/dev/null || die "system 管理端文档为空"
@@ -120,4 +167,4 @@ JOBS=$(docker exec ccloud-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -e \
 [ "${JOBS:-0}" -ge 2 ] || die "XXL-Job 两个重投任务尚未成功执行（成功的任务数 ${JOBS:-0}），任务每分钟调度一次，可稍后重试"
 ok "XXL-Job 消息重投任务已按时执行"
 
-echo "==> P1 端到端验收全部通过"
+echo "==> 端到端验收全部通过"

@@ -54,7 +54,8 @@ import static org.mockito.Mockito.*;
  * 与传给 system 的参数；令牌本身的签发、刷新、作废语义由 system 的测试覆盖
  */
 @Import({MemberAuthServiceImpl.class, MemberUserServiceImpl.class, MemberLevelServiceImpl.class,
-        MemberLoginFailCountRedisDAO.class})
+        com.ccloud.module.member.service.tag.MemberTagServiceImpl.class,
+        com.ccloud.module.member.service.group.MemberGroupServiceImpl.class, MemberLoginFailCountRedisDAO.class})
 @TestPropertySource(properties = {
         "ccloud.member.auth.login-fail-limit=3",
         "ccloud.member.auth.login-fail-lock-minutes=10",

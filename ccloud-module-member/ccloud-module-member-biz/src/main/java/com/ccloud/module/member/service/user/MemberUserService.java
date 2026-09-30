@@ -1,5 +1,8 @@
 package com.ccloud.module.member.service.user;
 
+import com.ccloud.framework.common.pojo.PageResult;
+import com.ccloud.module.member.controller.admin.user.vo.MemberUserPageReqVO;
+import com.ccloud.module.member.controller.admin.user.vo.MemberUserUpdateReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateMobileReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateReqVO;
 import com.ccloud.module.member.dal.dataobject.user.MemberUserDO;
@@ -42,4 +45,18 @@ public interface MemberUserService {
      * @throws com.ccloud.framework.common.exception.ServiceException 用户不存在时抛 USER_NOT_EXISTS
      */
     MemberUserDO validateUserExists(Long id);
+
+    // ========== 管理端 ==========
+
+    PageResult<MemberUserDO> getUserPage(MemberUserPageReqVO reqVO);
+
+    /**
+     * 管理员修改会员资料、标签与分组。改为关闭状态时作废该会员的全部令牌
+     */
+    void updateUserByAdmin(MemberUserUpdateReqVO reqVO);
+
+    /**
+     * 删除会员并作废其全部令牌
+     */
+    void deleteUser(Long id);
 }

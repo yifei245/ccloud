@@ -2,15 +2,21 @@ package com.ccloud.module.member.service.user;
 
 import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.framework.common.enums.TerminalEnum;
+import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.tenant.core.util.TenantUtils;
+import com.ccloud.module.member.controller.admin.user.vo.MemberUserPageReqVO;
+import com.ccloud.module.member.controller.admin.user.vo.MemberUserUpdateReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateMobileReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateReqVO;
 import com.ccloud.module.member.dal.dataobject.user.MemberUserDO;
 import com.ccloud.module.member.dal.dataobject.level.MemberLevelDO;
 import com.ccloud.module.member.dal.mysql.user.MemberUserMapper;
+import com.ccloud.module.member.service.group.MemberGroupService;
 import com.ccloud.module.member.service.level.MemberLevelService;
+import com.ccloud.module.member.service.tag.MemberTagService;
 import com.ccloud.module.member.test.BaseMemberDbUnitTest;
+import com.ccloud.module.system.api.oauth2.OAuth2TokenApi;
 import com.ccloud.module.system.api.sms.SmsCodeApi;
 import com.ccloud.module.system.api.sms.dto.SmsCodeUseReqDTO;
 import com.ccloud.module.system.enums.sms.SmsSceneEnum;
@@ -22,11 +28,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
 
+import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static com.ccloud.module.member.enums.ErrorCodeConstants.GROUP_DISABLED;
 import static com.ccloud.module.member.enums.ErrorCodeConstants.USER_MOBILE_USED;
 import static com.ccloud.module.member.enums.ErrorCodeConstants.USER_NOT_EXISTS;
 import static com.ccloud.module.system.enums.ErrorCodeConstants.SMS_CODE_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
@@ -42,6 +52,116 @@ class MemberUserServiceImplTest extends BaseMemberDbUnitTest {
     private SmsCodeApi smsCodeApi;
     @MockitoBean
     private MemberLevelService levelService;
+    @MockitoBean
+    private MemberTagService tagService;
+    @MockitoBean
+    private MemberGroupService groupService;
+    @MockitoBean
+    private OAuth2TokenApi oauth2TokenApi;
+
+    // ========== 管理端 ==========
+
+    @Test
+    void updateUserByAdmin_保存资料与标签_校验标签与分组_启用时不作废令牌() {
+        MemberUserDO user = userService.createUserIfAbsent("13911119001", "10.0.0.1", null);
+        MemberUserUpdateReqVO reqVO = updateReqVO(user.getId(), CommonStatusEnum.ENABLE);
+        reqVO.setTagIds(List.of(3L, 5L));
+        reqVO.setGroupId(9L);
+
+        userService.updateUserByAdmin(reqVO);
+
+        MemberUserDO saved = userMapper.selectById(user.getId());
+        assertThat(saved.getTagIds()).isEqualTo("3,5");
+        assertThat(saved.getGroupId()).isEqualTo(9L);
+        assertThat(saved.getNickname()).isEqualTo("改名");
+        assertThat(saved.getMark()).isEqualTo("重点客户");
+        verify(tagService).validateTagList(List.of(3L, 5L));
+        verify(groupService).validateGroupEnabled(9L);
+        verify(oauth2TokenApi, never()).removeAccessTokensByUser(anyLong(), anyInt());
+    }
+
+    @Test
+    void updateUserByAdmin_清空标签与分组时不校验() {
+        MemberUserDO user = userService.createUserIfAbsent("13911119002", "10.0.0.1", null);
+        userMapper.updateById(new MemberUserDO().setId(user.getId()).setTagIds("1").setGroupId(2L));
+
+        userService.updateUserByAdmin(updateReqVO(user.getId(), CommonStatusEnum.ENABLE));
+
+        MemberUserDO saved = userMapper.selectById(user.getId());
+        assertThat(saved.getTagIds()).isNull();
+        assertThat(saved.getGroupId()).isNull();
+        verify(tagService, never()).validateTagList(any());
+        verify(groupService, never()).validateGroupEnabled(any());
+    }
+
+    @Test
+    void updateUserByAdmin_校验失败时不修改() {
+        MemberUserDO user = userService.createUserIfAbsent("13911119007", "10.0.0.1", null);
+        doThrow(exception(GROUP_DISABLED)).when(groupService).validateGroupEnabled(9L);
+        MemberUserUpdateReqVO reqVO = updateReqVO(user.getId(), CommonStatusEnum.ENABLE);
+        reqVO.setGroupId(9L);
+
+        assertServiceException(() -> userService.updateUserByAdmin(reqVO), GROUP_DISABLED);
+
+        assertThat(userMapper.selectById(user.getId()).getNickname()).isNotEqualTo("改名");
+    }
+
+    @Test
+    void updateUserByAdmin_禁用时作废令牌_会员不存在报错() {
+        MemberUserDO user = userService.createUserIfAbsent("13911119003", "10.0.0.1", null);
+        when(oauth2TokenApi.removeAccessTokensByUser(anyLong(), anyInt())).thenReturn(CommonResult.success(true));
+
+        userService.updateUserByAdmin(updateReqVO(user.getId(), CommonStatusEnum.DISABLE));
+
+        assertThat(userMapper.selectById(user.getId()).getStatus()).isEqualTo(CommonStatusEnum.DISABLE.getStatus());
+        verify(oauth2TokenApi).removeAccessTokensByUser(user.getId(), UserTypeEnum.MEMBER.getValue());
+        assertServiceException(() -> userService.updateUserByAdmin(updateReqVO(-1L, CommonStatusEnum.ENABLE)),
+                USER_NOT_EXISTS);
+    }
+
+    @Test
+    void deleteUser_删除并作废令牌() {
+        MemberUserDO user = userService.createUserIfAbsent("13911119004", "10.0.0.1", null);
+        when(oauth2TokenApi.removeAccessTokensByUser(anyLong(), anyInt())).thenReturn(CommonResult.success(true));
+
+        userService.deleteUser(user.getId());
+
+        assertThat(userMapper.selectById(user.getId())).isNull();
+        verify(oauth2TokenApi).removeAccessTokensByUser(user.getId(), UserTypeEnum.MEMBER.getValue());
+        assertServiceException(() -> userService.deleteUser(-1L), USER_NOT_EXISTS);
+    }
+
+    @Test
+    void getUserPage_按标签任一命中_按分组与手机号筛选() {
+        MemberUserDO a = userService.createUserIfAbsent("13911119005", "10.0.0.1", null);
+        MemberUserDO b = userService.createUserIfAbsent("13911119006", "10.0.0.1", null);
+        userMapper.updateById(new MemberUserDO().setId(a.getId()).setTagIds("1,12").setGroupId(7L));
+        userMapper.updateById(new MemberUserDO().setId(b.getId()).setTagIds("2"));
+
+        MemberUserPageReqVO reqVO = new MemberUserPageReqVO();
+        reqVO.setTagIds(List.of(12L, 99L));
+        assertThat(userService.getUserPage(reqVO).getList()).extracting(MemberUserDO::getId).containsExactly(a.getId());
+        reqVO.setTagIds(List.of(2L, 12L));
+        assertThat(userService.getUserPage(reqVO).getList()).extracting(MemberUserDO::getId)
+                .containsExactlyInAnyOrder(a.getId(), b.getId());
+        reqVO.setTagIds(List.of(20L));
+        assertThat(userService.getUserPage(reqVO).getList()).isEmpty();
+        reqVO.setTagIds(null);
+        reqVO.setGroupId(7L);
+        assertThat(userService.getUserPage(reqVO).getList()).extracting(MemberUserDO::getId).containsExactly(a.getId());
+        reqVO.setGroupId(null);
+        reqVO.setMobile("9006");
+        assertThat(userService.getUserPage(reqVO).getList()).extracting(MemberUserDO::getId).containsExactly(b.getId());
+    }
+
+    private static MemberUserUpdateReqVO updateReqVO(Long id, CommonStatusEnum status) {
+        MemberUserUpdateReqVO reqVO = new MemberUserUpdateReqVO();
+        reqVO.setId(id);
+        reqVO.setNickname("改名");
+        reqVO.setStatus(status.getStatus());
+        reqVO.setMark("重点客户");
+        return reqVO;
+    }
 
     @Test
     void createUserIfAbsent_新会员按0经验定初始等级_积分经验为0() {

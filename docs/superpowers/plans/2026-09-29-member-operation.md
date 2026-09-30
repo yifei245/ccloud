@@ -1447,7 +1447,7 @@ git commit -m "feat(member): 会员收件地址与内部接口"
 
 `MemberTagDO`（`member_tag`）：`id, name`。保存 VO：`name @NotBlank`，最长 50。分页 VO：`name`（模糊）、`createTime[]`。
 
-- [ ] **Step 1: 写失败测试**：
+- [x] **Step 1: 写失败测试**：
 
 ```java
     @Test
@@ -1495,13 +1495,13 @@ git commit -m "feat(member): 会员收件地址与内部接口"
 - 无权限删除返回 403；
 - `list-all-simple` 登录即可访问。
 
-- [ ] **Step 2: 运行确认失败**。Run: `-Dtest='MemberTagServiceImplTest,MemberTagControllerTest'`。Expected: 编译失败。
-- [ ] **Step 3: 实现**：按 system `PostServiceImpl` 的写法做名称查重，删除前调用 `userMapper.selectCountByTagId(id) > 0` 报 `TAG_HAS_USER`。`validateTagList` 用 `selectByIds` 比对数量，逐个检查存在性。
-- [ ] **Step 4: 运行确认通过**，再跑会员模块全部测试。
-- [ ] **Step 5: 变异检查**：
+- [x] **Step 2: 运行确认失败**。Run: `-Dtest='MemberTagServiceImplTest,MemberTagControllerTest'`。Expected: 编译失败。
+- [x] **Step 3: 实现**：按 system `PostServiceImpl` 的写法做名称查重，删除前调用 `userMapper.selectCountByTagId(id) > 0` 报 `TAG_HAS_USER`。`validateTagList` 用 `selectByIds` 比对数量，逐个检查存在性。
+- [x] **Step 4: 运行确认通过**，再跑会员模块全部测试。
+- [x] **Step 5: 变异检查**：
   - 删除前的在用检查去掉；
   - `validateTagList` 只检查第一个编号。
-- [ ] **Step 6: 提交** `git commit -m "feat(member): 会员标签管理"`
+- [x] **Step 6: 提交** `git commit -m "feat(member): 会员标签管理"`
 
 ---
 

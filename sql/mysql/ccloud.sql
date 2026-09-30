@@ -763,7 +763,7 @@ CREATE TABLE `system_i18n_message` (
 
 -- >>>>>>>>>> ddl/02-infra.sql <<<<<<<<<<
 -- ----------------------------------------------------------------------------
--- infra 模块：配置、文件、定时任务、API 日志、代码生成、数据源、本地消息表
+-- infra 模块：配置、文件、API 日志、代码生成、数据源、代码生成演示、本地消息表
 -- 本文件由 DDL 生成器产出，公共约定与 01-system.sql 一致
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
@@ -839,49 +839,6 @@ CREATE TABLE `infra_file_content` (
   PRIMARY KEY (`id`),
   KEY `idx_config_path` (`config_id`, `path`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件内容表，仅数据库存储器使用';
-
--- ========================= 定时任务 =========================
-
-DROP TABLE IF EXISTS `infra_job`;
-CREATE TABLE `infra_job` (
-  `id`                bigint       NOT NULL AUTO_INCREMENT COMMENT '任务编号',
-  `name`              varchar(32)  NOT NULL COMMENT '任务名称',
-  `status`            tinyint      NOT NULL COMMENT '任务状态：0 初始化 1 开启 2 暂停',
-  `handler_name`      varchar(64)  NOT NULL COMMENT '处理器名，对应 @XxlJob 的 value',
-  `handler_param`     varchar(255) DEFAULT NULL COMMENT '处理器参数',
-  `cron_expression`   varchar(32)  NOT NULL COMMENT 'CRON 表达式',
-  `retry_count`       int          NOT NULL DEFAULT 0 COMMENT '重试次数',
-  `retry_interval`    int          NOT NULL DEFAULT 0 COMMENT '重试间隔，单位毫秒',
-  `monitor_timeout`   int          NOT NULL DEFAULT 0 COMMENT '监控超时时间，单位毫秒',
-  `creator`           varchar(64)  DEFAULT '' COMMENT '创建者',
-  `create_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater`           varchar(64)  DEFAULT '' COMMENT '更新者',
-  `update_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_handler_name` (`handler_name`, `deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='定时任务表，调度由 XXL-Job 执行，本表记录任务元数据';
-DROP TABLE IF EXISTS `infra_job_log`;
-CREATE TABLE `infra_job_log` (
-  `id`              bigint        NOT NULL AUTO_INCREMENT COMMENT '日志编号',
-  `job_id`          bigint        NOT NULL COMMENT '任务编号',
-  `handler_name`    varchar(64)   NOT NULL COMMENT '处理器名',
-  `handler_param`   varchar(255)  DEFAULT NULL COMMENT '处理器参数',
-  `execute_index`   tinyint       NOT NULL DEFAULT 1 COMMENT '第几次执行，重试时递增',
-  `begin_time`      datetime      NOT NULL COMMENT '开始执行时间',
-  `end_time`        datetime      DEFAULT NULL COMMENT '结束执行时间',
-  `duration`        int           DEFAULT NULL COMMENT '执行时长，单位毫秒',
-  `status`          tinyint       NOT NULL COMMENT '执行状态：0 运行中 1 成功 2 失败',
-  `result`          varchar(4000) DEFAULT '' COMMENT '结果数据',
-  `creator`         varchar(64)   DEFAULT '' COMMENT '创建者',
-  `create_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater`         varchar(64)   DEFAULT '' COMMENT '更新者',
-  `update_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`         bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
-  PRIMARY KEY (`id`),
-  KEY `idx_job_id` (`job_id`),
-  KEY `idx_begin_time` (`begin_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='定时任务日志表';
 
 -- ========================= API 日志 =========================
 
@@ -1028,6 +985,37 @@ CREATE TABLE `infra_data_source_config` (
   `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='数据源配置表';
+
+-- ========================= 代码生成演示 =========================
+
+DROP TABLE IF EXISTS `infra_demo_student`;
+CREATE TABLE `infra_demo_student` (
+  `id`            bigint        NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `name`          varchar(100)  NOT NULL COMMENT '姓名',
+  `sex`           tinyint       NOT NULL COMMENT '性别：1 男 2 女',
+  `birthday`      datetime      DEFAULT NULL COMMENT '出生日期',
+  `description`   varchar(1000) DEFAULT NULL COMMENT '简介',
+  `status`        tinyint       NOT NULL DEFAULT 0 COMMENT '状态：0 开启 1 关闭',
+  `creator`       varchar(64)   DEFAULT '' COMMENT '创建者',
+  `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
+  `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='演示学生表，代码生成单表模板的演示与验收用';
+DROP TABLE IF EXISTS `infra_demo_category`;
+CREATE TABLE `infra_demo_category` (
+  `id`            bigint        NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `name`          varchar(100)  NOT NULL COMMENT '名称',
+  `parent_id`     bigint        NOT NULL DEFAULT 0 COMMENT '父编号，0 表示根节点',
+  `sort`          int           NOT NULL DEFAULT 0 COMMENT '显示顺序',
+  `creator`       varchar(64)   DEFAULT '' COMMENT '创建者',
+  `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
+  `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='演示分类表，代码生成树表模板的演示与验收用';
 
 -- ========================= 本地消息表（最终一致性） =========================
 
@@ -3486,7 +3474,7 @@ INSERT INTO `member_user` (`id`, `mobile`, `password`, `status`, `register_ip`, 
 -- >>>>>>>>>> dml/02-menu.sql <<<<<<<<<<
 -- ----------------------------------------------------------------------------
 -- 初始化数据：菜单
--- 共 492 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
+-- 共 485 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -3629,13 +3617,6 @@ INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_i
   (134, '参数配置修改', 'infra:config:update', 3, 3, 131, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (135, '参数配置删除', 'infra:config:delete', 3, 4, 131, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (136, '参数配置导出', 'infra:config:export', 3, 5, 131, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (137, '定时任务', '', 2, 3, 121, 'job', 'fa-solid:tasks', 'infra/job/index', 'Job', 0, b'1', b'1', b'1', '1'),
-  (138, '定时任务查询', 'infra:job:query', 3, 1, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (139, '定时任务新增', 'infra:job:create', 3, 2, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (140, '定时任务修改', 'infra:job:update', 3, 3, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (141, '定时任务删除', 'infra:job:delete', 3, 4, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (142, '定时任务导出', 'infra:job:export', 3, 5, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (143, '定时任务触发执行', 'infra:job:trigger', 3, 6, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (144, 'API 日志', '', 1, 4, 121, 'log', 'fa:tasks', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (145, '访问日志', '', 2, 1, 144, 'api-access-log', '#', 'infra/apiAccessLog/index', 'Api-Access-Log', 0, b'1', b'1', b'1', '1'),
   (146, '访问日志查询', 'infra:api-access-log:query', 3, 1, 145, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
@@ -4145,13 +4126,6 @@ INSERT INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `tenant_id`, `creato
   (134, 1, 134, 1, '1'),
   (135, 1, 135, 1, '1'),
   (136, 1, 136, 1, '1'),
-  (137, 1, 137, 1, '1'),
-  (138, 1, 138, 1, '1'),
-  (139, 1, 139, 1, '1'),
-  (140, 1, 140, 1, '1'),
-  (141, 1, 141, 1, '1'),
-  (142, 1, 142, 1, '1'),
-  (143, 1, 143, 1, '1'),
   (144, 1, 144, 1, '1'),
   (145, 1, 145, 1, '1'),
   (146, 1, 146, 1, '1'),
@@ -4574,9 +4548,6 @@ INSERT INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `tenant_id`, `creato
   (559, 2, 131, 1, '1'),
   (560, 2, 132, 1, '1'),
   (561, 2, 136, 1, '1'),
-  (562, 2, 137, 1, '1'),
-  (563, 2, 138, 1, '1'),
-  (564, 2, 142, 1, '1'),
   (565, 2, 144, 1, '1'),
   (566, 2, 145, 1, '1'),
   (567, 2, 146, 1, '1'),
@@ -4788,7 +4759,6 @@ INSERT INTO `system_dict_type` (`id`, `name`, `type`, `status`, `remark`, `creat
   (17, '社交类型', 'system_social_type', 0, NULL, '1'),
   (18, 'OAuth2 授权类型', 'system_oauth2_grant_type', 0, NULL, '1'),
   (19, '是否', 'infra_boolean_string', 0, NULL, '1'),
-  (20, '任务状态', 'infra_job_status', 0, NULL, '1'),
   (21, '文件存储器', 'infra_file_storage', 0, NULL, '1'),
   (22, '参数类型', 'infra_config_type', 0, NULL, '1'),
   (23, '代码生成模板类型', 'infra_codegen_template_type', 0, NULL, '1'),
@@ -4891,20 +4861,13 @@ INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `st
   (71, 6, '社交登录', 'social', 'system_oauth2_grant_type', 0, '', '', NULL, '1'),
   (72, 1, '是', 'true', 'infra_boolean_string', 0, 'danger', '', NULL, '1'),
   (73, 2, '否', 'false', 'infra_boolean_string', 0, 'info', '', NULL, '1'),
-  (74, 1, '初始化', '0', 'infra_job_status', 0, 'info', '', NULL, '1'),
-  (75, 2, '开启', '1', 'infra_job_status', 0, 'success', '', NULL, '1'),
-  (76, 3, '暂停', '2', 'infra_job_status', 0, 'danger', '', NULL, '1'),
   (77, 1, '数据库', '1', 'infra_file_storage', 0, '', '', NULL, '1'),
   (78, 2, '本地磁盘', '10', 'infra_file_storage', 0, '', '', NULL, '1'),
-  (79, 3, 'FTP', '11', 'infra_file_storage', 0, '', '', NULL, '1'),
-  (80, 4, 'SFTP', '12', 'infra_file_storage', 0, '', '', NULL, '1'),
   (81, 5, 'S3 兼容存储', '20', 'infra_file_storage', 0, '', '', NULL, '1'),
   (82, 1, '系统内置', '1', 'infra_config_type', 0, 'danger', '', NULL, '1'),
   (83, 2, '自定义', '2', 'infra_config_type', 0, 'primary', '', NULL, '1'),
   (84, 1, '单表', '1', 'infra_codegen_template_type', 0, '', '', NULL, '1'),
   (85, 2, '树表', '2', 'infra_codegen_template_type', 0, '', '', NULL, '1'),
-  (86, 3, '主子表-主表', '10', 'infra_codegen_template_type', 0, '', '', NULL, '1'),
-  (87, 4, '主子表-子表', '11', 'infra_codegen_template_type', 0, '', '', NULL, '1'),
   (88, 1, '未处理', '0', 'infra_api_error_log_process_status', 0, 'warning', '', NULL, '1'),
   (89, 2, '已处理', '1', 'infra_api_error_log_process_status', 0, 'success', '', NULL, '1'),
   (90, 3, '已忽略', '2', 'infra_api_error_log_process_status', 0, 'danger', '', NULL, '1'),
@@ -5364,13 +5327,11 @@ INSERT INTO `system_notice` (`id`, `title`, `content`, `type`, `status`, `tenant
   (1, '欢迎使用 ccloud', '<p>ccloud 微服务平台已就绪。</p>', 2, 0, 1, '1');
 
 INSERT INTO `infra_file_config` (`id`, `name`, `storage`, `remark`, `master`, `config`, `creator`) VALUES
-  (1, '数据库存储', 1, '默认主配置，开箱即用；生产环境建议切换为 S3 兼容存储', b'1', '{"domain":"http://127.0.0.1:48080"}', '1');
+  (1, '数据库存储', 1, '默认主配置，开箱即用；生产环境建议切换为 S3 兼容存储', b'1', '{"domain":"http://127.0.0.1:28080"}', '1');
 
 INSERT INTO `infra_config` (`id`, `category`, `type`, `name`, `config_key`, `value`, `visible`, `remark`, `creator`) VALUES
-  (1, 'biz', 1, '用户管理-账号初始密码', 'system.user.init-password', '123456', b'0', '新建用户未指定密码时使用', '1'),
-  (2, 'biz', 1, '登录-是否开启图形验证码', 'system.captcha.enable', 'false', b'1', '本地开发默认关闭', '1'),
-  (3, 'biz', 1, '登录-连续失败锁定次数', 'system.login.max-fail-count', '5', b'1', NULL, '1'),
-  (4, 'biz', 1, '登录-锁定时长（分钟）', 'system.login.lock-minutes', '10', b'1', NULL, '1');
+  (1, 'biz', 1, '用户管理-账号初始密码', 'system.user.init-password', '123456', b'0', '导入用户时使用，不返回给前端', '1'),
+  (2, 'biz', 1, '管理后台-是否开放注册', 'system.auth.register-enabled', 'false', b'1', 'true 时登录页可自助注册管理员账号', '1');
 
 INSERT INTO `member_level` (`id`, `name`, `level`, `experience`, `discount_percent`, `icon`, `background_url`, `status`, `tenant_id`, `creator`) VALUES
   (1, '青铜会员', 1, 0, 100, '', '', 0, 1, '1'),
@@ -5400,8 +5361,8 @@ INSERT INTO `trade_delivery_express` (`id`, `code`, `name`, `logo`, `sort`, `sta
   (4, 'JD', '京东快递', '', 4, 0, 1, '1');
 
 INSERT INTO `pay_app` (`id`, `app_key`, `name`, `status`, `remark`, `order_notify_url`, `refund_notify_url`, `transfer_notify_url`, `tenant_id`, `creator`) VALUES
-  (1, 'mall', '商城', 0, '商城下单支付使用', 'http://127.0.0.1:48080/rpc-api/trade/order/update-paid', 'http://127.0.0.1:48080/rpc-api/trade/after-sale/update-refunded', 'http://127.0.0.1:48080/rpc-api/trade/brokerage/update-transferred', 1, '1'),
-  (2, 'wallet', '钱包充值', 0, '钱包充值使用', 'http://127.0.0.1:48080/rpc-api/pay/wallet/recharge/update-paid', 'http://127.0.0.1:48080/rpc-api/pay/wallet/recharge/update-refunded', NULL, 1, '1');
+  (1, 'mall', '商城', 0, '商城下单支付使用', 'http://127.0.0.1:28080/rpc-api/trade/order/update-paid', 'http://127.0.0.1:28080/rpc-api/trade/after-sale/update-refunded', 'http://127.0.0.1:28080/rpc-api/trade/brokerage/update-transferred', 1, '1'),
+  (2, 'wallet', '钱包充值', 0, '钱包充值使用', 'http://127.0.0.1:28080/rpc-api/pay/wallet/recharge/update-paid', 'http://127.0.0.1:28080/rpc-api/pay/wallet/recharge/update-refunded', NULL, 1, '1');
 
 INSERT INTO `pay_channel` (`id`, `code`, `status`, `remark`, `fee_rate`, `app_id`, `config`, `tenant_id`, `creator`) VALUES
   (1, 'mock', 0, '模拟支付：本地调试时直接支付成功', 0, 1, '{}', 1, '1'),

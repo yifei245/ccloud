@@ -22,13 +22,11 @@ INSERT INTO `system_notice` (`id`, `title`, `content`, `type`, `status`, `tenant
   (1, '欢迎使用 ccloud', '<p>ccloud 微服务平台已就绪。</p>', 2, 0, 1, '1');
 
 INSERT INTO `infra_file_config` (`id`, `name`, `storage`, `remark`, `master`, `config`, `creator`) VALUES
-  (1, '数据库存储', 1, '默认主配置，开箱即用；生产环境建议切换为 S3 兼容存储', b'1', '{"domain":"http://127.0.0.1:48080"}', '1');
+  (1, '数据库存储', 1, '默认主配置，开箱即用；生产环境建议切换为 S3 兼容存储', b'1', '{"domain":"http://127.0.0.1:28080"}', '1');
 
 INSERT INTO `infra_config` (`id`, `category`, `type`, `name`, `config_key`, `value`, `visible`, `remark`, `creator`) VALUES
-  (1, 'biz', 1, '用户管理-账号初始密码', 'system.user.init-password', '123456', b'0', '新建用户未指定密码时使用', '1'),
-  (2, 'biz', 1, '登录-是否开启图形验证码', 'system.captcha.enable', 'false', b'1', '本地开发默认关闭', '1'),
-  (3, 'biz', 1, '登录-连续失败锁定次数', 'system.login.max-fail-count', '5', b'1', NULL, '1'),
-  (4, 'biz', 1, '登录-锁定时长（分钟）', 'system.login.lock-minutes', '10', b'1', NULL, '1');
+  (1, 'biz', 1, '用户管理-账号初始密码', 'system.user.init-password', '123456', b'0', '导入用户时使用，不返回给前端', '1'),
+  (2, 'biz', 1, '管理后台-是否开放注册', 'system.auth.register-enabled', 'false', b'1', 'true 时登录页可自助注册管理员账号', '1');
 
 INSERT INTO `member_level` (`id`, `name`, `level`, `experience`, `discount_percent`, `icon`, `background_url`, `status`, `tenant_id`, `creator`) VALUES
   (1, '青铜会员', 1, 0, 100, '', '', 0, 1, '1'),
@@ -58,8 +56,8 @@ INSERT INTO `trade_delivery_express` (`id`, `code`, `name`, `logo`, `sort`, `sta
   (4, 'JD', '京东快递', '', 4, 0, 1, '1');
 
 INSERT INTO `pay_app` (`id`, `app_key`, `name`, `status`, `remark`, `order_notify_url`, `refund_notify_url`, `transfer_notify_url`, `tenant_id`, `creator`) VALUES
-  (1, 'mall', '商城', 0, '商城下单支付使用', 'http://127.0.0.1:48080/rpc-api/trade/order/update-paid', 'http://127.0.0.1:48080/rpc-api/trade/after-sale/update-refunded', 'http://127.0.0.1:48080/rpc-api/trade/brokerage/update-transferred', 1, '1'),
-  (2, 'wallet', '钱包充值', 0, '钱包充值使用', 'http://127.0.0.1:48080/rpc-api/pay/wallet/recharge/update-paid', 'http://127.0.0.1:48080/rpc-api/pay/wallet/recharge/update-refunded', NULL, 1, '1');
+  (1, 'mall', '商城', 0, '商城下单支付使用', 'http://127.0.0.1:28080/rpc-api/trade/order/update-paid', 'http://127.0.0.1:28080/rpc-api/trade/after-sale/update-refunded', 'http://127.0.0.1:28080/rpc-api/trade/brokerage/update-transferred', 1, '1'),
+  (2, 'wallet', '钱包充值', 0, '钱包充值使用', 'http://127.0.0.1:28080/rpc-api/pay/wallet/recharge/update-paid', 'http://127.0.0.1:28080/rpc-api/pay/wallet/recharge/update-refunded', NULL, 1, '1');
 
 INSERT INTO `pay_channel` (`id`, `code`, `status`, `remark`, `fee_rate`, `app_id`, `config`, `tenant_id`, `creator`) VALUES
   (1, 'mock', 0, '模拟支付：本地调试时直接支付成功', 0, 1, '{}', 1, '1'),

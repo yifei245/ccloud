@@ -1,5 +1,7 @@
 package com.ccloud.module.system;
 
+import com.ccloud.framework.test.core.ut.LocalRedis;
+import com.ccloud.framework.test.core.ut.LocalMySql;
 import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.util.json.JsonUtils;
 import com.ccloud.framework.datapermission.core.rule.DataPermissionRule;
@@ -7,7 +9,6 @@ import com.ccloud.framework.excel.core.service.DictFrameworkService;
 import com.ccloud.framework.security.core.LoginUser;
 import com.ccloud.framework.security.core.filter.LoginUserFilter;
 import com.ccloud.framework.security.core.util.InternalSignUtils;
-import com.ccloud.framework.test.core.ut.MySqlTestContainer;
 import com.ccloud.module.system.enums.ErrorCodeConstants;
 import com.ccloud.module.system.enums.permission.RoleCodeEnum;
 import org.junit.jupiter.api.AfterEach;
@@ -24,8 +25,6 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.MySQLContainer;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -65,24 +64,10 @@ class SystemSecurityIntegrationTest {
     private static final long EXPIRED_TENANT_USER = 90013L;
     private static final long SUPER_ADMIN_ROLE = 90021L;
 
-    @SuppressWarnings("resource")
-    private static final GenericContainer<?> REDIS = startRedis();
-
-    private static GenericContainer<?> startRedis() {
-        GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
-        redis.start();
-        return redis;
-    }
-
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        MySQLContainer<?> mysql = MySqlTestContainer.get();
-        registry.add("spring.datasource.dynamic.datasource.master.url", mysql::getJdbcUrl);
-        registry.add("spring.datasource.dynamic.datasource.master.username", mysql::getUsername);
-        registry.add("spring.datasource.dynamic.datasource.master.password", mysql::getPassword);
-        registry.add("spring.datasource.dynamic.datasource.master.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+        LocalMySql.register(registry);
+        LocalRedis.register(registry);
         registry.add("ccloud.security.internal-sign-secret", () -> SECRET);
     }
 

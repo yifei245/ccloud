@@ -6,7 +6,7 @@
 
 **Architecture:** 按功能分包，沿用会员模块与 system 模块已有的分层（Controller → Service → Mapper → DO）。积分、经验、等级的一切变动集中在 `MemberPointService` 与 `MemberLevelService`：事务内先 `SELECT ... FOR UPDATE` 锁定会员行，再查重、改值、写记录、重算等级。表结构 P1 已就位，本期只增加代码与初始化数据。
 
-**Tech Stack:** JDK 21、Spring Boot 3.5.16、MyBatis Plus 3.5.17、MySQL 8.4、Redis 7；测试用 JUnit 5 + AssertJ + Testcontainers（真实 MySQL 与 Redis）+ MockMvc。
+**Tech Stack:** JDK 21、Spring Boot 3.5.16、MyBatis Plus 3.5.17、MySQL 8.4、Redis 7；测试用 JUnit 5 + AssertJ + MockMvc，连接本机已有的 MySQL（`ccloud_test` 库）与 Redis（15 号库），见 `LocalMySql` / `LocalRedis`。
 
 **Spec:** `docs/superpowers/specs/2026-09-29-member-operation-design.md`
 
@@ -25,6 +25,7 @@
 - 先写测试再实现；每个任务结束前，对关键逻辑做变异检查：改坏代码，确认有测试失败，再还原。还原后必须 `touch` 被还原的文件，否则 Maven 会沿用改坏时编译出的 class。
 - 提交信息用中文 + Conventional Commits 前缀，不加署名行。
 - 与用户沟通一律用中文。
+- 测试与校验脚本连接本机已有的 MySQL、Redis（见 `LocalMySql` / `LocalRedis`、`scripts/lib/local-mysql.sh`），不临时启动容器；缺少中间件时先问用户，装了不删。
 
 ## 共享约定（跨任务，务必逐字一致）
 

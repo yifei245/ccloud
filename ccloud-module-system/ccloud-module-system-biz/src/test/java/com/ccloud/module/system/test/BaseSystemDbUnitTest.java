@@ -1,11 +1,11 @@
 package com.ccloud.module.system.test;
 
+import com.ccloud.framework.test.core.ut.LocalMySql;
 import com.ccloud.framework.common.exception.ErrorCode;
 import com.ccloud.framework.common.exception.ServiceException;
 import com.ccloud.framework.tenant.config.CcloudTenantAutoConfiguration;
 import com.ccloud.framework.tenant.core.context.TenantContextHolder;
 import com.ccloud.framework.test.core.ut.BaseDbUnitTest;
-import com.ccloud.framework.test.core.ut.MySqlTestContainer;
 import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +50,7 @@ public abstract class BaseSystemDbUnitTest extends BaseDbUnitTest {
     protected static final Long TENANT_ID = 1L;
 
     static {
-        MySqlTestContainer.get();
+        LocalMySql.ensureInitialized();
     }
 
     @org.springframework.beans.factory.annotation.Autowired

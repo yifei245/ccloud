@@ -1,12 +1,13 @@
 package com.ccloud.module.member.test;
 
+import com.ccloud.framework.test.core.ut.LocalRedis;
+import com.ccloud.framework.test.core.ut.LocalMySql;
 import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.common.util.json.JsonUtils;
 import com.ccloud.framework.security.core.LoginUser;
 import com.ccloud.framework.security.core.filter.LoginUserFilter;
 import com.ccloud.framework.security.core.util.InternalSignUtils;
-import com.ccloud.framework.test.core.ut.MySqlTestContainer;
 import com.ccloud.module.member.MemberServerApplication;
 import com.ccloud.module.system.api.logger.LoginLogApi;
 import com.ccloud.module.system.api.oauth2.OAuth2TokenApi;
@@ -24,7 +25,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.testcontainers.containers.GenericContainer;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -61,24 +61,10 @@ public abstract class BaseMemberWebIntegrationTest {
      */
     protected static final long NO_PERM_ADMIN_ID = 2L;
 
-    @SuppressWarnings("resource")
-    private static final GenericContainer<?> REDIS = startRedis();
-
-    private static GenericContainer<?> startRedis() {
-        GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
-        redis.start();
-        return redis;
-    }
-
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        var mysql = MySqlTestContainer.get();
-        registry.add("spring.datasource.dynamic.datasource.master.url", mysql::getJdbcUrl);
-        registry.add("spring.datasource.dynamic.datasource.master.username", mysql::getUsername);
-        registry.add("spring.datasource.dynamic.datasource.master.password", mysql::getPassword);
-        registry.add("spring.datasource.dynamic.datasource.master.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+        LocalMySql.register(registry);
+        LocalRedis.register(registry);
         registry.add("ccloud.security.internal-sign-secret", () -> SECRET);
     }
 

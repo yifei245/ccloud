@@ -5,6 +5,7 @@ import com.ccloud.framework.mq.redis.core.AbstractRedisStreamMessageListener;
 import com.ccloud.framework.mq.redis.core.RedisStreamMessageConsumer;
 import com.ccloud.framework.mq.redis.core.RedisStreamMessageSender;
 import com.ccloud.framework.mq.redis.core.RedisStreamPendingMessageResendJob;
+import com.ccloud.framework.test.core.ut.LocalRedis;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -19,7 +20,6 @@ import org.redisson.spring.data.connection.RedissonConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.testcontainers.containers.GenericContainer;
 
 import java.time.Duration;
 import java.util.List;
@@ -37,18 +37,16 @@ class RedisStreamConsumerIntegrationTest {
 
     private static final String GROUP = "test-app";
 
-    @SuppressWarnings("resource")
-    private static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
-
     private static StringRedisTemplate redisTemplate;
 
     private RedisStreamMessageConsumer consumer;
 
     @BeforeAll
     static void startRedis() {
-        REDIS.start();
-        LettuceConnectionFactory factory = new LettuceConnectionFactory(
-                new RedisStandaloneConfiguration(REDIS.getHost(), REDIS.getMappedPort(6379)));
+        RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration(LocalRedis.host(), LocalRedis.port());
+        configuration.setPassword(LocalRedis.password());
+        configuration.setDatabase(LocalRedis.database());
+        LettuceConnectionFactory factory = new LettuceConnectionFactory(configuration);
         factory.afterPropertiesSet();
         factory.start();
         redisTemplate = new StringRedisTemplate(factory);
@@ -57,7 +55,8 @@ class RedisStreamConsumerIntegrationTest {
     @BeforeEach
     void flush() {
         redisTemplate.execute(connection -> {
-            connection.serverCommands().flushAll();
+            // 只清测试专用的库：本机 Redis 与其他项目共用，不能 FLUSHALL
+            connection.serverCommands().flushDb();
             return null;
         }, true);
     }
@@ -151,7 +150,8 @@ class RedisStreamConsumerIntegrationTest {
     @Test
     void 使用Redisson连接时消费组已存在也应正常启动_服务重启场景() {
         Config config = new Config();
-        config.useSingleServer().setAddress("redis://" + REDIS.getHost() + ":" + REDIS.getMappedPort(6379));
+        config.useSingleServer().setAddress("redis://" + LocalRedis.host() + ":" + LocalRedis.port())
+                .setPassword(LocalRedis.password()).setDatabase(LocalRedis.database());
         RedissonClient redisson = Redisson.create(config);
         try {
             StringRedisTemplate redissonTemplate = new StringRedisTemplate(new RedissonConnectionFactory(redisson));

@@ -1,5 +1,6 @@
 package com.ccloud.module.member.test;
 
+import com.ccloud.framework.test.core.ut.LocalMySql;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DynamicDataSourceAutoConfiguration;
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import com.ccloud.framework.common.exception.ErrorCode;
@@ -8,7 +9,6 @@ import com.ccloud.framework.mybatis.config.CcloudMybatisAutoConfiguration;
 import com.ccloud.framework.tenant.config.CcloudTenantAutoConfiguration;
 import com.ccloud.framework.tenant.core.context.TenantContextHolder;
 import com.ccloud.framework.test.core.ut.BaseDbUnitTest;
-import com.ccloud.framework.test.core.ut.MySqlTestContainer;
 import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +50,7 @@ public abstract class BaseMemberDbUnitTest extends BaseDbUnitTest {
     protected static final Long TENANT_ID = 1L;
 
     static {
-        MySqlTestContainer.get();
+        LocalMySql.ensureInitialized();
     }
 
     @BeforeEach

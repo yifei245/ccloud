@@ -14,14 +14,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.MySQLContainer;
 
 /**
  * 数据库单测基类。
  *
- * <p>跑在真实 MySQL 8.4（Testcontainers）上，表结构来自仓库的正式 DDL：
+ * <p>跑在本机已有的真实 MySQL 上（见 {@link LocalMySql}），表结构来自仓库的正式 DDL：
  * 唯一约束、bit(1)、JSON 列、ON DUPLICATE KEY 等 MySQL 语义都能如实验证，
- * 也不必额外维护一份会与生产漂移的 H2 建表脚本。容器每个 JVM 只启动一次。
+ * 也不必额外维护一份会与生产漂移的 H2 建表脚本。表结构每个 JVM 只初始化一次。
  *
  * <p>只装配数据库相关的自动配置，不做组件扫描；被测 Service 由子类用 {@code @Import} 显式引入，
  * 其余依赖用 {@code @MockitoBean}。
@@ -45,12 +44,7 @@ public abstract class BaseDbUnitTest {
 
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry) {
-        MySQLContainer<?> mysql = MySqlTestContainer.get();
-        String prefix = "spring.datasource.dynamic.datasource.master.";
-        registry.add(prefix + "url", mysql::getJdbcUrl);
-        registry.add(prefix + "username", mysql::getUsername);
-        registry.add(prefix + "password", mysql::getPassword);
-        registry.add(prefix + "driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
+        LocalMySql.register(registry);
     }
 
     @Configuration(proxyBeanMethods = false)

@@ -1,5 +1,6 @@
 package com.ccloud.module.system;
 
+import com.ccloud.framework.test.core.ut.LocalRedis;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.DataPermissionInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.InnerInterceptor;
@@ -21,9 +22,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -39,7 +37,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * system 服务整体装配测试：真实 Redis（Testcontainers）+ H2，关闭 Nacos / XXL-Job / SBA / 链路上报。
+ * system 服务整体装配测试：本机真实 Redis（见 LocalRedis）+ H2，关闭 Nacos / XXL-Job / SBA / 链路上报。
  */
 @SpringBootTest(classes = SystemServerApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -51,16 +49,11 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "spring.cloud.service-registry.auto-registration.enabled=false"
         })
 @ActiveProfiles("unit-test")
-@Testcontainers
 class SystemServerApplicationTest {
-
-    @Container
-    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
     @DynamicPropertySource
     static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+        LocalRedis.register(registry);
     }
 
     private static final Pattern CREATE_TABLE =

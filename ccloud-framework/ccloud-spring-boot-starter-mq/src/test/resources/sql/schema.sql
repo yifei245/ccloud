@@ -14,7 +14,7 @@ CREATE TABLE infra_message_outbox (
     create_time     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updater         VARCHAR(64)  DEFAULT '',
     update_time     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted         BOOLEAN      NOT NULL DEFAULT FALSE,
+    deleted         BIGINT       NOT NULL DEFAULT 0,
     CONSTRAINT uk_outbox_message_id UNIQUE (message_id)
 );
 
@@ -28,7 +28,7 @@ CREATE TABLE infra_message_consume_log (
     create_time  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updater      VARCHAR(64)  DEFAULT '',
     update_time  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted      BOOLEAN      NOT NULL DEFAULT FALSE,
+    deleted      BIGINT       NOT NULL DEFAULT 0,
     CONSTRAINT uk_consume_log UNIQUE (message_id, consumer)
 );
 
@@ -47,5 +47,5 @@ CREATE TABLE infra_message_dead_letter (
     create_time  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updater      VARCHAR(64)  DEFAULT '',
     update_time  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted      BOOLEAN      NOT NULL DEFAULT FALSE
+    deleted      BIGINT       NOT NULL DEFAULT 0
 );

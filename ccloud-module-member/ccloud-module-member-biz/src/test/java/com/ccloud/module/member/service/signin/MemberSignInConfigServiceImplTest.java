@@ -1,7 +1,6 @@
 package com.ccloud.module.member.service.signin;
 
 import com.ccloud.framework.common.enums.CommonStatusEnum;
-import com.ccloud.framework.tenant.core.util.TenantUtils;
 import com.ccloud.module.member.controller.admin.signin.vo.MemberSignInConfigSaveReqVO;
 import com.ccloud.module.member.dal.dataobject.signin.MemberSignInConfigDO;
 import com.ccloud.module.member.dal.mysql.signin.MemberSignInConfigMapper;
@@ -53,13 +52,6 @@ class MemberSignInConfigServiceImplTest extends BaseMemberDbUnitTest {
             configService.deleteSignInConfig(id);
         }
         assertThat(configService.getSignInConfigList(null)).isEmpty();
-    }
-
-    @Test
-    void 物理删除仍受租户隔离() {
-        Long id = configService.createSignInConfig(config(null, 1, 2, 1, CommonStatusEnum.ENABLE));
-        assertThat(TenantUtils.execute(TENANT_ID + 1000, () -> configMapper.deleteByIdPhysically(id))).isZero();
-        assertThat(configMapper.selectById(id)).isNotNull();
     }
 
     @Test

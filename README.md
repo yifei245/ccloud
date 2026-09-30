@@ -165,6 +165,8 @@ P1 阶段开放平台服务尚未交付：应用在 Nacos 的 `ccloud-gateway.ya
 ## 数据库
 
 - 库名 `ccloud`，字符集 `utf8mb4`，排序规则 `utf8mb4_0900_ai_ci`；所有模块共用一个库，业务表带 `tenant_id` 行级隔离。
+- 逻辑删除：每张表都有 `deleted bigint NOT NULL DEFAULT 0`，0 表示未删除，删除时写入记录自身的编号。唯一索引一律带上 `deleted`
+  （如 `(username, tenant_id, deleted)`），未删除的记录仍受唯一约束，同一个值也可以反复删除、重建。新建表须遵守这一约定，`scripts/verify-sql.sh` 会校验。
 - 全量脚本 `sql/mysql/ccloud.sql`（建库 + 全部建表 + 初始化数据），由 `sql/mysql/ddl/`（按模块建表）与 `sql/mysql/dml/`（初始化数据）拼装生成，**不要手工编辑**。
   修改 `ddl/`、`dml/` 后执行 `scripts/build-sql.sh` 重新生成，`scripts/verify-sql.sh` 校验。
 - `scripts/docker-up.sh` 在本机 MySQL 中没有 `ccloud` 库时自动导入；需要重新初始化时执行 `scripts/docker-up.sh --reset-db`（只影响 `ccloud` 库）。

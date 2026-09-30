@@ -44,7 +44,7 @@ public class DefaultDBFieldHandler implements MetaObjectHandler {
             baseDO.setUpdater(userId.toString());
         }
         if (Objects.isNull(baseDO.getDeleted())) {
-            baseDO.setDeleted(false);
+            baseDO.setDeleted(0L);
         }
     }
 

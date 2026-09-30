@@ -47,6 +47,15 @@ if [ -n "$MISSING_AUDIT" ] && [ "$MISSING_AUDIT" != "NULL" ]; then
 fi
 echo "  OK   全部表均带审计字段"
 
+# 逻辑删除列须为 bigint：删除时写入记录编号，唯一索引 (..., deleted) 才不会与已删除的记录冲突；
+# 若为 bit / tinyint，同一个值第二次删除就会违反唯一约束
+BAD_DELETED=$(q "SELECT GROUP_CONCAT(table_name) FROM information_schema.columns
+  WHERE table_schema='$DB' AND column_name='deleted' AND (data_type<>'bigint' OR column_default<>'0' OR is_nullable<>'NO');")
+if [ -n "$BAD_DELETED" ] && [ "$BAD_DELETED" != "NULL" ]; then
+  echo "  FAIL 以下表的 deleted 列不是 bigint NOT NULL DEFAULT 0: $BAD_DELETED"; exit 1
+fi
+echo "  OK   全部表的 deleted 列为 bigint NOT NULL DEFAULT 0"
+
 # 每张表都必须有主键，无主键表在主从复制与在线 DDL 下都会出问题
 NO_PK=$(q "SELECT GROUP_CONCAT(t.table_name) FROM information_schema.tables t
   WHERE t.table_schema='$DB'

@@ -39,7 +39,7 @@ public class MemberSignInConfigServiceImpl implements MemberSignInConfigService 
     @Override
     public void deleteSignInConfig(Long id) {
         validateConfigExists(id);
-        configMapper.deleteByIdPhysically(id);
+        configMapper.deleteById(id);
     }
 
     private void validateConfigExists(Long id) {

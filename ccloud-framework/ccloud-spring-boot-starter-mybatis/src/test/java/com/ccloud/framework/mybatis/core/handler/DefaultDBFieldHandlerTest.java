@@ -36,7 +36,7 @@ class DefaultDBFieldHandlerTest {
         assertThat(demo.getUpdateTime()).isEqualTo(demo.getCreateTime());
         assertThat(demo.getCreator()).isEqualTo("1");
         assertThat(demo.getUpdater()).isEqualTo("1");
-        assertThat(demo.getDeleted()).isFalse();
+        assertThat(demo.getDeleted()).isZero();
     }
 
     @Test
@@ -78,6 +78,6 @@ class DefaultDBFieldHandlerTest {
 
         assertThat(demo.getCreateTime()).isNotNull();
         assertThat(demo.getCreator()).isNull();
-        assertThat(demo.getDeleted()).isFalse();
+        assertThat(demo.getDeleted()).isZero();
     }
 }

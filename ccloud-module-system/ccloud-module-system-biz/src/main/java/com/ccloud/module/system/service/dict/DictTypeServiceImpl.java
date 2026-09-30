@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -55,8 +54,6 @@ public class DictTypeServiceImpl implements DictTypeService {
         if (dictDataService.getDictDataCountByDictType(dictType.getType()) > 0) {
             throw exception(DICT_TYPE_HAS_CHILDREN);
         }
-        // 先记录删除时间再逻辑删除：唯一索引为 (type, deleted_time)，删除后才能重建同一类型
-        dictTypeMapper.updateById(new DictTypeDO().setId(id).setDeletedTime(LocalDateTime.now()));
         dictTypeMapper.deleteById(id);
     }
 

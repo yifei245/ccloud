@@ -132,6 +132,17 @@ class MemberUserServiceImplTest extends BaseMemberDbUnitTest {
     }
 
     @Test
+    void deleteUser_同一手机号可反复注册与删除() {
+        when(oauth2TokenApi.removeAccessTokensByUser(anyLong(), anyInt())).thenReturn(CommonResult.success(true));
+        for (int i = 0; i < 3; i++) {
+            MemberUserDO user = userService.createUserIfAbsent("13911119008", "10.0.0.1", null);
+            userService.deleteUser(user.getId());
+        }
+        MemberUserDO again = userService.createUserIfAbsent("13911119008", "10.0.0.1", null);
+        assertThat(userService.getUserByMobile("13911119008").getId()).isEqualTo(again.getId());
+    }
+
+    @Test
     void getUserPage_按标签任一命中_按分组与手机号筛选() {
         MemberUserDO a = userService.createUserIfAbsent("13911119005", "10.0.0.1", null);
         MemberUserDO b = userService.createUserIfAbsent("13911119006", "10.0.0.1", null);

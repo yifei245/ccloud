@@ -296,6 +296,17 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
     }
 
     @Test
+    void deleteUser_同一账号可反复删除与重建() {
+        for (int i = 0; i < 3; i++) {
+            Long id = userService.createUser(newReqVO("zhang", "13700000009", "zhang@ccloud.local"));
+            userService.deleteUser(id);
+        }
+        assertThat(userService.createUser(newReqVO("zhang", "13700000009", "zhang@ccloud.local"))).isNotNull();
+        // 未删除的账号仍受唯一约束
+        assertServiceException(() -> userService.createUser(newReqVO("zhang", null, null)), USER_USERNAME_EXISTS);
+    }
+
+    @Test
     void deleteUserList() {
         Long a = userService.createUser(newReqVO("dela", null, null));
         Long b = userService.createUser(newReqVO("delb", null, null));

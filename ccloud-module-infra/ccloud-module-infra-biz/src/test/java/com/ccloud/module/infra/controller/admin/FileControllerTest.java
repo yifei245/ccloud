@@ -37,14 +37,17 @@ class FileControllerTest extends BaseInfraWebIntegrationTest {
     private FileController fileController;
 
     /**
-     * 测试库只有建表脚本，没有种子数据：没有主配置时补上与生产种子相同的配置 1（数据库存储，主配置）。
-     * 已有主配置则沿用，断言对照上传返回的地址，不写死配置编号
+     * 测试库只有建表脚本，没有种子数据：没有主配置时临时补一条（数据库存储，名称带 Web测试 前缀，不指定编号），
+     * 结束后按名称前缀删除；已有主配置则沿用且不改动，断言对照上传返回的地址，不写死配置编号
      */
     @BeforeEach
-    void ensureSeedMaster() {
-        jdbcTemplate.update("INSERT IGNORE INTO infra_file_config (id, name, storage, master, config) "
-                + "SELECT 1, '数据库存储', 1, b'1', '{\"domain\":\"http://127.0.0.1:28080\"}' FROM DUAL "
-                + "WHERE NOT EXISTS (SELECT 1 FROM infra_file_config WHERE master = b'1' AND deleted = 0)");
+    void ensureMaster() {
+        Integer masters = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM infra_file_config WHERE master = b'1' AND deleted = 0", Integer.class);
+        if (masters == 0) {
+            jdbcTemplate.update("INSERT INTO infra_file_config (name, storage, master, config) VALUES "
+                    + "('Web测试主配置', 1, b'1', '{\"domain\":\"http://127.0.0.1:28080\"}')");
+        }
     }
 
     @AfterEach

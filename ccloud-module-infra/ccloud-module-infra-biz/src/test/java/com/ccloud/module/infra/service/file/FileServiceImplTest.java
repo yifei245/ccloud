@@ -42,8 +42,8 @@ class FileServiceImplTest extends BaseInfraDbUnitTest {
     private FileConfigMapper fileConfigMapper;
 
     /**
-     * 测试库只有建表脚本，没有种子数据；Web 测试会把种子主配置提交进库，因此已有主配置时直接沿用，否则补一条，
-     * 断言一律对照实际使用的主配置编号
+     * 测试库只有建表脚本，没有种子数据：已有主配置时沿用，否则在本测试自己的事务里补一条（随回滚消失），
+     * 不依赖其他测试类；断言一律对照实际使用的主配置编号
      */
     private Long masterId;
 

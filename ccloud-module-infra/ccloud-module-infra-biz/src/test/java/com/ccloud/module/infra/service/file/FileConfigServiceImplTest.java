@@ -38,8 +38,7 @@ class FileConfigServiceImplTest extends BaseInfraDbUnitTest {
     Path dir;
 
     /**
-     * 测试库只有建表脚本，没有种子数据；Web 测试会把种子主配置提交进库，因此已有主配置时直接沿用，否则补一条，
-     * 对应生产种子中的编号 1
+     * 测试库只有建表脚本，没有种子数据：已有主配置时沿用，否则在本测试自己的事务里补一条（随回滚消失）
      */
     private Long masterId;
 

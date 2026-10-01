@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.ccloud</groupId>
+        <artifactId>ccloud</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>ccloud-module-infra</artifactId>
+    <packaging>pom</packaging>
+    <name>${project.artifactId}</name>
+    <description>基础设施模块 infra：参数配置、文件、API 日志、消息死信、数据源、数据库文档、代码生成</description>
+
+    <modules>
+        <module>ccloud-module-infra-api</module>
+        <module>ccloud-module-infra-biz</module>
+    </modules>
+</project>

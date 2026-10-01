@@ -1,11 +1,15 @@
 package com.ccloud.module.infra.service.file;
 
+import com.ccloud.framework.common.util.json.JsonUtils;
+import com.ccloud.framework.operatelog.core.util.DesensitizeUtils;
 import com.ccloud.module.infra.controller.admin.file.vo.FileConfigSaveReqVO;
 import com.ccloud.module.infra.dal.dataobject.file.FileConfigDO;
 import com.ccloud.module.infra.dal.mysql.file.FileConfigMapper;
 import com.ccloud.module.infra.framework.file.core.FileClientFactory;
 import com.ccloud.module.infra.framework.file.core.FileConfigRefresher;
+import com.ccloud.module.infra.framework.file.core.enums.FileStorageEnum;
 import com.ccloud.module.infra.test.BaseInfraDbUnitTest;
+import com.fasterxml.jackson.core.type.TypeReference;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Map;
 
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.*;
@@ -103,6 +108,52 @@ class FileConfigServiceImplTest extends BaseInfraDbUnitTest {
         fileConfigService.updateFileConfigMaster(masterId);
         fileConfigService.deleteFileConfig(a);
         verify(fileConfigRefresher, times(4)).publish();
+    }
+
+    @Test
+    void S3配置_返回时密钥掩码_以掩码提交修改时沿用原密钥() {
+        Long id = fileConfigService.createFileConfig(save(null, 20, s3("real-secret")));
+        FileConfigDO db = fileConfigMapper.selectById(id);
+        assertThat(db.getStorage()).isEqualTo(20);
+        assertThat(secretOf(db)).isEqualTo("real-secret");
+
+        // 返回给前端时按存储器声明的密钥项掩码（与 Controller 的 toRespVO 同一规则）
+        Map<String, Object> shown = JsonUtils.parseObject(db.getConfig(), new TypeReference<Map<String, Object>>() {});
+        FileStorageEnum.S3.getSecretKeys().forEach(key -> shown.computeIfPresent(key, (k, v) -> DesensitizeUtils.MASK));
+        assertThat(shown.get("accessSecret")).isEqualTo("******");
+        assertThat(shown.get("accessKey")).isEqualTo("ut-ak");
+
+        // 前端把掩码原样提交：改名称，密钥沿用
+        FileConfigSaveReqVO renamed = save(id, 20, shown);
+        renamed.setName("改名后");
+        fileConfigService.updateFileConfig(renamed);
+        db = fileConfigMapper.selectById(id);
+        assertThat(db.getName()).isEqualTo("改名后");
+        assertThat(secretOf(db)).isEqualTo("real-secret");
+
+        // 提交新密钥：以新值为准
+        fileConfigService.updateFileConfig(save(id, 20, s3("new-secret")));
+        assertThat(secretOf(fileConfigMapper.selectById(id))).isEqualTo("new-secret");
+    }
+
+    @Test
+    void S3配置_缺存储桶或密钥报错() {
+        Map<String, Object> noBucket = new HashMap<>(s3("real-secret"));
+        noBucket.remove("bucket");
+        assertServiceException(() -> fileConfigService.createFileConfig(save(null, 20, noBucket)), FILE_CONFIG_INVALID);
+        Map<String, Object> noSecret = new HashMap<>(s3("real-secret"));
+        noSecret.remove("accessSecret");
+        assertServiceException(() -> fileConfigService.createFileConfig(save(null, 20, noSecret)), FILE_CONFIG_INVALID);
+    }
+
+    private static Map<String, Object> s3(String secret) {
+        return Map.of("endpoint", "https://oss-cn-hangzhou.aliyuncs.com", "bucket", "ccloud-test",
+                "accessKey", "ut-ak", "accessSecret", secret, "region", "cn-hangzhou",
+                "domain", "https://ccloud-test.oss-cn-hangzhou.aliyuncs.com");
+    }
+
+    private static String secretOf(FileConfigDO db) {
+        return (String) JsonUtils.parseObject(db.getConfig(), new TypeReference<Map<String, Object>>() {}).get("accessSecret");
     }
 
     private Map<String, Object> local() {

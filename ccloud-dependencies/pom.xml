@@ -92,6 +92,8 @@
         <tencent-cos.version>5.6.277</tencent-cos.version>
         <tencent-sms.version>3.1.880</tencent-sms.version>
         <minio.version>9.0.3</minio.version>
+        <!-- AWS SDK for Java 2.x，S3 兼容存储（AWS S3、阿里云 OSS）使用 -->
+        <awssdk.version>2.55.9</awssdk.version>
 
         <!-- ========== 测试 ========== -->
         <!-- Jakarta EL 实现，hibernate-validator 8.x(EE10) 对应 5.x；6.x 是 EE11 的 -->
@@ -123,6 +125,13 @@
                 <groupId>com.alibaba.cloud</groupId>
                 <artifactId>spring-cloud-alibaba-dependencies</artifactId>
                 <version>${spring.cloud.alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${awssdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

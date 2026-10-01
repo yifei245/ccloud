@@ -3,6 +3,7 @@ package com.ccloud.module.infra.framework.file.core.enums;
 import com.ccloud.module.infra.framework.file.core.client.FileClientConfig;
 import com.ccloud.module.infra.framework.file.core.client.db.DBFileClientConfig;
 import com.ccloud.module.infra.framework.file.core.client.local.LocalFileClientConfig;
+import com.ccloud.module.infra.framework.file.core.client.s3.S3FileClientConfig;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -17,7 +18,8 @@ import java.util.Set;
 public enum FileStorageEnum {
 
     DB(1, DBFileClientConfig.class, Set.of()),
-    LOCAL(10, LocalFileClientConfig.class, Set.of());
+    LOCAL(10, LocalFileClientConfig.class, Set.of()),
+    S3(20, S3FileClientConfig.class, Set.of("accessSecret"));
 
     private final Integer storage;
     private final Class<? extends FileClientConfig> configClass;

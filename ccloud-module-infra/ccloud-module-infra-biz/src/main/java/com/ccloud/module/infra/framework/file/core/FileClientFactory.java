@@ -10,6 +10,8 @@ import com.ccloud.module.infra.framework.file.core.client.db.DBFileClient;
 import com.ccloud.module.infra.framework.file.core.client.db.DBFileClientConfig;
 import com.ccloud.module.infra.framework.file.core.client.local.LocalFileClient;
 import com.ccloud.module.infra.framework.file.core.client.local.LocalFileClientConfig;
+import com.ccloud.module.infra.framework.file.core.client.s3.S3FileClient;
+import com.ccloud.module.infra.framework.file.core.client.s3.S3FileClientConfig;
 import com.ccloud.module.infra.framework.file.core.enums.FileStorageEnum;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
@@ -67,6 +69,7 @@ public class FileClientFactory {
         return switch (storage) {
             case DB -> new DBFileClient(config.getId(), (DBFileClientConfig) clientConfig, fileContentMapper);
             case LOCAL -> new LocalFileClient(config.getId(), (LocalFileClientConfig) clientConfig);
+            case S3 -> new S3FileClient(config.getId(), (S3FileClientConfig) clientConfig);
         };
     }
 }

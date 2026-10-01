@@ -2,7 +2,9 @@ package com.ccloud.module.system.service.user;
 
 import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.framework.common.enums.UserTypeEnum;
+import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.common.pojo.PageResult;
+import com.ccloud.module.infra.api.config.ConfigApi;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdatePasswordReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdateReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.user.UserImportExcelVO;
@@ -26,10 +28,10 @@ import com.ccloud.module.system.service.tenant.TenantInfoHandler;
 import com.ccloud.module.system.service.tenant.TenantService;
 import com.ccloud.module.system.test.BaseSystemDbUnitTest;
 import jakarta.annotation.Resource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
@@ -44,10 +46,10 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @Import({AdminUserServiceImpl.class, DeptServiceImpl.class, PostServiceImpl.class, PermissionServiceImpl.class,
         LocalValidatorFactoryBean.class})
-@TestPropertySource(properties = "ccloud.system.user.init-password=init123")
 class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
 
     @Resource
@@ -66,9 +68,16 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
     private PasswordEncoder passwordEncoder;
 
     @MockitoBean
+    private ConfigApi configApi;
+    @MockitoBean
     private TenantService tenantService;
     @MockitoBean
     private OAuth2TokenService oauth2TokenService;
+
+    @BeforeEach
+    void stubInitPassword() {
+        when(configApi.getConfigValueByKey("system.user.init-password")).thenReturn(CommonResult.success("init123"));
+    }
 
     // ========== 创建 ==========
 
@@ -391,6 +400,16 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
     @Test
     void importUserList_空列表() {
         assertServiceException(() -> userService.importUserList(List.of(), false), USER_IMPORT_LIST_IS_EMPTY);
+    }
+
+    @Test
+    void importUserList_参数未配置或infra不可用时拒绝导入() {
+        List<UserImportExcelVO> list = List.of(importRow("import_none", null));
+        when(configApi.getConfigValueByKey("system.user.init-password")).thenReturn(CommonResult.success(null));
+        assertServiceException(() -> userService.importUserList(list, false), USER_IMPORT_INIT_PASSWORD);
+        when(configApi.getConfigValueByKey("system.user.init-password")).thenThrow(new RuntimeException("connect refused"));
+        assertServiceException(() -> userService.importUserList(list, false), USER_IMPORT_INIT_PASSWORD);
+        assertThat(userMapper.selectByUsername("import_none")).isNull();
     }
 
     @Test

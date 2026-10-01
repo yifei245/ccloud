@@ -2,7 +2,9 @@ package com.ccloud.module.system.api;
 
 import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.framework.common.enums.UserTypeEnum;
+import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.web.core.handler.GlobalExceptionHandler;
+import com.ccloud.module.infra.api.config.ConfigApi;
 import com.ccloud.module.system.api.dept.DeptApiImpl;
 import com.ccloud.module.system.api.dept.PostApiImpl;
 import com.ccloud.module.system.api.dict.DictDataApiImpl;
@@ -54,7 +56,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.type.classreading.CachingMetadataReaderFactory;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -69,6 +70,7 @@ import static com.ccloud.module.system.service.oauth2.OAuth2TestData.CLIENT_ID;
 import static com.ccloud.module.system.service.oauth2.OAuth2TestData.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -84,7 +86,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         DeptServiceImpl.class, PostServiceImpl.class, DictDataServiceImpl.class, DictTypeServiceImpl.class,
         TenantServiceImpl.class, LoginLogServiceImpl.class,
         CacheTestConfiguration.class, org.springframework.validation.beanvalidation.LocalValidatorFactoryBean.class})
-@TestPropertySource(properties = "ccloud.system.user.init-password=init123")
 class RpcApiIntegrationTest extends BaseSystemDbAndRedisUnitTest {
 
     /**
@@ -115,11 +116,14 @@ class RpcApiIntegrationTest extends BaseSystemDbAndRedisUnitTest {
 
     @MockitoBean
     private com.ccloud.module.system.service.tenant.TenantPackageService tenantPackageService;
+    @MockitoBean
+    private ConfigApi configApi;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
+        when(configApi.getConfigValueByKey("system.user.init-password")).thenReturn(CommonResult.success("init123"));
         Object[] controllers = applicationContext.getBeansWithAnnotation(RestController.class).values().toArray();
         mockMvc = MockMvcBuilders.standaloneSetup(controllers)
                 .setControllerAdvice(new GlobalExceptionHandler("ccloud-system-server", null))

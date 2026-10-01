@@ -123,14 +123,9 @@ ccloud:
       # 同一租户下同一账号连续失败达到上限后锁定，锁定期内即使密码正确也拒绝
       login-fail-limit: 5
       login-fail-lock-minutes: 10
-      # 是否开放管理后台注册
-      register-enabled: ${CCLOUD_REGISTER_ENABLED:false}
     captcha:
       # 登录验证码；本地与联调环境默认关闭，便于自动化调试
       enable: ${CCLOUD_CAPTCHA_ENABLED:true}
-    user:
-      # 导入用户的初始密码，未配置时导入接口直接报错而不是使用弱默认值
-      init-password: ${CCLOUD_USER_INIT_PASSWORD:}
   security:
     # 网关与各服务共享的内部签名密钥，必须通过环境变量或 Nacos 注入，缺失时所有内部身份均被拒绝
     internal-sign-secret: ${CCLOUD_INTERNAL_SIGN_SECRET:}

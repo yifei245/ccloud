@@ -2,7 +2,9 @@ package com.ccloud.module.system.service.auth;
 
 import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.framework.common.enums.UserTypeEnum;
+import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.tenant.core.util.TenantUtils;
+import com.ccloud.module.infra.api.config.ConfigApi;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthLoginReqVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthLoginRespVO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthPermissionInfoRespVO;
@@ -72,11 +74,7 @@ import static org.mockito.Mockito.*;
         OAuth2TokenServiceImpl.class, OAuth2ClientServiceImpl.class, OAuth2AccessTokenRedisDAO.class,
         LoginFailCountRedisDAO.class, DictDataServiceImpl.class, DictTypeServiceImpl.class,
         CacheTestConfiguration.class, org.springframework.validation.beanvalidation.LocalValidatorFactoryBean.class})
-@TestPropertySource(properties = {
-        "ccloud.system.auth.client-id=" + CLIENT_ID,
-        "ccloud.system.auth.register-enabled=true",
-        "ccloud.system.user.init-password=init123"
-})
+@TestPropertySource(properties = "ccloud.system.auth.client-id=" + CLIENT_ID)
 class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
 
     @Resource
@@ -105,6 +103,8 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
     private TenantMapper tenantMapper;
 
     @MockitoBean
+    private ConfigApi configApi;
+    @MockitoBean
     private TenantService tenantService;
     @MockitoBean
     private CaptchaService captchaService;
@@ -116,6 +116,14 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
     private com.ccloud.module.system.service.social.SocialClientService socialClientService;
 
     private static final String MOBILE = "13800000000";
+
+    private static AuthRegisterReqVO newRegisterReqVO(String username) {
+        AuthRegisterReqVO reqVO = new AuthRegisterReqVO();
+        reqVO.setUsername(username);
+        reqVO.setNickname("新用户");
+        reqVO.setPassword("new123");
+        return reqVO;
+    }
 
     private Long userId;
 
@@ -130,6 +138,9 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
         userId = userService.createUser(reqVO);
         loginFailCountRedisDAO.delete(1L, "admin");
         when(captchaService.isEnabled()).thenReturn(false);
+        when(configApi.getConfigValueByKey("system.auth.register-enabled")).thenReturn(CommonResult.success("true"));
+        // 导入用户等路径用到的初始密码
+        when(configApi.getConfigValueByKey("system.user.init-password")).thenReturn(CommonResult.success("init123"));
     }
 
     // ========== 账密登录 ==========
@@ -317,6 +328,16 @@ class AdminAuthServiceImplTest extends BaseSystemDbAndRedisUnitTest {
 
         assertThat(userService.getUserByUsername("newbie")).isNotNull();
         assertThat(tokenService.checkAccessToken(respVO.getAccessToken()).getUserId()).isEqualTo(respVO.getUserId());
+    }
+
+    @Test
+    void register_开关关闭或infra不可用时拒绝() {
+        AuthRegisterReqVO reqVO = newRegisterReqVO("reg_off");
+        when(configApi.getConfigValueByKey("system.auth.register-enabled")).thenReturn(CommonResult.success("false"));
+        assertServiceException(() -> authService.register(reqVO, "127.0.0.1", "ut"), AUTH_REGISTER_DISABLED);
+        when(configApi.getConfigValueByKey("system.auth.register-enabled")).thenThrow(new RuntimeException("down"));
+        assertServiceException(() -> authService.register(reqVO, "127.0.0.1", "ut"), AUTH_REGISTER_DISABLED);
+        assertThat(userService.getUserByUsername("reg_off")).isNull();
     }
 
     @Test

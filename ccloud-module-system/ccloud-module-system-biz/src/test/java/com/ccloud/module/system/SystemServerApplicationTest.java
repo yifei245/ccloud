@@ -11,6 +11,8 @@ import com.ccloud.framework.monitor.core.filter.TraceFilter;
 import com.ccloud.framework.security.core.filter.LoginUserFilter;
 import com.ccloud.framework.tenant.config.TenantProperties;
 import com.ccloud.framework.web.core.handler.GlobalExceptionHandler;
+import com.ccloud.module.infra.api.config.ConfigApi;
+import com.ccloud.module.infra.api.file.FileApi;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -69,6 +71,12 @@ class SystemServerApplicationTest {
         assertThat(ctx.getEnvironment().getProperty("spring.application.name")).isEqualTo("ccloud-system-server");
         // 测试用随机端口，这里校验的是 application.yaml 声明的默认端口
         assertThat(ctx.getEnvironment().getProperty("server.port")).isNotBlank();
+    }
+
+    @Test
+    void 调用infra的Feign客户端已注册() {
+        assertThat(ctx.getBeanNamesForType(ConfigApi.class)).isNotEmpty();
+        assertThat(ctx.getBeanNamesForType(FileApi.class)).isNotEmpty();
     }
 
     @Test

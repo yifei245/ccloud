@@ -19,6 +19,11 @@
             <groupId>com.ccloud</groupId>
             <artifactId>ccloud-module-system-api</artifactId>
         </dependency>
+        <!-- 参数配置、文件存储经 RPC 由 infra 提供 -->
+        <dependency>
+            <groupId>com.ccloud</groupId>
+            <artifactId>ccloud-module-infra-api</artifactId>
+        </dependency>
 
         <!-- ==================== 框架能力 ==================== -->
         <dependency><groupId>com.ccloud</groupId><artifactId>ccloud-spring-boot-starter-web</artifactId></dependency>

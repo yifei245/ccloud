@@ -11,6 +11,7 @@ import com.ccloud.framework.common.util.object.BeanUtils;
 import com.ccloud.framework.common.util.validation.ValidationUtils;
 import com.ccloud.framework.datapermission.core.annotation.DataPermission;
 import com.ccloud.framework.mybatis.core.query.LambdaQueryWrapperX;
+import com.ccloud.module.infra.api.config.ConfigApi;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdatePasswordReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdateReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.user.UserImportExcelVO;
@@ -30,7 +31,6 @@ import jakarta.annotation.Resource;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -69,10 +69,13 @@ public class AdminUserServiceImpl implements AdminUserService {
     private Validator validator;
 
     /**
-     * 导入用户的初始密码。基础设施服务（配置中心 infra_config）上线后改由其提供
+     * 导入用户的初始密码，存于 infra 参数配置
      */
-    @Value("${ccloud.system.user.init-password:}")
-    private String initPassword;
+    static final String INIT_PASSWORD_CONFIG_KEY = "system.user.init-password";
+
+    @Resource
+    @Lazy
+    private ConfigApi configApi;
 
     // ========== 创建与修改 ==========
 
@@ -278,14 +281,12 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (CollUtil.isEmpty(importUsers)) {
             throw exception(USER_IMPORT_LIST_IS_EMPTY);
         }
-        if (StrUtil.isEmpty(initPassword)) {
-            throw exception(USER_IMPORT_INIT_PASSWORD);
-        }
+        String initPassword = getInitPassword();
         UserImportRespVO respVO = new UserImportRespVO();
         for (UserImportExcelVO importUser : importUsers) {
             String username = StrUtil.nullToEmpty(importUser.getUsername());
             try {
-                importUser(importUser, isUpdateSupport, respVO);
+                importUser(importUser, isUpdateSupport, initPassword, respVO);
             } catch (ConstraintViolationException ex) {
                 respVO.getFailureUsernames().put(username, ex.getConstraintViolations().iterator().next().getMessage());
             } catch (ServiceException ex) {
@@ -295,7 +296,8 @@ public class AdminUserServiceImpl implements AdminUserService {
         return respVO;
     }
 
-    private void importUser(UserImportExcelVO importUser, boolean isUpdateSupport, UserImportRespVO respVO) {
+    private void importUser(UserImportExcelVO importUser, boolean isUpdateSupport, String initPassword,
+                            UserImportRespVO respVO) {
         ValidationUtils.validate(validator, importUser);
         AdminUserDO existUser = userMapper.selectByUsername(importUser.getUsername());
         if (existUser == null) {
@@ -320,6 +322,23 @@ public class AdminUserServiceImpl implements AdminUserService {
         updateObj.setId(existUser.getId());
         userMapper.updateById(updateObj);
         respVO.getUpdateUsernames().add(importUser.getUsername());
+    }
+
+    /**
+     * 取不到值或 infra 不可用都拒绝导入：没有初始密码时生成的账号无法登录，也不能退回到某个硬编码的弱密码
+     */
+    private String getInitPassword() {
+        String password;
+        try {
+            password = configApi.getConfigValueByKey(INIT_PASSWORD_CONFIG_KEY).getCheckedData();
+        } catch (RuntimeException e) {
+            log.warn("[getInitPassword][读取参数 {} 失败]", INIT_PASSWORD_CONFIG_KEY, e);
+            throw exception(USER_IMPORT_INIT_PASSWORD);
+        }
+        if (StrUtil.isEmpty(password)) {
+            throw exception(USER_IMPORT_INIT_PASSWORD);
+        }
+        return password;
     }
 
     // ========== 校验 ==========

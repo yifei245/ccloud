@@ -6,8 +6,7 @@ ccloud:
       # 管理员密码登录连续失败达到次数后锁定账号，锁定时长单位分钟（需重启）
       login-fail-limit: 5
       login-fail-lock-minutes: 10
-  # 短信验证码（即时生效）。开放注册开关 ccloud.system.auth.register-enabled 由环境变量 CCLOUD_REGISTER_ENABLED 控制，
-  # 不在这里配置，否则会覆盖环境变量
+  # 短信验证码（即时生效）
   sms-code:
     # 有效期
     expire-times: 10m

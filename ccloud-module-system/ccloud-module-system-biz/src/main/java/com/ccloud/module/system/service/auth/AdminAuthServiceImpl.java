@@ -7,6 +7,7 @@ import com.ccloud.framework.common.util.collection.CollectionUtils;
 import com.ccloud.framework.common.util.object.BeanUtils;
 import com.ccloud.framework.tenant.core.context.TenantContextHolder;
 import com.ccloud.framework.tenant.core.util.TenantUtils;
+import com.ccloud.module.infra.api.config.ConfigApi;
 import com.ccloud.module.system.api.social.dto.SocialUserBindReqDTO;
 import com.ccloud.module.system.api.social.dto.SocialUserRespDTO;
 import com.ccloud.module.system.controller.admin.auth.vo.AuthSocialBindLoginReqVO;
@@ -47,6 +48,7 @@ import com.ccloud.module.system.service.user.AdminUserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -101,8 +103,15 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     private int loginFailLimit;
     @Value("${ccloud.system.auth.login-fail-lock-minutes:10}")
     private int loginFailLockMinutes;
-    @Value("${ccloud.system.auth.register-enabled:false}")
-    private boolean registerEnabled;
+
+    /**
+     * 是否开放注册，存于 infra 参数配置
+     */
+    static final String REGISTER_ENABLED_CONFIG_KEY = "system.auth.register-enabled";
+
+    @Resource
+    @Lazy
+    private ConfigApi configApi;
 
     // ========== 登录 ==========
 
@@ -333,9 +342,21 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
     // ========== 注册 ==========
 
+    /**
+     * 读取失败按关闭处理：注册开关宁可误关，不能误开
+     */
+    private boolean isRegisterEnabled() {
+        try {
+            return Boolean.parseBoolean(configApi.getConfigValueByKey(REGISTER_ENABLED_CONFIG_KEY).getCheckedData());
+        } catch (RuntimeException e) {
+            log.warn("[isRegisterEnabled][读取参数 {} 失败，按关闭处理]", REGISTER_ENABLED_CONFIG_KEY, e);
+            return false;
+        }
+    }
+
     @Override
     public AuthLoginRespVO register(AuthRegisterReqVO reqVO, String userIp, String userAgent) {
-        if (!registerEnabled) {
+        if (!isRegisterEnabled()) {
             throw exception(AUTH_REGISTER_DISABLED);
         }
         if (captchaService.isEnabled()) {

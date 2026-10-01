@@ -1,5 +1,6 @@
 package com.ccloud.module.member.framework.rpc.config;
 
+import com.ccloud.module.infra.api.file.FileApi;
 import com.ccloud.module.system.api.dict.DictDataApi;
 import com.ccloud.module.system.api.i18n.I18nMessageApi;
 import com.ccloud.module.system.api.logger.LoginLogApi;
@@ -22,7 +23,9 @@ import org.springframework.context.annotation.Configuration;
         // 框架契约：权限、租户、字典、国际化、操作日志
         PermissionApi.class, TenantApi.class, DictDataApi.class, I18nMessageApi.class, OperateLogApi.class,
         // C 端认证：令牌、登录日志、短信验证码、社交登录
-        OAuth2TokenApi.class, LoginLogApi.class, SmsCodeApi.class, SocialClientApi.class, SocialUserApi.class
+        OAuth2TokenApi.class, LoginLogApi.class, SmsCodeApi.class, SocialClientApi.class, SocialUserApi.class,
+        // 文件：头像
+        FileApi.class
 })
 public class RpcConfiguration {
 }

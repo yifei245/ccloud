@@ -8,6 +8,7 @@ import com.ccloud.framework.common.util.json.JsonUtils;
 import com.ccloud.framework.security.core.LoginUser;
 import com.ccloud.framework.security.core.filter.LoginUserFilter;
 import com.ccloud.framework.security.core.util.InternalSignUtils;
+import com.ccloud.module.infra.api.file.FileApi;
 import com.ccloud.module.member.MemberServerApplication;
 import com.ccloud.module.system.api.logger.LoginLogApi;
 import com.ccloud.module.system.api.oauth2.OAuth2TokenApi;
@@ -83,6 +84,8 @@ public abstract class BaseMemberWebIntegrationTest {
     protected LoginLogApi loginLogApi;
     @MockitoBean
     protected PermissionApi permissionApi;
+    @MockitoBean
+    protected FileApi fileApi;
 
     @BeforeEach
     void stubCommonApis() {

@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.pojo.PageResult;
+import com.ccloud.module.infra.api.file.FileApi;
+import com.ccloud.module.infra.api.file.dto.FileCreateReqDTO;
 import com.ccloud.module.member.controller.admin.user.vo.MemberUserPageReqVO;
 import com.ccloud.module.member.controller.admin.user.vo.MemberUserUpdateReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateMobileReqVO;
@@ -54,6 +56,8 @@ public class MemberUserServiceImpl implements MemberUserService {
     private MemberGroupService groupService;
     @Resource
     private OAuth2TokenApi oauth2TokenApi;
+    @Resource
+    private FileApi fileApi;
 
     @Override
     public MemberUserDO getUser(Long id) {
@@ -127,6 +131,18 @@ public class MemberUserServiceImpl implements MemberUserService {
         // updateById 忽略 null 字段，未传的字段保持原值
         memberUserMapper.updateById(new MemberUserDO().setId(id).setNickname(reqVO.getNickname())
                 .setAvatar(reqVO.getAvatar()).setSex(reqVO.getSex()).setBirthday(reqVO.getBirthday()));
+    }
+
+    @Override
+    public String updateUserAvatar(Long id, String name, byte[] content) {
+        validateUserExists(id);
+        FileCreateReqDTO reqDTO = new FileCreateReqDTO();
+        reqDTO.setName(name);
+        reqDTO.setContent(content);
+        // 文件被拒绝（类型、大小）时 getCheckedData 抛出 infra 的错误码，头像保持不变
+        String url = fileApi.createFile(reqDTO).getCheckedData();
+        memberUserMapper.updateById(new MemberUserDO().setId(id).setAvatar(url));
+        return url;
     }
 
     @Override

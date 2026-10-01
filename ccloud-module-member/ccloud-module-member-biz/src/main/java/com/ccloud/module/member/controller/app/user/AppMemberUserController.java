@@ -1,6 +1,7 @@
 package com.ccloud.module.member.controller.app.user;
 
 import cn.hutool.core.util.StrUtil;
+import com.ccloud.framework.apilog.core.annotation.ApiAccessLog;
 import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.common.util.object.BeanUtils;
 import com.ccloud.framework.common.util.servlet.ServletUtils;
@@ -15,8 +16,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 import static com.ccloud.framework.common.pojo.CommonResult.success;
 
@@ -46,6 +51,14 @@ public class AppMemberUserController {
     public CommonResult<Boolean> updateUser(@RequestBody @Valid AppMemberUserUpdateReqVO reqVO) {
         userService.updateUser(SecurityFrameworkUtils.getLoginUserId(), reqVO);
         return success(true);
+    }
+
+    @PutMapping(value = "/update-avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "上传头像")
+    @ApiAccessLog(requestEnable = false)
+    public CommonResult<String> updateUserAvatar(@RequestParam("avatarFile") MultipartFile file) throws IOException {
+        return success(userService.updateUserAvatar(SecurityFrameworkUtils.getLoginUserId(),
+                file.getOriginalFilename(), file.getBytes()));
     }
 
     @PutMapping("/update-mobile")

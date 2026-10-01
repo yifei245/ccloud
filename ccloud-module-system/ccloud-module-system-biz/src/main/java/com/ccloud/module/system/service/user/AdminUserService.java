@@ -38,6 +38,14 @@ public interface AdminUserService {
     void updateUserProfile(Long id, @Valid UserProfileUpdateReqVO reqVO);
 
     /**
+     * 本人上传头像：文件交给 infra 存储，成功后更新头像地址
+     *
+     * @return 头像访问地址
+     * @throws com.ccloud.framework.common.exception.ServiceException 用户不存在，或文件被 infra 拒绝（类型、大小）
+     */
+    String updateUserAvatar(Long id, String name, byte[] content);
+
+    /**
      * 本人修改密码，需校验旧密码
      */
     void updateUserPassword(Long id, @Valid UserProfileUpdatePasswordReqVO reqVO);

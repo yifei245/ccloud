@@ -36,6 +36,14 @@ public interface MemberUserService {
     void updateUser(Long id, AppMemberUserUpdateReqVO reqVO);
 
     /**
+     * 上传头像：文件交给 infra 存储，成功后更新头像地址
+     *
+     * @return 头像访问地址
+     * @throws com.ccloud.framework.common.exception.ServiceException 用户不存在，或文件被 infra 拒绝（类型、大小）
+     */
+    String updateUserAvatar(Long id, String name, byte[] content);
+
+    /**
      * 修改手机号：新旧手机号的验证码都要通过
      */
     void updateUserMobile(Long id, AppMemberUserUpdateMobileReqVO reqVO, String userIp);

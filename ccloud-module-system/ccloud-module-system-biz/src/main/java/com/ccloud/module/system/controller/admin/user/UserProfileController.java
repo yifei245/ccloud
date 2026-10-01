@@ -1,5 +1,6 @@
 package com.ccloud.module.system.controller.admin.user;
 
+import com.ccloud.framework.apilog.core.annotation.ApiAccessLog;
 import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.common.util.collection.CollectionUtils;
 import com.ccloud.framework.common.util.object.BeanUtils;
@@ -18,8 +19,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.ccloud.framework.common.pojo.CommonResult.success;
@@ -72,6 +77,14 @@ public class UserProfileController {
     public CommonResult<Boolean> updateUserProfile(@Valid @RequestBody UserProfileUpdateReqVO reqVO) {
         userService.updateUserProfile(SecurityFrameworkUtils.getLoginUserId(), reqVO);
         return success(true);
+    }
+
+    @PutMapping(value = "/update-avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "上传用户个人头像")
+    @ApiAccessLog(requestEnable = false)
+    public CommonResult<String> updateUserAvatar(@RequestParam("avatarFile") MultipartFile file) throws IOException {
+        return success(userService.updateUserAvatar(SecurityFrameworkUtils.getLoginUserId(),
+                file.getOriginalFilename(), file.getBytes()));
     }
 
     @PutMapping("/update-password")

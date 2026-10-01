@@ -12,6 +12,7 @@ import com.ccloud.module.member.dal.redis.auth.MemberLoginFailCountRedisDAO;
 import com.ccloud.module.member.service.level.MemberLevelServiceImpl;
 import com.ccloud.module.member.service.user.MemberUserServiceImpl;
 import com.ccloud.module.member.test.BaseMemberDbAndRedisUnitTest;
+import com.ccloud.module.infra.api.file.FileApi;
 import com.ccloud.module.system.api.logger.LoginLogApi;
 import com.ccloud.module.system.api.logger.dto.LoginLogCreateReqDTO;
 import com.ccloud.module.system.api.oauth2.OAuth2TokenApi;
@@ -79,6 +80,8 @@ class MemberAuthServiceImplTest extends BaseMemberDbAndRedisUnitTest {
     private OAuth2TokenApi oauth2TokenApi;
     @MockitoBean
     private SmsCodeApi smsCodeApi;
+    @MockitoBean
+    private FileApi fileApi;
     @MockitoBean
     private SocialUserApi socialUserApi;
     @MockitoBean

@@ -12,6 +12,8 @@ import com.ccloud.framework.common.util.validation.ValidationUtils;
 import com.ccloud.framework.datapermission.core.annotation.DataPermission;
 import com.ccloud.framework.mybatis.core.query.LambdaQueryWrapperX;
 import com.ccloud.module.infra.api.config.ConfigApi;
+import com.ccloud.module.infra.api.file.FileApi;
+import com.ccloud.module.infra.api.file.dto.FileCreateReqDTO;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdatePasswordReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdateReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.user.UserImportExcelVO;
@@ -76,6 +78,9 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Resource
     @Lazy
     private ConfigApi configApi;
+    @Resource
+    @Lazy
+    private FileApi fileApi;
 
     // ========== 创建与修改 ==========
 
@@ -137,6 +142,18 @@ public class AdminUserServiceImpl implements AdminUserService {
         validateMobileUnique(id, reqVO.getMobile());
         validateEmailUnique(id, reqVO.getEmail());
         userMapper.updateById(BeanUtils.toBean(reqVO, AdminUserDO.class).setId(id));
+    }
+
+    @Override
+    public String updateUserAvatar(Long id, String name, byte[] content) {
+        validateUserExists(id);
+        FileCreateReqDTO reqDTO = new FileCreateReqDTO();
+        reqDTO.setName(name);
+        reqDTO.setContent(content);
+        // 文件被拒绝（类型、大小）时 getCheckedData 抛出 infra 的错误码，头像保持不变
+        String url = fileApi.createFile(reqDTO).getCheckedData();
+        userMapper.updateById(new AdminUserDO().setId(id).setAvatar(url));
+        return url;
     }
 
     /**

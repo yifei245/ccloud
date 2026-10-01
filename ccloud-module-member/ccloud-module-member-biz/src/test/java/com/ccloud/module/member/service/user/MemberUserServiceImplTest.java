@@ -3,8 +3,10 @@ package com.ccloud.module.member.service.user;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.framework.common.enums.TerminalEnum;
 import com.ccloud.framework.common.enums.UserTypeEnum;
+import com.ccloud.framework.common.exception.ServiceException;
 import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.tenant.core.util.TenantUtils;
+import com.ccloud.module.infra.api.file.FileApi;
 import com.ccloud.module.member.controller.admin.user.vo.MemberUserPageReqVO;
 import com.ccloud.module.member.controller.admin.user.vo.MemberUserUpdateReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateMobileReqVO;
@@ -34,6 +36,7 @@ import static com.ccloud.module.member.enums.ErrorCodeConstants.USER_MOBILE_USED
 import static com.ccloud.module.member.enums.ErrorCodeConstants.USER_NOT_EXISTS;
 import static com.ccloud.module.system.enums.ErrorCodeConstants.SMS_CODE_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -51,6 +54,8 @@ class MemberUserServiceImplTest extends BaseMemberDbUnitTest {
     @MockitoBean
     private SmsCodeApi smsCodeApi;
     @MockitoBean
+    private FileApi fileApi;
+    @MockitoBean
     private MemberLevelService levelService;
     @MockitoBean
     private MemberTagService tagService;
@@ -58,6 +63,30 @@ class MemberUserServiceImplTest extends BaseMemberDbUnitTest {
     private MemberGroupService groupService;
     @MockitoBean
     private OAuth2TokenApi oauth2TokenApi;
+
+    // ========== 头像 ==========
+
+    @Test
+    void updateUserAvatar_存储后更新头像地址_会员不存在报错() {
+        MemberUserDO user = userService.createUserIfAbsent("13911119101", "10.0.0.1", null);
+        when(fileApi.createFile(any())).thenReturn(CommonResult.success("http://f/avatar.png"));
+
+        assertThat(userService.updateUserAvatar(user.getId(), "a.png", new byte[]{1, 2})).isEqualTo("http://f/avatar.png");
+
+        assertThat(userMapper.selectById(user.getId()).getAvatar()).isEqualTo("http://f/avatar.png");
+        assertServiceException(() -> userService.updateUserAvatar(-1L, "a.png", new byte[]{1}), USER_NOT_EXISTS);
+    }
+
+    @Test
+    void updateUserAvatar_文件被拒绝时不改头像() {
+        MemberUserDO user = userService.createUserIfAbsent("13911119102", "10.0.0.1", null);
+        when(fileApi.createFile(any())).thenReturn(CommonResult.error(1_002_007_001, "不支持上传该类型的文件：image/svg+xml"));
+
+        assertThatThrownBy(() -> userService.updateUserAvatar(user.getId(), "a.svg", new byte[]{1}))
+                .isInstanceOf(ServiceException.class).extracting("code").isEqualTo(1_002_007_001);
+
+        assertThat(userMapper.selectById(user.getId()).getAvatar()).isEqualTo(user.getAvatar());
+    }
 
     // ========== 管理端 ==========
 

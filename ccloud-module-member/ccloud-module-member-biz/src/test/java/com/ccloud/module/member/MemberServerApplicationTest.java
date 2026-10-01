@@ -17,6 +17,7 @@ import com.ccloud.framework.tenant.config.TenantProperties;
 import com.ccloud.framework.tenant.core.service.TenantFrameworkService;
 import com.ccloud.framework.tenant.core.web.TenantSecurityWebFilter;
 import com.ccloud.module.member.framework.contract.*;
+import com.ccloud.module.infra.api.file.FileApi;
 import com.ccloud.module.system.api.oauth2.OAuth2TokenApi;
 import com.ccloud.module.system.api.permission.PermissionApi;
 import com.ccloud.module.system.api.tenant.TenantApi;
@@ -99,6 +100,7 @@ class MemberServerApplicationTest {
         assertThat(ctx.getBeanNamesForType(PermissionApi.class)).isNotEmpty();
         assertThat(ctx.getBeanNamesForType(TenantApi.class)).isNotEmpty();
         assertThat(ctx.getBeanNamesForType(OAuth2TokenApi.class)).isNotEmpty();
+        assertThat(ctx.getBeanNamesForType(FileApi.class)).as("头像经 infra 存储").isNotEmpty();
     }
 
     @Test

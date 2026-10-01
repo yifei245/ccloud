@@ -12,9 +12,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -37,6 +42,16 @@ public final class LocalMySql {
      * 建表脚本以 USE `ccloud` 切到正式库，测试时去掉，让脚本作用于测试库
      */
     private static final Pattern USE_DATABASE = Pattern.compile("(?im)^\\s*USE\\s+`?ccloud`?\\s*;\\s*$");
+
+    /**
+     * 提取 DDL 中的表名
+     */
+    private static final Pattern CREATE_TABLE = Pattern.compile("CREATE TABLE\\s+`?(\\w+)`?", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * 正式业务库名，测试库不能是它
+     */
+    private static final String BUSINESS_DATABASE = "ccloud";
 
     private static volatile boolean initialized;
 
@@ -88,6 +103,7 @@ public final class LocalMySql {
     }
 
     private static void initSchema() {
+        assertNotBusinessDatabase(DATABASE);
         try (Connection connection = DriverManager.getConnection(serverUrl() + PARAMS, USERNAME, PASSWORD);
              Statement statement = connection.createStatement()) {
             statement.execute("CREATE DATABASE IF NOT EXISTS `" + DATABASE
@@ -102,11 +118,74 @@ public final class LocalMySql {
                 ScriptUtils.executeSqlScript(connection, new EncodedResource(
                         new ByteArrayResource(script.getBytes(StandardCharsets.UTF_8), file.toString()), StandardCharsets.UTF_8));
             }
+            dropTablesNotInDdl(connection);
         } catch (SQLException e) {
             throw new IllegalStateException("初始化测试库 " + DATABASE + " 失败", e);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * 测试库不能是正式业务库：初始化会删表，误指向业务库会清掉真实数据
+     */
+    static void assertNotBusinessDatabase(String database) {
+        if (BUSINESS_DATABASE.equalsIgnoreCase(database)) {
+            throw new IllegalStateException("测试库不能是业务库 " + BUSINESS_DATABASE
+                    + "：初始化测试库会删除表。请检查 ccloud.test.mysql.database 配置。");
+        }
+    }
+
+    /**
+     * DDL 中已经删掉的表，在 DDL 脚本里没有对应的 DROP，会残留在长期存在的测试库中；这里删掉当前库中 DDL 不再包含的表
+     */
+    static void dropTablesNotInDdl(Connection connection) throws SQLException {
+        String database = connection.getCatalog();
+        assertNotBusinessDatabase(database);
+        Set<String> ddlTables = ddlTableNames();
+        List<String> stale = new ArrayList<>();
+        try (Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = '"
+                     + database.replace("'", "''") + "' AND TABLE_TYPE = 'BASE TABLE'")) {
+            while (rs.next()) {
+                String table = rs.getString(1);
+                if (!ddlTables.contains(table)) {
+                    stale.add(table);
+                }
+            }
+        }
+        if (stale.isEmpty()) {
+            return;
+        }
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("SET FOREIGN_KEY_CHECKS = 0");
+            try {
+                for (String table : stale) {
+                    statement.execute("DROP TABLE IF EXISTS `" + table + "`");
+                    System.out.println("[LocalMySql] 删除测试库 " + database + " 中 DDL 已不存在的表：" + table);
+                }
+            } finally {
+                statement.execute("SET FOREIGN_KEY_CHECKS = 1");
+            }
+        }
+    }
+
+    /**
+     * 所有 DDL 文件中 CREATE TABLE 的表名
+     */
+    static Set<String> ddlTableNames() {
+        Set<String> names = new LinkedHashSet<>();
+        try {
+            for (Path file : listDdlFiles()) {
+                Matcher matcher = CREATE_TABLE.matcher(Files.readString(file, StandardCharsets.UTF_8));
+                while (matcher.find()) {
+                    names.add(matcher.group(1));
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return names;
     }
 
     /**

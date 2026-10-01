@@ -135,6 +135,9 @@ ccloud:
     enable: true
     # 租户校验结果本地缓存时长：每个请求都要经 RPC 校验租户，缓存期内租户状态变更不会立即生效
     valid-cache-duration: 1m
+    # 缓存全局表数据的缓存名（不含 #ttl 后缀），不按租户隔离，否则各租户各缓存一份、修改后只清掉一份
+    ignore-caches:
+      - infra_config
     # 不含 tenant_id 列的全局表，与 sql/mysql/ddl 保持一致（由 InfraServerApplicationTest 校验；与 system 共用一个库）
     ignore-tables:
       - system_menu

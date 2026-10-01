@@ -133,6 +133,9 @@ ccloud:
       error-retain-days: 90
   tenant:
     enable: true
+    # 文件读取为公开接口，不带租户；读取按存储路径进行，不查按租户隔离的 infra_file
+    ignore-urls:
+      - /admin-api/infra/file/*/get/**
     # 租户校验结果本地缓存时长：每个请求都要经 RPC 校验租户，缓存期内租户状态变更不会立即生效
     valid-cache-duration: 1m
     # 缓存全局表数据的缓存名（不含 #ttl 后缀），不按租户隔离，否则各租户各缓存一份、修改后只清掉一份

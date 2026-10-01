@@ -48,7 +48,7 @@ class LocalFileClientTest {
     void 越出根目录的路径一律拒绝() throws Exception {
         LocalFileClient client = client();
         Files.writeString(base.resolve("outside.txt"), "secret");
-        for (String path : new String[]{"../outside.txt", "d/../../outside.txt", "/etc/passwd", "d/./../../outside.txt"}) {
+        for (String path : new String[]{"../outside.txt", "d/../../outside.txt", "/etc/passwd", "d/./../../outside.txt", "a\0b.png"}) {
             assertThatThrownBy(() -> client.getContent(path)).as(path).isInstanceOf(ServiceException.class);
             assertThatThrownBy(() -> client.upload(new byte[]{1}, path, "text/plain")).as(path).isInstanceOf(ServiceException.class);
             assertThatThrownBy(() -> client.delete(path)).as(path).isInstanceOf(ServiceException.class);

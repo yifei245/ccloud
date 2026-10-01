@@ -95,6 +95,8 @@ ccloud:
       - /app-api/member/auth/weixin-mini-app-login
       - /app-api/member/auth/refresh-token
       - /app-api/member/auth/logout
+      # ---- infra ----
+      - GET /admin-api/infra/file/*/get/**
       # ---- 接口文档转发路由（ccloud.swagger.enable=false 时不注册） ----
       - /*/v3/api-docs/*
     # 登出后立即清除网关上该令牌的缓存

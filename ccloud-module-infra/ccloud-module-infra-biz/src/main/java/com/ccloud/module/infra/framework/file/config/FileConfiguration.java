@@ -1,6 +1,7 @@
 package com.ccloud.module.infra.framework.file.config;
 
 import com.ccloud.module.infra.framework.file.core.FileConfigRefresher;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -8,6 +9,7 @@ import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(FileProperties.class)
 public class FileConfiguration {
 
     @Bean

@@ -6,6 +6,7 @@ import com.ccloud.module.infra.service.db.dto.ColumnInfo;
 import com.ccloud.module.infra.service.db.dto.IndexInfo;
 import com.ccloud.module.infra.service.db.dto.TableInfo;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.sql.Connection;
@@ -22,6 +23,7 @@ import java.util.Map;
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.DATA_SOURCE_CONFIG_NOT_OK;
 
+@Slf4j
 @Service
 public class DatabaseTableServiceImpl implements DatabaseTableService {
 
@@ -90,13 +92,14 @@ public class DatabaseTableServiceImpl implements DatabaseTableService {
         Map<String, List<ColumnInfo>> result = new LinkedHashMap<>();
         try (PreparedStatement ps = prepare(conn, SQL_COLUMNS, tableName); ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                long charMaxLength = rs.getLong("CHARACTER_MAXIMUM_LENGTH");
+                // 非字符类型为 NULL，须按对象读取，不能用 getLong（会得到 0）
+                Long charMaxLength = rs.getObject("CHARACTER_MAXIMUM_LENGTH", Long.class);
                 ColumnInfo column = new ColumnInfo(rs.getString("COLUMN_NAME"), rs.getString("COLUMN_TYPE"),
                         rs.getString("DATA_TYPE").toLowerCase(Locale.ROOT), StrUtil.nullToEmpty(rs.getString("COLUMN_COMMENT")),
                         "YES".equals(rs.getString("IS_NULLABLE")), rs.getString("COLUMN_DEFAULT"),
                         "PRI".equals(rs.getString("COLUMN_KEY")),
                         StrUtil.containsIgnoreCase(rs.getString("EXTRA"), "auto_increment"),
-                        rs.getInt("ORDINAL_POSITION"), rs.wasNull() ? null : charMaxLength);
+                        rs.getInt("ORDINAL_POSITION"), charMaxLength);
                 result.computeIfAbsent(rs.getString("TABLE_NAME"), k -> new ArrayList<>()).add(column);
             }
         }
@@ -144,6 +147,7 @@ public class DatabaseTableServiceImpl implements DatabaseTableService {
         try (Connection conn = dataSourceConfigService.openConnection(dataSourceConfigId)) {
             return action.apply(conn);
         } catch (SQLException e) {
+            log.warn("[execute][读取数据源({})的表结构失败]", dataSourceConfigId, e);
             throw exception(DATA_SOURCE_CONFIG_NOT_OK);
         }
     }

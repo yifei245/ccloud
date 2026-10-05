@@ -11,6 +11,7 @@ import com.ccloud.module.infra.dal.dataobject.db.DataSourceConfigDO;
 import com.ccloud.module.infra.dal.mysql.codegen.CodegenTableMapper;
 import com.ccloud.module.infra.dal.mysql.db.DataSourceConfigMapper;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -25,6 +26,7 @@ import java.util.Properties;
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.*;
 
+@Slf4j
 @Service
 @Validated
 public class DataSourceConfigServiceImpl implements DataSourceConfigService {
@@ -124,6 +126,9 @@ public class DataSourceConfigServiceImpl implements DataSourceConfigService {
         try (Connection ignored = connect(config)) {
             // 能建立连接即可
         } catch (SQLException e) {
+            // 只记录不含查询参数的地址，避免 url 里携带密码时写入日志
+            log.warn("[validateConnectionOk][数据源({}) {} 连接失败]", config.getName(),
+                    StrUtil.subBefore(config.getUrl(), "?", false), e);
             throw exception(DATA_SOURCE_CONFIG_NOT_OK);
         }
     }

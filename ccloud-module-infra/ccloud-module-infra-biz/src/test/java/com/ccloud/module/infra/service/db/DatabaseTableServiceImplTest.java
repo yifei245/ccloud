@@ -32,6 +32,7 @@ class DatabaseTableServiceImplTest extends BaseInfraDbUnitTest {
         assertThat(id.name()).isEqualTo("id");
         assertThat(id.autoIncrement()).isTrue();
         assertThat(id.dataType()).isEqualTo("bigint");
+        assertThat(id.charMaxLength()).isNull();
 
         ColumnInfo key = table.columns().stream().filter(c -> c.name().equals("config_key")).findFirst().orElseThrow();
         assertThat(key.columnType()).isEqualTo("varchar(100)");

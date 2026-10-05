@@ -16,6 +16,8 @@ import com.ccloud.framework.security.core.service.SecurityFrameworkService;
 import com.ccloud.framework.tenant.config.TenantProperties;
 import com.ccloud.framework.tenant.core.service.TenantFrameworkService;
 import com.ccloud.framework.tenant.core.web.TenantSecurityWebFilter;
+import com.ccloud.framework.apilog.core.service.ApiAccessLogFrameworkService;
+import com.ccloud.framework.apilog.core.service.ApiErrorLogFrameworkService;
 import com.ccloud.module.member.framework.contract.*;
 import com.ccloud.module.infra.api.file.FileApi;
 import com.ccloud.module.system.api.oauth2.OAuth2TokenApi;
@@ -84,6 +86,8 @@ class MemberServerApplicationTest {
         assertThat(ctx.getBean(DictFrameworkService.class)).isInstanceOf(DictFrameworkServiceImpl.class);
         assertThat(ctx.getBean(I18nMessageFrameworkService.class)).isInstanceOf(I18nMessageFrameworkServiceImpl.class);
         assertThat(ctx.getBean(OperateLogFrameworkService.class)).isInstanceOf(OperateLogFrameworkServiceImpl.class);
+        assertThat(ctx.getBean(ApiAccessLogFrameworkService.class)).isInstanceOf(ApiLogFrameworkServiceImpl.class);
+        assertThat(ctx.getBean(ApiErrorLogFrameworkService.class)).isInstanceOf(ApiLogFrameworkServiceImpl.class);
     }
 
     @Test

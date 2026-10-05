@@ -28,6 +28,9 @@ xxl:
     enabled: false
 
 ccloud:
+  # Web 测试不记访问日志：它们不回滚事务，日志会残留在共享测试库。需要的测试自行打开（ApiLogStreamIntegrationTest）
+  access-log:
+    enable: false
   mybatis:
     encrypt-key: ccloud1234567890
   security:

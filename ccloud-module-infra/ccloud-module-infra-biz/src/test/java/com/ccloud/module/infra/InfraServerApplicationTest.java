@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.InnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
+import com.ccloud.framework.apilog.core.service.ApiAccessLogFrameworkService;
+import com.ccloud.framework.apilog.core.service.ApiErrorLogFrameworkService;
 import com.ccloud.framework.excel.core.service.DictFrameworkService;
 import com.ccloud.framework.i18n.core.I18nMessageFrameworkService;
 import com.ccloud.framework.i18n.core.I18nMessageRefresher;
@@ -82,6 +84,8 @@ class InfraServerApplicationTest {
         assertThat(ctx.getBean(DictFrameworkService.class)).isInstanceOf(DictFrameworkServiceImpl.class);
         assertThat(ctx.getBean(I18nMessageFrameworkService.class)).isInstanceOf(I18nMessageFrameworkServiceImpl.class);
         assertThat(ctx.getBean(OperateLogFrameworkService.class)).isInstanceOf(OperateLogFrameworkServiceImpl.class);
+        assertThat(ctx.getBean(ApiAccessLogFrameworkService.class)).isInstanceOf(ApiLogFrameworkServiceImpl.class);
+        assertThat(ctx.getBean(ApiErrorLogFrameworkService.class)).isInstanceOf(ApiLogFrameworkServiceImpl.class);
     }
 
     @Test

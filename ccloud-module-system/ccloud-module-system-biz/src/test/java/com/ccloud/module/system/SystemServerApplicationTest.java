@@ -102,6 +102,11 @@ class SystemServerApplicationTest {
         assertThat(ctx.getBean(com.ccloud.framework.operatelog.core.service.OperateLogFrameworkService.class))
                 .isInstanceOf(com.ccloud.module.system.service.logger.OperateLogFrameworkServiceImpl.class);
         assertThat(ctx.getBeansOfType(com.ccloud.framework.operatelog.core.aop.OperateLogAspect.class)).hasSize(1);
+        // API 访问日志与异常日志须经 Redis Stream 发给 infra 写库，而不是框架默认的只打日志
+        assertThat(ctx.getBean(com.ccloud.framework.apilog.core.service.ApiAccessLogFrameworkService.class))
+                .isInstanceOf(com.ccloud.module.system.framework.contract.ApiLogFrameworkServiceImpl.class);
+        assertThat(ctx.getBean(com.ccloud.framework.apilog.core.service.ApiErrorLogFrameworkService.class))
+                .isInstanceOf(com.ccloud.module.system.framework.contract.ApiLogFrameworkServiceImpl.class);
         // 数据库文案须被加载进 messageSource，并能收到其他节点的刷新通知
         assertThat(ctx.getBeansOfType(com.ccloud.framework.i18n.core.I18nMessageRefresher.class)).hasSize(1);
         // 多实例部署下站内信等实时推送必须经 Redis 广播，否则连接在其他节点上的用户收不到

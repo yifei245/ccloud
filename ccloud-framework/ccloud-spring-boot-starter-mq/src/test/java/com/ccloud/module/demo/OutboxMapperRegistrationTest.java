@@ -1,6 +1,7 @@
 package com.ccloud.module.demo;
 
 import com.ccloud.framework.mq.outbox.core.ConsumeLogMapper;
+import com.ccloud.framework.mq.outbox.core.DeadLetterMapper;
 import com.ccloud.framework.mq.outbox.core.IdempotentConsumer;
 import com.ccloud.framework.mq.outbox.core.OutboxMessageMapper;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,7 @@ class OutboxMapperRegistrationTest {
     void 业务包下启动时框架Mapper应被注册() {
         assertThat(ctx.getBeansOfType(OutboxMessageMapper.class)).hasSize(1);
         assertThat(ctx.getBeansOfType(ConsumeLogMapper.class)).hasSize(1);
+        assertThat(ctx.getBeansOfType(DeadLetterMapper.class)).hasSize(1);
         assertThat(ctx.getBeansOfType(IdempotentConsumer.class)).hasSize(1);
     }
 }

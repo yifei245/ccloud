@@ -1,6 +1,8 @@
 package com.ccloud.framework.mq.redis;
 
 import com.ccloud.framework.common.util.json.JsonUtils;
+import com.ccloud.framework.mq.outbox.core.DeadLetterDO;
+import com.ccloud.framework.mq.outbox.core.DeadLetterMapper;
 import com.ccloud.framework.mq.redis.core.AbstractRedisStreamMessageListener;
 import com.ccloud.framework.mq.redis.core.RedisStreamMessageConsumer;
 import com.ccloud.framework.mq.redis.core.RedisStreamMessageSender;
@@ -16,7 +18,10 @@ import org.junit.jupiter.api.Test;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import org.mockito.ArgumentCaptor;
 import org.redisson.spring.data.connection.RedissonConnectionFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -28,6 +33,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 /**
  * Redis Stream 消费：至少一次投递。成功才 ACK；失败留在待处理列表，由重投任务捞回；
@@ -100,7 +109,7 @@ class RedisStreamConsumerIntegrationTest {
         await().atMost(Duration.ofSeconds(5)).until(() -> pendingCount("demo.retry") == 1);
         assertThat(listener.received).isEmpty();
 
-        String result = new RedisStreamPendingMessageResendJob(redisTemplate, GROUP, List.of(listener), Duration.ZERO, 3)
+        String result = new RedisStreamPendingMessageResendJob(redisTemplate, GROUP, List.of(listener), Duration.ZERO, 3, noDeadLetterMapper())
                 .execute();
 
         assertThat(result).contains("重投 1 条");
@@ -113,21 +122,39 @@ class RedisStreamConsumerIntegrationTest {
     void 超过重试上限应ACK丢弃不再投递() {
         RecordingListener listener = new RecordingListener("demo.dead", Integer.MAX_VALUE);
         start(listener);
-        new RedisStreamMessageSender(redisTemplate).send("demo.dead", "m1", JsonUtils.toJsonString(new DemoMessage(4L, "dead")));
-        RedisStreamPendingMessageResendJob job =
-                new RedisStreamPendingMessageResendJob(redisTemplate, GROUP, List.of(listener), Duration.ZERO, 2);
+        String payload = JsonUtils.toJsonString(new DemoMessage(4L, "dead"));
+        new RedisStreamMessageSender(redisTemplate).send("demo.dead", "m1", payload);
+        DeadLetterMapper deadLetterMapper = mock(DeadLetterMapper.class);
+        RedisStreamPendingMessageResendJob job = new RedisStreamPendingMessageResendJob(redisTemplate, GROUP,
+                List.of(listener), Duration.ZERO, 2, deadLetterProvider(deadLetterMapper));
 
         for (int attempt = 1; attempt <= 3; attempt++) {
             int expected = attempt;
             await().atMost(Duration.ofSeconds(10)).until(() -> listener.attempts.get() == expected);
             await().atMost(Duration.ofSeconds(5)).until(() -> pendingCount("demo.dead") == 1);
-            job.execute();
+            // 未达上限的重投不写死信
+            if (attempt <= 2) {
+                job.execute();
+                verify(deadLetterMapper, never()).insert(any(DeadLetterDO.class));
+            }
         }
+        job.execute();
 
         // 首次 + 重投 2 次后放弃
         assertThat(pendingCount("demo.dead")).isZero();
         assertThat(job.execute()).contains("重投 0 条");
         assertThat(listener.attempts.get()).isEqualTo(3);
+
+        ArgumentCaptor<DeadLetterDO> captor = ArgumentCaptor.forClass(DeadLetterDO.class);
+        verify(deadLetterMapper).insert(captor.capture());
+        DeadLetterDO deadLetter = captor.getValue();
+        assertThat(deadLetter.getMessageId()).isEqualTo("m1");
+        assertThat(deadLetter.getTopic()).isEqualTo("demo.dead");
+        assertThat(deadLetter.getPayload()).isEqualTo(payload);
+        assertThat(deadLetter.getTenantId()).isZero();
+        assertThat(deadLetter.getRetryCount()).isEqualTo(2);
+        assertThat(deadLetter.getErrorMsg()).isEqualTo("消费重试 2 次仍失败");
+        assertThat(deadLetter.getHandled()).isFalse();
     }
 
     @Test
@@ -172,6 +199,16 @@ class RedisStreamConsumerIntegrationTest {
         } finally {
             redisson.shutdown();
         }
+    }
+
+    private static ObjectProvider<DeadLetterMapper> noDeadLetterMapper() {
+        return new StaticListableBeanFactory().getBeanProvider(DeadLetterMapper.class);
+    }
+
+    private static ObjectProvider<DeadLetterMapper> deadLetterProvider(DeadLetterMapper mapper) {
+        StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
+        beanFactory.addBean("deadLetterMapper", mapper);
+        return beanFactory.getBeanProvider(DeadLetterMapper.class);
     }
 
     private void start(AbstractRedisStreamMessageListener<?> listener) {

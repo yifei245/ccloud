@@ -82,6 +82,10 @@ class OutboxIntegrationTest {
     private IdempotentConsumer idempotentConsumer;
     @Autowired
     private StubMessageSender sender;
+    @Autowired
+    private OutboxPublisher outboxPublisher;
+    @Autowired
+    private DeadLetterMapper deadLetterMapper;
 
     @BeforeEach
     void setUp() {
@@ -89,6 +93,7 @@ class OutboxIntegrationTest {
         jdbcTemplate.execute("CREATE TABLE demo_order (order_no VARCHAR(64) PRIMARY KEY)");
         jdbcTemplate.execute("DELETE FROM infra_message_outbox");
         jdbcTemplate.execute("DELETE FROM infra_message_consume_log");
+        jdbcTemplate.execute("DELETE FROM infra_message_dead_letter");
         sender.reset();
     }
 
@@ -150,6 +155,74 @@ class OutboxIntegrationTest {
         assertThat(message.getRetryCount()).isEqualTo(1);
         assertThat(message.getNextRetryTime()).isNotNull();
         assertThat(message.getErrorMsg()).isNotBlank();
+    }
+
+    // ========== 死信 ==========
+
+    private OutboxMessageDO insertMessage(String messageId, Long tenantId, int retryCount, int maxRetry) {
+        OutboxMessageDO message = new OutboxMessageDO();
+        message.setMessageId(messageId);
+        message.setTopic("order.created");
+        message.setPayload("{\"orderNo\":\"" + messageId + "\"}");
+        message.setStatus(OutboxStatusEnum.FAILURE.getStatus());
+        message.setRetryCount(retryCount);
+        message.setMaxRetry(maxRetry);
+        message.setNextRetryTime(java.time.LocalDateTime.now());
+        message.setTenantId(tenantId);
+        outboxMapper.insert(message);
+        return message;
+    }
+
+    @Test
+    @DisplayName("重试达到上限时状态转为死信，并写入一条与原消息一致的死信记录")
+    void exhaustedRetry_shouldWriteDeadLetter() {
+        OutboxMessageDO message = insertMessage("DL-1", 7L, 4, 5);
+        sender.setFailing(true);
+
+        outboxPublisher.publish(message);
+
+        assertThat(outboxMapper.selectById(message.getId()).getStatus()).isEqualTo(OutboxStatusEnum.DEAD.getStatus());
+        List<DeadLetterDO> deadLetters = deadLetterMapper.selectList();
+        assertThat(deadLetters).hasSize(1);
+        DeadLetterDO deadLetter = deadLetters.get(0);
+        assertThat(deadLetter.getMessageId()).isEqualTo("DL-1");
+        assertThat(deadLetter.getTopic()).isEqualTo("order.created");
+        assertThat(deadLetter.getPayload()).isEqualTo(message.getPayload());
+        assertThat(deadLetter.getTenantId()).isEqualTo(7L);
+        assertThat(deadLetter.getRetryCount()).isEqualTo(5);
+        assertThat(deadLetter.getErrorMsg()).isEqualTo("模拟投递失败");
+        assertThat(deadLetter.getHandled()).isFalse();
+        assertThat(deadLetter.getHandledTime()).isNull();
+    }
+
+    @Test
+    @DisplayName("重试未达上限时不写死信")
+    void belowMaxRetry_shouldNotWriteDeadLetter() {
+        OutboxMessageDO message = insertMessage("DL-2", 7L, 3, 5);
+        sender.setFailing(true);
+
+        outboxPublisher.publish(message);
+
+        assertThat(outboxMapper.selectById(message.getId()).getStatus()).isEqualTo(OutboxStatusEnum.FAILURE.getStatus());
+        assertThat(deadLetterMapper.selectCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("内存中的消息没有租户（刚插入未回读）时，死信的租户取自库中原消息")
+    void exhaustedRetry_shouldTakeTenantFromStoredMessageWhenMissingInMemory() {
+        OutboxMessageDO stored = insertMessage("DL-3", 9L, 0, 1);
+        OutboxMessageDO inMemory = new OutboxMessageDO();
+        inMemory.setId(stored.getId());
+        inMemory.setMessageId("DL-3");
+        inMemory.setTopic("order.created");
+        inMemory.setPayload("{}");
+        inMemory.setRetryCount(0);
+        inMemory.setMaxRetry(1);
+        sender.setFailing(true);
+
+        outboxPublisher.publish(inMemory);
+
+        assertThat(deadLetterMapper.selectList()).extracting(DeadLetterDO::getTenantId).containsExactly(9L);
     }
 
     // ========== 不变量二：消费幂等 ==========

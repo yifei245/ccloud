@@ -15,6 +15,7 @@ public class OutboxPublisher {
 
     private final MessageSender messageSender;
     private final OutboxMessageMapper outboxMessageMapper;
+    private final DeadLetterMapper deadLetterMapper;
 
     /**
      * 投递一条消息，并按结果更新状态。
@@ -48,15 +49,46 @@ public class OutboxPublisher {
         update.setId(message.getId());
         update.setRetryCount(retryCount);
         update.setErrorMsg(StrUtil.maxLength(e.getMessage(), 900));
-        if (retryCount >= maxRetry) {
+        if (retryCount >= maxRetry && saveDeadLetter(message, retryCount, update.getErrorMsg())) {
             // 超过上限转死信，避免无效重试永远占用调度资源
             update.setStatus(OutboxStatusEnum.DEAD.getStatus());
             log.error("[markFailure] 消息 {} 重试 {} 次仍失败，转入死信", message.getMessageId(), retryCount);
         } else {
+            // 死信写入失败时同样走退避重试，下一轮会再次尝试转死信，不让消息既不重投也没有死信记录
             update.setStatus(OutboxStatusEnum.FAILURE.getStatus());
             // 指数退避：下游故障时，固定间隔重试会持续加压，让它更难恢复
-            update.setNextRetryTime(LocalDateTime.now().plusMinutes(1L << (retryCount - 1)));
+            update.setNextRetryTime(LocalDateTime.now().plusMinutes(1L << Math.min(retryCount - 1, 10)));
         }
         outboxMessageMapper.updateById(update);
+    }
+
+    /**
+     * 死信的租户取自原消息。刚插入的消息对象上租户编号为空（拦截器只改写 SQL，不回填实体），此时回读库中记录
+     */
+    private boolean saveDeadLetter(OutboxMessageDO message, int retryCount, String errorMsg) {
+        try {
+            doSaveDeadLetter(message, retryCount, errorMsg);
+            return true;
+        } catch (Exception e) {
+            log.error("[saveDeadLetter] 消息 {} 写入死信表失败，保持待重试", message.getMessageId(), e);
+            return false;
+        }
+    }
+
+    private void doSaveDeadLetter(OutboxMessageDO message, int retryCount, String errorMsg) {
+        Long tenantId = message.getTenantId();
+        if (tenantId == null) {
+            OutboxMessageDO stored = outboxMessageMapper.selectById(message.getId());
+            tenantId = stored == null ? null : stored.getTenantId();
+        }
+        DeadLetterDO deadLetter = new DeadLetterDO();
+        deadLetter.setMessageId(message.getMessageId());
+        deadLetter.setTopic(message.getTopic());
+        deadLetter.setPayload(message.getPayload());
+        deadLetter.setRetryCount(retryCount);
+        deadLetter.setErrorMsg(errorMsg);
+        deadLetter.setHandled(false);
+        deadLetter.setTenantId(tenantId == null ? 0L : tenantId);
+        deadLetterMapper.insert(deadLetter);
     }
 }

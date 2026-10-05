@@ -40,8 +40,9 @@ public class CcloudOutboxAutoConfiguration {
     @Bean
     @ConditionalOnBean(MessageSender.class)
     public OutboxPublisher outboxPublisher(MessageSender messageSender,
-                                           OutboxMessageMapper outboxMessageMapper) {
-        return new OutboxPublisher(messageSender, outboxMessageMapper);
+                                           OutboxMessageMapper outboxMessageMapper,
+                                           DeadLetterMapper deadLetterMapper) {
+        return new OutboxPublisher(messageSender, outboxMessageMapper, deadLetterMapper);
     }
 
     @Bean

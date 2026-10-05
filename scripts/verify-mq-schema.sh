@@ -44,5 +44,6 @@ check_do() {
 D=ccloud-framework/ccloud-spring-boot-starter-mq/src/main/java/com/ccloud/framework/mq/outbox/core
 check_do $D/OutboxMessageDO.java infra_message_outbox
 check_do $D/ConsumeLogDO.java infra_message_consume_log
+check_do $D/DeadLetterDO.java infra_message_dead_letter
 
 [ $fail -eq 0 ] && echo "==> 本地消息表结构一致" || exit 1

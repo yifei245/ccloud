@@ -25,13 +25,10 @@ echo "==> 初始化 XXL-Job 执行器与任务"
 if [ "$(lq "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='xxl_job'")" = "0" ]; then
   lmysql < "$ROOT/docker/mysql/init/03-xxl-job.sql" 2>&1 | { grep -v "Using a password" || true; }
 fi
-if [ "$(lq "SELECT COUNT(*) FROM xxl_job.xxl_job_group WHERE app_name='ccloud-system-server'")" = "0" ]; then
-  docker cp "$ROOT/docker/mysql/init/04-ccloud-init.sh" "$MYSQL_CONTAINER:/tmp/04-ccloud-init.sh"
-  docker exec -e XXL_JOB_ADMIN_PASSWORD="$XXL_JOB_ADMIN_PASSWORD" "$MYSQL_CONTAINER" bash /tmp/04-ccloud-init.sh 2>&1 \
-    | { grep -v "Using a password" || true; }
-else
-  echo "    已登记，跳过"
-fi
+# 登记脚本可重复执行：已登记的执行器与任务会跳过，新增的会补上
+docker cp "$ROOT/docker/mysql/init/04-ccloud-init.sh" "$MYSQL_CONTAINER:/tmp/04-ccloud-init.sh"
+docker exec -e XXL_JOB_ADMIN_PASSWORD="$XXL_JOB_ADMIN_PASSWORD" "$MYSQL_CONTAINER" bash /tmp/04-ccloud-init.sh 2>&1 \
+  | { grep -v "Using a password" || true; }
 
 echo "==> 导入 Nacos 配置到命名空间 $NACOS_NAMESPACE"
 bash "$ROOT/scripts/nacos-import.sh"

@@ -41,12 +41,17 @@ for file in "$ROOT"/docker/nacos/config/*.yaml; do
 done
 
 echo "==> 校验 XXL-Job 执行器与任务已登记"
-group=$(lq "SELECT COUNT(*) FROM xxl_job.xxl_job_group WHERE app_name='ccloud-system-server';")
-[ "$group" -eq 1 ] || fail "缺少执行器 ccloud-system-server"
-for handler in outboxRetryJob redisStreamPendingMessageResendJob; do
+for app in ccloud-system-server ccloud-infra-server; do
+  group=$(lq "SELECT COUNT(*) FROM xxl_job.xxl_job_group WHERE app_name='$app';")
+  [ "$group" -eq 1 ] || fail "缺少执行器 $app"
+done
+for spec in "ccloud-system-server:outboxRetryJob" "ccloud-system-server:redisStreamPendingMessageResendJob" \
+            "ccloud-infra-server:redisStreamPendingMessageResendJob" "ccloud-infra-server:apiAccessLogCleanJob" \
+            "ccloud-infra-server:apiErrorLogCleanJob"; do
+  app="${spec%%:*}"; handler="${spec#*:}"
   running=$(lq "SELECT COUNT(*) FROM xxl_job.xxl_job_info i JOIN xxl_job.xxl_job_group g ON i.job_group=g.id
-    WHERE g.app_name='ccloud-system-server' AND i.executor_handler='$handler' AND i.trigger_status=1;")
-  [ "$running" -eq 1 ] || fail "任务 $handler 未登记或未启动"
+    WHERE g.app_name='$app' AND i.executor_handler='$handler' AND i.trigger_status=1;")
+  [ "$running" -eq 1 ] || fail "$app 的任务 $handler 未登记或未启动"
 done
 # 上游脚本的 admin 默认密码 123456（SHA-256）必须已被 .env 中的密码替换
 weak=$(lq "SELECT COUNT(*) FROM xxl_job.xxl_job_user

@@ -57,6 +57,8 @@
             <exclusions>
                 <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion>
                 <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache-client</artifactId></exclusion>
+                <!-- 新版 SDK 改用 apache5-client 作为默认的 Apache 实现 -->
+                <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache5-client</artifactId></exclusion>
             </exclusions>
         </dependency>
         <dependency>

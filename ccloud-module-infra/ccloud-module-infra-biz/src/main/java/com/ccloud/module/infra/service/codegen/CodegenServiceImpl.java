@@ -139,10 +139,14 @@ public class CodegenServiceImpl implements CodegenService {
             if (!Objects.equals(old.getDataType(), c.getDataType()) || !Objects.equals(old.getColumnComment(), c.getColumnComment())
                     || !Objects.equals(old.getNullable(), c.getNullable()) || !Objects.equals(old.getPrimaryKey(), c.getPrimaryKey())
                     || !Objects.equals(old.getOrdinalPosition(), c.getOrdinalPosition())) {
-                updates.add(new CodegenColumnDO().setId(old.getId()).setDataType(c.getDataType())
+                CodegenColumnDO update = new CodegenColumnDO().setId(old.getId()).setDataType(c.getDataType())
                         .setColumnComment(c.getColumnComment()).setNullable(c.getNullable())
-                        .setPrimaryKey(c.getPrimaryKey()).setOrdinalPosition(c.getOrdinalPosition())
-                        .setJavaType(c.getJavaType()));
+                        .setPrimaryKey(c.getPrimaryKey()).setOrdinalPosition(c.getOrdinalPosition());
+                // 只有数据库类型变了才重置 Java 类型，否则保留用户的修改
+                if (!Objects.equals(old.getDataType(), c.getDataType())) {
+                    update.setJavaType(c.getJavaType());
+                }
+                updates.add(update);
             }
         });
         if (inserts.isEmpty() && deletes.isEmpty() && updates.isEmpty()) {

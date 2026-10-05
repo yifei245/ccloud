@@ -18,11 +18,6 @@ public class CodegenTableSaveReqVO {
     @NotNull(message = "生成场景不能为空")
     private Integer scene;
 
-    @Schema(description = "表名", requiredMode = Schema.RequiredMode.REQUIRED, example = "infra_demo_student")
-    @NotBlank(message = "表名不能为空")
-    @Size(max = 200, message = "表名长度不能超过 200 个字符")
-    private String tableName;
-
     @Schema(description = "表描述", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "表描述不能为空")
     @Size(max = 500, message = "表描述长度不能超过 500 个字符")

@@ -193,6 +193,42 @@ class CodegenServiceImplTest extends BaseInfraDbUnitTest {
     }
 
     @Test
+    void syncCodegenFromDB_只有类型变化时才重置Java类型() {
+        Long tableId = importOne(STUDENT);
+        // 用户把 sex 改成 Boolean；库里的排序与注释与定义不一致
+        jdbcTemplate.update("UPDATE infra_codegen_column SET java_type = 'Boolean', ordinal_position = 50, "
+                + "column_comment = '旧注释' WHERE table_id = ? AND column_name = 'sex'", tableId);
+
+        codegenService.syncCodegenFromDB(tableId);
+
+        CodegenColumnDO sex = column(tableId, "sex");
+        assertThat(sex.getOrdinalPosition()).isEqualTo(3);
+        assertThat(sex.getColumnComment()).isEqualTo("性别：1 男 2 女");
+        assertThat(sex.getJavaType()).isEqualTo("Boolean");
+
+        // 数据库类型变化时，Java 类型按新类型重置
+        jdbcTemplate.update("UPDATE infra_codegen_column SET data_type = 'varchar(10)' "
+                + "WHERE table_id = ? AND column_name = 'sex'", tableId);
+        codegenService.syncCodegenFromDB(tableId);
+        assertThat(column(tableId, "sex").getJavaType()).isEqualTo("Integer");
+    }
+
+    @Test
+    void updateCodegen_表名不可修改() {
+        Long tableId = importOne(STUDENT);
+        CodegenUpdateReqVO reqVO = updateReq(tableId);
+        reqVO.getTable().setClassName("Renamed");
+
+        codegenService.updateCodegen(reqVO);
+
+        CodegenTableDO table = codegenTableMapper.selectById(tableId);
+        assertThat(table.getClassName()).isEqualTo("Renamed");
+        assertThat(table.getTableName()).isEqualTo(STUDENT);
+        assertThat(CodegenTableSaveReqVO.class.getDeclaredFields())
+                .extracting(java.lang.reflect.Field::getName).doesNotContain("tableName");
+    }
+
+    @Test
     void deleteCodegen_同时删除字段定义() {
         Long tableId = importOne(STUDENT);
 

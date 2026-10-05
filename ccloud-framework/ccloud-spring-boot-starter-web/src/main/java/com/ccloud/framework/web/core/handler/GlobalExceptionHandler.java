@@ -1,14 +1,13 @@
 package com.ccloud.framework.web.core.handler;
 
 import cn.hutool.core.exceptions.ExceptionUtil;
-import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ccloud.framework.apilog.core.service.ApiErrorLog;
 import com.ccloud.framework.apilog.core.service.ApiErrorLogFrameworkService;
+import com.ccloud.framework.apilog.core.util.ApiLogUtils;
 import com.ccloud.framework.common.exception.ServerException;
 import com.ccloud.framework.common.exception.ServiceException;
 import com.ccloud.framework.common.pojo.CommonResult;
-import com.ccloud.framework.common.util.json.JsonUtils;
 import com.ccloud.framework.common.util.monitor.TracerUtils;
 import com.ccloud.framework.common.util.servlet.ServletUtils;
 import com.ccloud.framework.web.core.util.WebFrameworkUtils;
@@ -32,6 +31,7 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 import static com.ccloud.framework.common.exception.enums.GlobalErrorCodeConstants.*;
@@ -229,11 +229,9 @@ public class GlobalExceptionHandler {
                 errorLog.setUserType(WebFrameworkUtils.getLoginUserType(req));
                 errorLog.setRequestMethod(req.getMethod());
                 errorLog.setRequestUrl(req.getRequestURI());
-                errorLog.setRequestParams(StrUtil.maxLength(
-                        JsonUtils.toJsonString(MapUtil.<String, Object>builder()
-                                .put("query", ServletUtils.getParamMap(req))
-                                .put("body", ServletUtils.getBody(req))
-                                .build()), 8000));
+                errorLog.setTenantId(WebFrameworkUtils.getTenantId(req));
+                errorLog.setRequestParams(ApiLogUtils.buildRequestParams(
+                        ServletUtils.getParamMap(req), ServletUtils.getBody(req), List.of()));
                 errorLog.setUserIp(ServletUtils.getClientIP(req));
                 errorLog.setUserAgent(ServletUtils.getUserAgent(req));
             }

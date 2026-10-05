@@ -1,11 +1,14 @@
 package com.ccloud.framework.web.core.handler;
 
+import com.ccloud.framework.apilog.core.service.ApiErrorLog;
+import com.ccloud.framework.apilog.core.service.ApiErrorLogFrameworkService;
 import com.ccloud.framework.common.exception.ServiceException;
 import com.ccloud.framework.common.pojo.CommonResult;
 import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.core.MethodParameter;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.validation.BeanPropertyBindingResult;
@@ -19,6 +22,8 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class GlobalExceptionHandlerTest {
 
@@ -110,6 +115,24 @@ class GlobalExceptionHandlerTest {
     void allExceptionHandler_shouldDispatchByType() {
         CommonResult<?> r = handler.allExceptionHandler(request, new ServiceException(1_001_000_002, "越权"));
         assertThat(r.getCode()).isEqualTo(1_001_000_002);
+    }
+
+    @Test
+    @DisplayName("异常日志里的请求参数要脱敏，并记录请求头中的租户编号")
+    void unknownException_shouldMaskRequestParamsAndRecordTenantId() {
+        ApiErrorLogFrameworkService errorLogService = mock(ApiErrorLogFrameworkService.class);
+        GlobalExceptionHandler logging = new GlobalExceptionHandler("ccloud-test-server", errorLogService);
+        MockHttpServletRequest post = new MockHttpServletRequest("POST", "/admin-api/system/auth/login");
+        post.setContentType("application/json");
+        post.setContent("{\"username\":\"admin\",\"password\":\"admin123\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        post.addHeader("X-Tenant-Id", "7");
+
+        logging.defaultExceptionHandler(post, new IllegalStateException("boom"));
+
+        ArgumentCaptor<ApiErrorLog> captor = ArgumentCaptor.forClass(ApiErrorLog.class);
+        verify(errorLogService).createApiErrorLogAsync(captor.capture());
+        assertThat(captor.getValue().getRequestParams()).contains("\"username\":\"admin\"").doesNotContain("admin123");
+        assertThat(captor.getValue().getTenantId()).isEqualTo(7L);
     }
 
     @SuppressWarnings("unused")

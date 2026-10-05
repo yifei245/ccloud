@@ -16,6 +16,11 @@ public class ApiAccessLog {
     private Integer userType;
     private String applicationName;
 
+    /**
+     * 租户编号，取自请求头 X-Tenant-Id，没有时为 null
+     */
+    private Long tenantId;
+
     private String requestMethod;
     private String requestUrl;
     private String requestParams;

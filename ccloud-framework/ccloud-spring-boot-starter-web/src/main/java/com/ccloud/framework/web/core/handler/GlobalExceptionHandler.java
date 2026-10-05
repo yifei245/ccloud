@@ -2,6 +2,7 @@ package com.ccloud.framework.web.core.handler;
 
 import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.util.StrUtil;
+import com.ccloud.framework.apilog.core.annotation.ApiAccessLog;
 import com.ccloud.framework.apilog.core.service.ApiErrorLog;
 import com.ccloud.framework.apilog.core.service.ApiErrorLogFrameworkService;
 import com.ccloud.framework.apilog.core.util.ApiLogUtils;
@@ -31,6 +32,8 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -229,9 +232,14 @@ public class GlobalExceptionHandler {
                 errorLog.setUserType(WebFrameworkUtils.getLoginUserType(req));
                 errorLog.setRequestMethod(req.getMethod());
                 errorLog.setRequestUrl(req.getRequestURI());
-                errorLog.setTenantId(WebFrameworkUtils.getTenantId(req));
-                errorLog.setRequestParams(ApiLogUtils.buildRequestParams(
-                        ServletUtils.getParamMap(req), ServletUtils.getBody(req), List.of()));
+                errorLog.setTenantId(ApiLogUtils.getTenantId(req));
+                // 与访问日志同一套规则：注解声明的敏感字段要脱敏，关闭了请求参数记录的接口这里也不记
+                ApiAccessLog annotation = ApiLogUtils.resolveAnnotation(req);
+                if (annotation == null || annotation.requestEnable()) {
+                    Collection<String> sanitizeKeys = annotation != null ? Arrays.asList(annotation.sanitizeKeys()) : List.of();
+                    errorLog.setRequestParams(ApiLogUtils.buildRequestParams(
+                            ServletUtils.getParamMap(req), ServletUtils.getBody(req), sanitizeKeys));
+                }
                 errorLog.setUserIp(ServletUtils.getClientIP(req));
                 errorLog.setUserAgent(ServletUtils.getUserAgent(req));
             }

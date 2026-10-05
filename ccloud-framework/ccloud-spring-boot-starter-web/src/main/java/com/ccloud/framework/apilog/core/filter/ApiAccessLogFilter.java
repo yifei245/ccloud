@@ -19,7 +19,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.servlet.HandlerMapping;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -65,8 +64,8 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
     private void createApiAccessLog(HttpServletRequest request, LocalDateTime beginTime,
                                     Map<String, String> queryString, String requestBody, Exception ex) {
         try {
-            HandlerMethod handler = getHandlerMethod(request);
-            ApiAccessLog annotation = handler == null ? null : getAnnotation(handler);
+            HandlerMethod handler = ApiLogUtils.getHandlerMethod(request);
+            ApiAccessLog annotation = handler == null ? null : ApiLogUtils.getAnnotation(handler);
             if (annotation != null && !annotation.enable()) {
                 return;
             }
@@ -80,7 +79,7 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
             accessLog.setApplicationName(applicationName);
             accessLog.setRequestMethod(request.getMethod());
             accessLog.setRequestUrl(request.getRequestURI());
-            accessLog.setTenantId(WebFrameworkUtils.getTenantId(request));
+            accessLog.setTenantId(ApiLogUtils.getTenantId(request));
             if (annotation == null || annotation.requestEnable()) {
                 accessLog.setRequestParams(ApiLogUtils.buildRequestParams(queryString, requestBody, sanitizeKeys));
             }
@@ -110,16 +109,6 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
         } catch (Throwable th) {
             log.error("[createApiAccessLog] 访问日志记录失败，url={}", request.getRequestURI(), th);
         }
-    }
-
-    private static HandlerMethod getHandlerMethod(HttpServletRequest request) {
-        Object handler = request.getAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE);
-        return handler instanceof HandlerMethod method ? method : null;
-    }
-
-    private static ApiAccessLog getAnnotation(HandlerMethod handler) {
-        ApiAccessLog annotation = handler.getMethodAnnotation(ApiAccessLog.class);
-        return annotation != null ? annotation : handler.getBeanType().getAnnotation(ApiAccessLog.class);
     }
 
     /**

@@ -75,6 +75,16 @@ class ApiAccessLogFilterTest {
         assertThat(captured().getRequestParams()).doesNotContain("abc").contains("无法解析的请求体");
     }
 
+    @Test
+    void 租户编号请求头格式不对时仍记录日志_租户编号为空() throws Exception {
+        mockMvc.perform(post("/admin-api/ut/login").header("X-Tenant-Id", "x").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"admin\",\"password\":\"admin123\"}"));
+        com.ccloud.framework.apilog.core.service.ApiAccessLog log = captured();
+        assertThat(log.getTenantId()).isNull();
+        assertThat(log.getRequestParams()).contains("\"username\":\"admin\"").doesNotContain("admin123");
+        assertThat(log.getOperateName()).isEqualTo("登录");
+    }
+
     private com.ccloud.framework.apilog.core.service.ApiAccessLog captured() {
         ArgumentCaptor<com.ccloud.framework.apilog.core.service.ApiAccessLog> captor =
                 ArgumentCaptor.forClass(com.ccloud.framework.apilog.core.service.ApiAccessLog.class);

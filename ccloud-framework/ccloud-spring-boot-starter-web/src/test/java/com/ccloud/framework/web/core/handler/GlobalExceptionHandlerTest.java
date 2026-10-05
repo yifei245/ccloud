@@ -1,5 +1,6 @@
 package com.ccloud.framework.web.core.handler;
 
+import com.ccloud.framework.apilog.core.annotation.ApiAccessLog;
 import com.ccloud.framework.apilog.core.service.ApiErrorLog;
 import com.ccloud.framework.apilog.core.service.ApiErrorLogFrameworkService;
 import com.ccloud.framework.common.exception.ServiceException;
@@ -15,6 +16,8 @@ import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindException;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.servlet.NoHandlerFoundException;
@@ -23,6 +26,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class GlobalExceptionHandlerTest {
@@ -133,6 +137,64 @@ class GlobalExceptionHandlerTest {
         verify(errorLogService).createApiErrorLogAsync(captor.capture());
         assertThat(captor.getValue().getRequestParams()).contains("\"username\":\"admin\"").doesNotContain("admin123");
         assertThat(captor.getValue().getTenantId()).isEqualTo(7L);
+    }
+
+    @Test
+    @DisplayName("异常日志沿用 @ApiAccessLog：注解声明的敏感字段脱敏，关闭请求参数记录时不记参数")
+    void unknownException_shouldHonorApiAccessLogAnnotation() throws NoSuchMethodException {
+        ApiErrorLogFrameworkService errorLogService = mock(ApiErrorLogFrameworkService.class);
+        GlobalExceptionHandler logging = new GlobalExceptionHandler("ccloud-test-server", errorLogService);
+        AnnotatedController controller = new AnnotatedController();
+
+        MockHttpServletRequest sanitized = jsonPost("{\"cardNo\":\"6222000011112222\",\"name\":\"n\"}");
+        sanitized.setAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE,
+                new HandlerMethod(controller, AnnotatedController.class.getMethod("card")));
+        logging.defaultExceptionHandler(sanitized, new IllegalStateException("boom"));
+
+        MockHttpServletRequest silent = jsonPost("{\"a\":\"b\"}");
+        silent.setAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE,
+                new HandlerMethod(controller, AnnotatedController.class.getMethod("noParams")));
+        logging.defaultExceptionHandler(silent, new IllegalStateException("boom"));
+
+        ArgumentCaptor<ApiErrorLog> captor = ArgumentCaptor.forClass(ApiErrorLog.class);
+        verify(errorLogService, times(2)).createApiErrorLogAsync(captor.capture());
+        assertThat(captor.getAllValues().get(0).getRequestParams())
+                .contains("\"name\":\"n\"").doesNotContain("6222000011112222");
+        assertThat(captor.getAllValues().get(1).getRequestParams()).isNull();
+    }
+
+    @Test
+    @DisplayName("租户编号请求头格式不对时异常日志照常记录，租户编号为空")
+    void unknownException_shouldStillLogWhenTenantHeaderMalformed() {
+        ApiErrorLogFrameworkService errorLogService = mock(ApiErrorLogFrameworkService.class);
+        GlobalExceptionHandler logging = new GlobalExceptionHandler("ccloud-test-server", errorLogService);
+        MockHttpServletRequest post = jsonPost("{\"username\":\"admin\",\"password\":\"admin123\"}");
+        post.addHeader("X-Tenant-Id", "x");
+
+        logging.defaultExceptionHandler(post, new IllegalStateException("boom"));
+
+        ArgumentCaptor<ApiErrorLog> captor = ArgumentCaptor.forClass(ApiErrorLog.class);
+        verify(errorLogService).createApiErrorLogAsync(captor.capture());
+        assertThat(captor.getValue().getTenantId()).isNull();
+        assertThat(captor.getValue().getRequestParams()).contains("\"username\":\"admin\"").doesNotContain("admin123");
+    }
+
+    private static MockHttpServletRequest jsonPost(String body) {
+        MockHttpServletRequest post = new MockHttpServletRequest("POST", "/admin-api/system/auth/login");
+        post.setContentType("application/json");
+        post.setContent(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return post;
+    }
+
+    static class AnnotatedController {
+
+        @ApiAccessLog(sanitizeKeys = "cardNo")
+        public void card() {
+        }
+
+        @ApiAccessLog(requestEnable = false)
+        public void noParams() {
+        }
     }
 
     @SuppressWarnings("unused")

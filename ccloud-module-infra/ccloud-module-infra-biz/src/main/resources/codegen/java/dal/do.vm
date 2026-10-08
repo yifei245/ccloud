@@ -1,0 +1,36 @@
+package ${basePackage}.${module}.dal.dataobject.${business};
+
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.ccloud.framework.mybatis.core.dataobject.${baseDOClass};
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+import lombok.experimental.Accessors;
+#foreach ($import in $javaTypeImports)
+import ${import};
+#end
+
+/**
+ * ${classJavadoc} DO
+ *
+ * @author ${author}
+ */
+@TableName("${table.tableName}")
+@Data
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
+@Accessors(chain = true)
+public class ${className}DO extends ${baseDOClass} {
+
+#foreach ($column in $doColumns)
+    /**
+     * ${column.javadoc}
+     */
+#if ($column.primaryKey)
+    @TableId
+#end
+    private ${column.javaType} ${column.javaField};
+
+#end
+}

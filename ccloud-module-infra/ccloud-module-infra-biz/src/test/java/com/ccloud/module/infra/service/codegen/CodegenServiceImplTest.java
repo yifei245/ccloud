@@ -240,12 +240,16 @@ class CodegenServiceImplTest extends BaseInfraDbUnitTest {
     }
 
     @Test
-    void generationCodes_交给引擎生成_表不存在报错() {
+    void generationCodes_交给引擎生成_表不存在或字段为空报错() {
         Long tableId = importOne(STUDENT);
         when(codegenEngine.execute(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Map.of("a.java", "code"));
 
         assertThat(codegenService.generationCodes(tableId)).containsEntry("a.java", "code");
         assertServiceException(() -> codegenService.generationCodes(-1L), CODEGEN_TABLE_NOT_EXISTS);
+
+        // 字段定义为空时不交给引擎
+        codegenColumnMapper.deleteListByTableId(tableId);
+        assertServiceException(() -> codegenService.generationCodes(tableId), CODEGEN_COLUMN_NOT_EXISTS);
     }
 }

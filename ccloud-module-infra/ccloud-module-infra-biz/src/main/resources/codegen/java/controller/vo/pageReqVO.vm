@@ -1,0 +1,31 @@
+package ${voPackage};
+
+import com.ccloud.framework.common.pojo.PageParam;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+import org.springframework.format.annotation.DateTimeFormat;
+#foreach ($import in $javaTypeImports)
+import ${import};
+#end
+
+@Schema(description = "${sceneLabel} - ${classComment}分页查询 Request VO")
+@Data
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
+public class ${pageReqVO} extends PageParam {
+
+#foreach ($column in $listColumns)
+    @Schema(description = "${column.comment}"#if ($column.example), example = "${column.example}"#end)
+#if ($column.between)
+#if ($column.dateTimePattern)
+    @DateTimeFormat(pattern = "${column.dateTimePattern}")
+#end
+    private ${column.javaType}[] ${column.javaField};
+#else
+    private ${column.javaType} ${column.javaField};
+#end
+
+#end
+}

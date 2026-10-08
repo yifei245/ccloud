@@ -1,0 +1,119 @@
+package ${basePackage}.${module}.controller.${sceneEnum}.${business};
+
+import com.ccloud.framework.apilog.core.annotation.ApiAccessLog;
+import com.ccloud.framework.common.pojo.CommonResult;
+import com.ccloud.framework.common.pojo.PageParam;
+import com.ccloud.framework.common.pojo.PageResult;
+import com.ccloud.framework.common.util.object.BeanUtils;
+import com.ccloud.framework.excel.core.util.ExcelUtils;
+import ${voPackage}.*;
+import ${basePackage}.${module}.dal.dataobject.${business}.${className}DO;
+import ${basePackage}.${module}.service.${business}.${className}Service;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.io.IOException;
+import java.util.List;
+
+import static com.ccloud.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
+import static com.ccloud.framework.common.pojo.CommonResult.success;
+
+/**
+ * ${sceneLabel} - ${classJavadoc}
+ *
+ * @author ${author}
+ */
+@Tag(name = "${sceneLabel} - ${classComment}")
+@RestController
+@RequestMapping("${urlPrefix}/${module}/${kebab}")
+@Validated
+public class ${scenePrefix}${className}Controller {
+
+    @Resource
+    private ${className}Service ${classNameVar}Service;
+
+    @PostMapping("/create")
+    @Operation(summary = "创建${classComment}")
+#if ($isAdmin)
+    @PreAuthorize("@ss.hasPermission('${permissionPrefix}:create')")
+#end
+    public CommonResult<${pkType}> create${className}(@Valid @RequestBody ${saveReqVO} createReqVO) {
+        return success(${classNameVar}Service.create${className}(createReqVO));
+    }
+
+    @PutMapping("/update")
+    @Operation(summary = "修改${classComment}")
+#if ($isAdmin)
+    @PreAuthorize("@ss.hasPermission('${permissionPrefix}:update')")
+#end
+    public CommonResult<Boolean> update${className}(@Valid @RequestBody ${saveReqVO} updateReqVO) {
+        ${classNameVar}Service.update${className}(updateReqVO);
+        return success(true);
+    }
+
+    @DeleteMapping("/delete")
+    @Operation(summary = "删除${classComment}")
+    @Parameter(name = "id", description = "编号", required = true, example = "1")
+#if ($isAdmin)
+    @PreAuthorize("@ss.hasPermission('${permissionPrefix}:delete')")
+#end
+    public CommonResult<Boolean> delete${className}(@RequestParam("id") ${pkType} id) {
+        ${classNameVar}Service.delete${className}(id);
+        return success(true);
+    }
+
+    @GetMapping("/get")
+    @Operation(summary = "获得${classComment}")
+    @Parameter(name = "id", description = "编号", required = true, example = "1")
+#if ($isAdmin)
+    @PreAuthorize("@ss.hasPermission('${permissionPrefix}:query')")
+#end
+    public CommonResult<${respVO}> get${className}(@RequestParam("id") ${pkType} id) {
+        return success(BeanUtils.toBean(${classNameVar}Service.get${className}(id), ${respVO}.class));
+    }
+
+#if ($isTree)
+    @GetMapping("/list")
+    @Operation(summary = "获得${classComment}列表")
+#if ($isAdmin)
+    @PreAuthorize("@ss.hasPermission('${permissionPrefix}:query')")
+#end
+    public CommonResult<List<${respVO}>> get${className}List(@Valid ${listReqVO} listReqVO) {
+        return success(BeanUtils.toBean(${classNameVar}Service.get${className}List(listReqVO), ${respVO}.class));
+    }
+#else
+    @GetMapping("/page")
+    @Operation(summary = "获得${classComment}分页")
+#if ($isAdmin)
+    @PreAuthorize("@ss.hasPermission('${permissionPrefix}:query')")
+#end
+    public CommonResult<PageResult<${respVO}>> get${className}Page(@Valid ${pageReqVO} pageReqVO) {
+        return success(BeanUtils.toBean(${classNameVar}Service.get${className}Page(pageReqVO), ${respVO}.class));
+    }
+#end
+#if ($isAdmin)
+
+    @GetMapping("/export-excel")
+    @Operation(summary = "导出${classComment} Excel")
+    @PreAuthorize("@ss.hasPermission('${permissionPrefix}:export')")
+    @ApiAccessLog(operateType = EXPORT)
+#if ($isTree)
+    public void export${className}Excel(@Valid ${listReqVO} listReqVO, HttpServletResponse response) throws IOException {
+        List<${className}DO> list = ${classNameVar}Service.get${className}List(listReqVO);
+#else
+    public void export${className}Excel(@Valid ${pageReqVO} pageReqVO, HttpServletResponse response) throws IOException {
+        pageReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
+        List<${className}DO> list = ${classNameVar}Service.get${className}Page(pageReqVO).getList();
+#end
+        ExcelUtils.write(response, "${classComment}.xls", "数据", ${respVO}.class, BeanUtils.toBean(list, ${respVO}.class));
+    }
+#end
+
+}

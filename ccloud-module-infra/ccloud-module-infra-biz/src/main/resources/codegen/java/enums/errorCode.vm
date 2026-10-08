@@ -1,0 +1,4 @@
+    // ========== ${classComment}（代码生成，编号请按模块段位调整） ==========
+#foreach ($error in $errorCodes)
+    ErrorCode ${error.name} = new ErrorCode(${error.javaCode}, "${error.zh}");
+#end

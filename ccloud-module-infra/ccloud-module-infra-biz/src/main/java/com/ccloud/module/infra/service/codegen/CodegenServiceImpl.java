@@ -196,7 +196,11 @@ public class CodegenServiceImpl implements CodegenService {
     @Override
     public Map<String, String> generationCodes(Long tableId) {
         CodegenTableDO table = validateCodegenTableExists(tableId);
-        return codegenEngine.execute(table, codegenColumnMapper.selectListByTableId(tableId));
+        List<CodegenColumnDO> columns = codegenColumnMapper.selectListByTableId(tableId);
+        if (columns.isEmpty()) {
+            throw exception(CODEGEN_COLUMN_NOT_EXISTS);
+        }
+        return codegenEngine.execute(table, columns);
     }
 
     private CodegenTableDO validateCodegenTableExists(Long id) {

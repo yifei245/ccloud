@@ -1,0 +1,123 @@
+package ${basePackage}.${module}.service.${business};
+
+import com.ccloud.framework.common.pojo.PageResult;
+import com.ccloud.framework.common.util.object.BeanUtils;
+import ${voPackage}.${queryReqVO};
+import ${voPackage}.${saveReqVO};
+import ${basePackage}.${module}.dal.dataobject.${business}.${className}DO;
+import ${basePackage}.${module}.dal.mysql.${business}.${className}Mapper;
+import jakarta.annotation.Resource;
+import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
+
+import java.util.List;
+import java.util.Objects;
+
+import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static ${basePackage}.${module}.enums.ErrorCodeConstants.*;
+
+/**
+ * ${classJavadoc} Service 实现类
+ *
+ * @author ${author}
+ */
+@Service
+@Validated
+public class ${className}ServiceImpl implements ${className}Service {
+#if ($isTree)
+
+    /**
+     * 根节点的父编号
+     */
+    private static final Long PARENT_ID_ROOT = 0L;
+#end
+
+    @Resource
+    private ${className}Mapper ${classNameVar}Mapper;
+
+    @Override
+    public ${pkType} create${className}(${saveReqVO} createReqVO) {
+#if ($isTree)
+        validateParent${className}(null, createReqVO.get${parentUpper}());
+#end
+        ${className}DO ${classNameVar} = BeanUtils.toBean(createReqVO, ${className}DO.class);
+        ${classNameVar}Mapper.insert(${classNameVar});
+        return ${classNameVar}.get${pkUpper}();
+    }
+
+    @Override
+    public void update${className}(${saveReqVO} updateReqVO) {
+        validate${className}Exists(updateReqVO.get${pkUpper}());
+#if ($isTree)
+        validateParent${className}(updateReqVO.get${pkUpper}(), updateReqVO.get${parentUpper}());
+#end
+        ${classNameVar}Mapper.updateById(BeanUtils.toBean(updateReqVO, ${className}DO.class));
+    }
+
+    @Override
+    public void delete${className}(${pkType} id) {
+        validate${className}Exists(id);
+#if ($isTree)
+        if (${classNameVar}Mapper.selectCountByParentId(id) > 0) {
+            throw exception(${errorCodePrefix}_EXITS_CHILDREN);
+        }
+#end
+        ${classNameVar}Mapper.deleteById(id);
+    }
+
+    private void validate${className}Exists(${pkType} id) {
+        if (id == null || ${classNameVar}Mapper.selectById(id) == null) {
+            throw exception(${errorCodePrefix}_NOT_EXISTS);
+        }
+    }
+#if ($isTree)
+
+    /**
+     * 父节点须存在，且不能是自己或自己的子孙，否则会形成环
+     */
+    private void validateParent${className}(${pkType} id, ${parentType} parentId) {
+        if (parentId == null || PARENT_ID_ROOT.equals(parentId)) {
+            return;
+        }
+        if (Objects.equals(id, parentId)) {
+            throw exception(${errorCodePrefix}_PARENT_ERROR);
+        }
+        ${className}DO parent = ${classNameVar}Mapper.selectById(parentId);
+        if (parent == null) {
+            throw exception(${errorCodePrefix}_PARENT_NOT_EXITS);
+        }
+        if (id == null) {
+            return;
+        }
+        // 沿父链向上查找，遇到自己说明新的父节点是自己的子孙
+        for (int depth = 0; depth < Short.MAX_VALUE && parent != null; depth++) {
+            ${parentType} ancestorId = parent.get${parentUpper}();
+            if (ancestorId == null || PARENT_ID_ROOT.equals(ancestorId)) {
+                return;
+            }
+            if (Objects.equals(id, ancestorId)) {
+                throw exception(${errorCodePrefix}_PARENT_IS_CHILD);
+            }
+            parent = ${classNameVar}Mapper.selectById(ancestorId);
+        }
+    }
+#end
+
+    @Override
+    public ${className}DO get${className}(${pkType} id) {
+        return ${classNameVar}Mapper.selectById(id);
+    }
+
+#if ($isTree)
+    @Override
+    public List<${className}DO> get${className}List(${listReqVO} listReqVO) {
+        return ${classNameVar}Mapper.selectList(listReqVO);
+    }
+#else
+    @Override
+    public PageResult<${className}DO> get${className}Page(${pageReqVO} pageReqVO) {
+        return ${classNameVar}Mapper.selectPage(pageReqVO);
+    }
+#end
+
+}

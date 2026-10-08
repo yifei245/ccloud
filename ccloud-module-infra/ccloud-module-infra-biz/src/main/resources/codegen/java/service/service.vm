@@ -1,0 +1,32 @@
+package ${basePackage}.${module}.service.${business};
+
+import com.ccloud.framework.common.pojo.PageResult;
+import ${voPackage}.${queryReqVO};
+import ${voPackage}.${saveReqVO};
+import ${basePackage}.${module}.dal.dataobject.${business}.${className}DO;
+import jakarta.validation.Valid;
+
+import java.util.List;
+
+/**
+ * ${classJavadoc} Service 接口
+ *
+ * @author ${author}
+ */
+public interface ${className}Service {
+
+    ${pkType} create${className}(@Valid ${saveReqVO} createReqVO);
+
+    void update${className}(@Valid ${saveReqVO} updateReqVO);
+
+    void delete${className}(${pkType} id);
+
+    ${className}DO get${className}(${pkType} id);
+
+#if ($isTree)
+    List<${className}DO> get${className}List(${listReqVO} listReqVO);
+#else
+    PageResult<${className}DO> get${className}Page(${pageReqVO} pageReqVO);
+#end
+
+}

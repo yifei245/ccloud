@@ -1,0 +1,34 @@
+package ${voPackage};
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+#foreach ($import in $javaTypeImports)
+import ${import};
+#end
+
+@Schema(description = "${sceneLabel} - ${classComment}新增/修改 Request VO")
+@Data
+public class ${saveReqVO} {
+
+    @Schema(description = "${primaryColumn.comment}，修改时必填", example = "1")
+    private ${pkType} ${primaryColumn.javaField};
+
+#foreach ($column in $saveColumns)
+    @Schema(description = "${column.comment}"#if (!$column.nullable), requiredMode = Schema.RequiredMode.REQUIRED#end#if ($column.example), example = "${column.example}"#end)
+#if (!$column.nullable)
+#if ($column.string)
+    @NotBlank(message = "${column.label}不能为空")
+#else
+    @NotNull(message = "${column.label}不能为空")
+#end
+#end
+#if ($column.string && $column.maxLength)
+    @Size(max = ${column.maxLength}, message = "${column.label}长度不能超过 ${column.maxLength} 个字符")
+#end
+    private ${column.javaType} ${column.javaField};
+
+#end
+}

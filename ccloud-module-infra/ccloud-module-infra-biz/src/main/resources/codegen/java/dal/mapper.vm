@@ -1,0 +1,39 @@
+package ${basePackage}.${module}.dal.mysql.${business};
+
+import com.ccloud.framework.common.pojo.PageResult;
+import com.ccloud.framework.mybatis.core.mapper.BaseMapperX;
+import com.ccloud.framework.mybatis.core.query.LambdaQueryWrapperX;
+import ${voPackage}.${queryReqVO};
+import ${basePackage}.${module}.dal.dataobject.${business}.${className}DO;
+import org.apache.ibatis.annotations.Mapper;
+
+import java.util.List;
+
+/**
+ * ${classJavadoc} Mapper
+ *
+ * @author ${author}
+ */
+@Mapper
+public interface ${className}Mapper extends BaseMapperX<${className}DO> {
+
+#if ($isTree)
+    default List<${className}DO> selectList(${listReqVO} reqVO) {
+        return selectList(new LambdaQueryWrapperX<${className}DO>()
+#else
+    default PageResult<${className}DO> selectPage(${pageReqVO} reqVO) {
+        return selectPage(reqVO, new LambdaQueryWrapperX<${className}DO>()
+#end
+#foreach ($column in $listColumns)
+                .${column.queryMethod}(${className}DO::get${column.javaFieldUpper}, reqVO.get${column.javaFieldUpper}())
+#end
+                .orderByDesc(${className}DO::get${pkUpper}));
+    }
+#if ($isTree)
+
+    default Long selectCountByParentId(${parentType} parentId) {
+        return selectCount(${className}DO::get${parentUpper}, parentId);
+    }
+#end
+
+}

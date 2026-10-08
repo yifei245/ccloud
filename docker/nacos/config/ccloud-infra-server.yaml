@@ -1,0 +1,11 @@
+# ccloud-infra-server 的可调配置
+
+ccloud:
+  infra:
+    file:
+      # 单个文件的大小上限；不得超过 spring.servlet.multipart.max-file-size（16MB）
+      max-size: 10MB
+    api-log:
+      # 访问日志、异常日志的保留天数，由每日清理任务使用，修改后下次执行生效
+      access-retain-days: 30
+      error-retain-days: 90

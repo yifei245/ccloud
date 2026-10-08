@@ -1,4 +1,4 @@
-# ccloud 应用镜像（gateway / system / member / monitor 共用同一份内容，由 scripts/verify-docker.sh 校验一致）。
+# ccloud 应用镜像（gateway / system / infra / member / monitor 共用同一份内容，由 scripts/verify-docker.sh 校验一致）。
 # 构建前先执行 mvn package；构建上下文为模块目录。
 # 分层：依赖变动少、业务代码变动多，按层复制后只改代码时只需重建最后一层
 
@@ -20,7 +20,8 @@ COPY --from=builder /app/extracted/dependencies/ ./
 COPY --from=builder /app/extracted/spring-boot-loader/ ./
 COPY --from=builder /app/extracted/snapshot-dependencies/ ./
 COPY --from=builder /app/extracted/application/ ./
-RUN mkdir -p /app/logs && chown -R ccloud:ccloud /app
+# /app/files 为本地磁盘文件存储的默认根目录（infra 使用），先建好并交给 ccloud 用户，挂载数据卷后仍可写
+RUN mkdir -p /app/logs /app/files && chown -R ccloud:ccloud /app
 # 不以 root 运行：应用被攻破时不直接拿到容器内 root
 USER ccloud
 ENV JAVA_OPTS="-Xms512m -Xmx512m -XX:+UseZGC" \

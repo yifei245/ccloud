@@ -8,6 +8,7 @@
 | `ccloud-datasource.yaml` | system、member | 连接池的通用行为 |
 | `ccloud-gateway.yaml` | gateway | 限流阈值、令牌缓存、开放平台应用 |
 | `ccloud-system-server.yaml` | system | 登录失败锁定、短信验证码 |
+| `ccloud-infra-server.yaml` | infra | 文件大小上限、访问日志与异常日志保留天数 |
 | `ccloud-member-server.yaml` | member | 会员登录失败锁定、C 端功能开关 |
 
 ## 导入

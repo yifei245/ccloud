@@ -145,6 +145,7 @@ echo "==> 文档、链路追踪、监控、定时任务"
 curl -sf -o /dev/null "$GW/doc.html" || die "接口文档聚合页不可访问"
 curl -s "$GW/system/v3/api-docs/admin" | jq -e '.paths | length > 0' >/dev/null || die "system 管理端文档为空"
 curl -s "$GW/member/v3/api-docs/app" | jq -e '.paths | length > 0' >/dev/null || die "member 用户端文档为空"
+curl -s "$GW/infra/v3/api-docs/admin" | jq -e '.paths | length > 0' >/dev/null || die "infra 管理端文档为空"
 ok "接口文档聚合"
 curl -s -D- -o /dev/null "$GW/admin-api/system/auth/get-permission-info" -H "Authorization: Bearer $NEW" \
   | grep -qi '^trace-id:' || die "响应缺少 trace-id 头"; ok "响应携带 trace-id"
@@ -159,14 +160,14 @@ deadline=$((SECONDS + 60))
 while true; do
   APPS=$(curl -s -u "admin:${CCLOUD_MONITOR_PASSWORD}" -H 'Accept: application/json' "http://127.0.0.1:${MONITOR_PORT}/applications")
   down=""
-  for app in ccloud-gateway ccloud-system-server ccloud-member-server; do
+  for app in ccloud-gateway ccloud-system-server ccloud-infra-server ccloud-member-server; do
     echo "$APPS" | jq -e --arg n "$app" 'map(select(.name == $n and .status == "UP")) | length == 1' >/dev/null || down="$down $app"
   done
   [ -z "$down" ] && break
   [ $SECONDS -lt $deadline ] || die "监控面板中$down 不是 UP"
   sleep 5
 done
-ok "监控面板显示 gateway、system、member 均为 UP"
+ok "监控面板显示 gateway、system、infra、member 均为 UP"
 JOBS=$(lq "SELECT COUNT(DISTINCT executor_handler) FROM xxl_job.xxl_job_log l JOIN xxl_job.xxl_job_group g ON l.job_group = g.id
   WHERE g.app_name = 'ccloud-system-server' AND l.handle_code = 200")
 [ "${JOBS:-0}" -ge 2 ] || die "XXL-Job 两个重投任务尚未成功执行（成功的任务数 ${JOBS:-0}），任务每分钟调度一次，可稍后重试"

@@ -149,15 +149,18 @@ update_config() {  # $1=编号 $2=名称 $3=键 $4=值 $5=是否可见
   curl -s -X PUT "$GW/admin-api/infra/config/update" -H "$AUTH" -H "$JSON" \
     -d "{\"id\":$1,\"category\":\"biz\",\"name\":\"$2\",\"key\":\"$3\",\"value\":\"$4\",\"visible\":$5}" | jq -r '.code'
 }
-delete_admin_user() {  # $1=账号
+delete_admin_user() {  # $1=账号（精确匹配：分页接口的 username 参数是模糊查询）
   local id
-  id=$(curl -s "$GW/admin-api/system/user/page?pageNo=1&pageSize=1&username=$1" -H "$AUTH" | jq -r '.data.list[0].id // empty')
+  id=$(curl -s "$GW/admin-api/system/user/page?pageNo=1&pageSize=20&username=$1" -H "$AUTH" \
+    | jq -r --arg u "$1" '[.data.list[] | select(.username == $u)][0].id // empty')
   if [ -n "$id" ]; then curl -s -X DELETE "$GW/admin-api/system/user/delete?id=$id" -H "$AUTH" >/dev/null; fi
 }
 REG="e2ereg$(date +%s)"
 TID=""
-DLID=""
+MID=""
 ERR_APP=""
+ADMIN_AVATAR_SAVED=""
+MEMBER_AVATAR_SAVED=""
 # 无论本节在哪一步失败，都把改动过的参数恢复、删除创建的账号与测试数据
 infra_cleanup() {
   set +e
@@ -165,7 +168,13 @@ infra_cleanup() {
   update_config 2 '管理后台-是否开放注册' system.auth.register-enabled false true >/dev/null
   for u in demo01 demo02 "$REG" "${REG}x"; do delete_admin_user "$u"; done
   [ -z "$TID" ] || curl -s -X DELETE "$GW/admin-api/infra/codegen/delete?tableId=$TID" -H "$AUTH" >/dev/null
-  [ -z "$DLID" ] || lq "DELETE FROM ccloud.infra_message_dead_letter WHERE id=$DLID;" >/dev/null
+  [ -z "$MID" ] || lq "DELETE FROM ccloud.infra_message_dead_letter WHERE message_id='$MID';" >/dev/null
+  [ -z "$ERR_APP" ] || lq "DELETE FROM ccloud.infra_api_error_log WHERE application_name='$ERR_APP';" >/dev/null
+  # 还原头像（上传头像会改写用户资料）
+  [ -z "$ADMIN_AVATAR_SAVED" ] || curl -s -X PUT "$GW/admin-api/system/user/profile/update" -H "$AUTH" -H "$JSON" \
+    -d "{\"avatar\":\"$ADMIN_AVATAR\"}" >/dev/null
+  [ -z "$MEMBER_AVATAR_SAVED" ] || curl -s -X PUT "$GW/app-api/member/user/update" -H "Authorization: Bearer $MT" -H "$JSON" \
+    -d "{\"avatar\":\"$MEMBER_AVATAR\"}" >/dev/null
   redis_cli DEL ccloud:stream:e2e.topic >/dev/null 2>&1
   rm -rf "$TMP"
 }
@@ -208,6 +217,8 @@ R=$(curl -s -X POST "$GW/admin-api/infra/file/upload" -H "$AUTH" -F "file=@$TMP/
 [ "$R" = "1002007001" ] || die "SVG 改名后上传返回 $R，期望被拒绝"; ok "SVG 改名上传被拒绝"
 R=$(curl -s -X POST "$GW/app-api/infra/file/upload" -H "Authorization: Bearer $MT" -F "file=@$TMP/a.png" | jq -r '.code')
 [ "$R" = "0" ] || die "会员上传文件返回 $R"; ok "会员上传文件"
+ADMIN_AVATAR=$(curl -s "$GW/admin-api/system/user/profile/get" -H "$AUTH" | jq -r '.data.avatar // ""'); ADMIN_AVATAR_SAVED=1
+MEMBER_AVATAR=$(curl -s "$GW/app-api/member/user/get" -H "Authorization: Bearer $MT" | jq -r '.data.avatar // ""'); MEMBER_AVATAR_SAVED=1
 AVATAR=$(curl -s -X PUT "$GW/admin-api/system/user/profile/update-avatar" -H "$AUTH" -F "avatarFile=@$TMP/a.png" | jq -r '.data // empty')
 [ -n "$AVATAR" ] && [ "$(curl -s "$GW/admin-api/system/user/profile/get" -H "$AUTH" | jq -r '.data.avatar')" = "$AVATAR" ] \
   || die "管理员上传头像失败"
@@ -216,15 +227,18 @@ AVATAR=$(curl -s -X PUT "$GW/app-api/member/user/update-avatar" -H "Authorizatio
   || die "会员上传头像失败"
 ok "管理员与会员上传头像"
 
-# API 日志：登录请求已记录且密码已脱敏
+# API 日志：登录请求已记录且密码已脱敏。用唯一账号发起一次登录（失败也会记访问日志），再按账号定位，不会被旧日志满足
+LOG_USER="e2e_log_$(date +%s)_$$"
+admin_login "$LOG_USER" admin123 >/dev/null
 deadline=$((SECONDS + 60))
-until LOG=$(curl -s "$GW/admin-api/infra/api-access-log/page?pageNo=1&pageSize=1&applicationName=ccloud-system-server&requestUrl=/admin-api/system/auth/login" -H "$AUTH") \
-      && [ "$(echo "$LOG" | jq -r '.data.total // 0')" -gt 0 ]; do
-  [ $SECONDS -lt $deadline ] || die "60 秒内未查到登录接口的访问日志"
+PARAMS=""
+until PARAMS=$(curl -s "$GW/admin-api/infra/api-access-log/page?pageNo=1&pageSize=10&applicationName=ccloud-system-server&requestUrl=/admin-api/system/auth/login" -H "$AUTH" \
+      | jq -r --arg u "$LOG_USER" '[.data.list[] | select((.requestParams // "") | contains($u))][0].requestParams // empty') \
+      && [ -n "$PARAMS" ]; do
+  [ $SECONDS -lt $deadline ] || die "60 秒内未查到账号 $LOG_USER 的登录访问日志"
   sleep 3
 done
-PARAMS=$(echo "$LOG" | jq -r '.data.list[0].requestParams')
-echo "$PARAMS" | grep -q 'admin123' && die "访问日志中出现了明文密码"
+echo "$PARAMS" | grep -q 'admin123' && die "访问日志中出现了明文密码：$PARAMS"
 echo "$PARAMS" | grep -q '\*\*\*\*\*\*' || die "访问日志中的密码未替换为掩码：$PARAMS"
 ok "其他服务的访问日志经消息流写入 infra，密码已脱敏"
 ERR_APP="e2e-$(date +%s)"
@@ -259,6 +273,7 @@ MID="e2e-dead-$(date +%s)"
 lq "INSERT INTO ccloud.infra_message_dead_letter (message_id, topic, payload, retry_count, error_msg, handled, tenant_id)
     VALUES ('$MID', 'e2e.topic', '{\"a\":1}', 5, 'e2e', b'0', 1);" >/dev/null
 DLID=$(lq "SELECT id FROM ccloud.infra_message_dead_letter WHERE message_id='$MID';")
+[ -n "$DLID" ] || die "死信测试数据未写入"
 R=$(curl -s -X PUT "$GW/admin-api/infra/message-dead-letter/resend?id=$DLID" -H "$AUTH" | jq -r '.code')
 [ "$R" = "0" ] || die "死信重新投递返回 $R"
 redis_cli XRANGE ccloud:stream:e2e.topic - + | grep -q "$MID" || die "死信未投递到原主题的消息流"

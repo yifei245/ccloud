@@ -19,7 +19,7 @@ import static ${basePackage}.${module}.enums.ErrorCodeConstants.*;
 /**
  * ${classJavadoc} Service 实现类
  *
- * @author ${author}
+ * @author ${authorJavadoc}
  */
 @Service
 @Validated
@@ -59,7 +59,7 @@ public class ${className}ServiceImpl implements ${className}Service {
         validate${className}Exists(id);
 #if ($isTree)
         if (${classNameVar}Mapper.selectCountByParentId(id) > 0) {
-            throw exception(${errorCodePrefix}_EXITS_CHILDREN);
+            throw exception(${errorCodePrefix}_EXISTS_CHILDREN);
         }
 #end
         ${classNameVar}Mapper.deleteById(id);
@@ -84,7 +84,7 @@ public class ${className}ServiceImpl implements ${className}Service {
         }
         ${className}DO parent = ${classNameVar}Mapper.selectById(parentId);
         if (parent == null) {
-            throw exception(${errorCodePrefix}_PARENT_NOT_EXITS);
+            throw exception(${errorCodePrefix}_PARENT_NOT_EXISTS);
         }
         if (id == null) {
             return;

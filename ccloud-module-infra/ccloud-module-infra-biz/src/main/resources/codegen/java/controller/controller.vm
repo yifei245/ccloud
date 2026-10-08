@@ -28,7 +28,7 @@ import static com.ccloud.framework.common.pojo.CommonResult.success;
 /**
  * ${sceneLabel} - ${classJavadoc}
  *
- * @author ${author}
+ * @author ${authorJavadoc}
  */
 @Tag(name = "${sceneLabel} - ${classComment}")
 @RestController

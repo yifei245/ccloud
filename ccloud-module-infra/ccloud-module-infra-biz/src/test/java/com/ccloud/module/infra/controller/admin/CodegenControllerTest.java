@@ -1,6 +1,9 @@
 package com.ccloud.module.infra.controller.admin;
 
 import com.ccloud.module.infra.test.BaseInfraWebIntegrationTest;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -20,6 +23,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class CodegenControllerTest extends BaseInfraWebIntegrationTest {
@@ -39,10 +43,18 @@ class CodegenControllerTest extends BaseInfraWebIntegrationTest {
                 .andExpect(jsonPath("$.code").value(0))
                 .andReturn().getResponse().getContentAsString().replaceAll(".*\"data\":\\[(\\d+)].*", "$1");
 
-        mockMvc.perform(asAdmin(get("/admin-api/infra/codegen/detail").param("tableId", tableId), ADMIN_ID))
+        String detail = mockMvc.perform(asAdmin(get("/admin-api/infra/codegen/detail").param("tableId", tableId), ADMIN_ID))
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.table.tableName").value("infra_demo_student"))
-                .andExpect(jsonPath("$.data.columns", hasSize(11)));
+                .andExpect(jsonPath("$.data.columns", hasSize(11)))
+                .andReturn().getResponse().getContentAsString();
+
+        // 业务名会成为包名与压缩包内的路径，不合法时在入参校验阶段拒绝
+        JsonNode update = new ObjectMapper().readTree(detail).get("data");
+        ((ObjectNode) update.get("table")).put("businessName", "../x");
+        mockMvc.perform(asAdmin(put("/admin-api/infra/codegen/update"), ADMIN_ID).contentType(MediaType.APPLICATION_JSON)
+                        .content(update.toString()))
+                .andExpect(jsonPath("$.code").value(400));
 
         mockMvc.perform(asAdmin(get("/admin-api/infra/codegen/preview").param("tableId", tableId), ADMIN_ID))
                 .andExpect(jsonPath("$.code").value(0))

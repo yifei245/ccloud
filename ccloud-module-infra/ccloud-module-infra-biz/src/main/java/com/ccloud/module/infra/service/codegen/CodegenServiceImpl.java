@@ -1,5 +1,7 @@
 package com.ccloud.module.infra.service.codegen;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
 import com.ccloud.framework.common.pojo.PageResult;
 import com.ccloud.framework.common.util.collection.CollectionUtils;
 import com.ccloud.framework.common.util.object.BeanUtils;
@@ -16,6 +18,7 @@ import com.ccloud.module.infra.enums.codegen.CodegenSceneEnum;
 import com.ccloud.module.infra.enums.codegen.CodegenTemplateTypeEnum;
 import com.ccloud.module.infra.service.codegen.inner.CodegenBuilder;
 import com.ccloud.module.infra.service.codegen.inner.CodegenEngine;
+import com.ccloud.module.infra.service.codegen.inner.CodegenValidator;
 import com.ccloud.module.infra.service.db.DataSourceConfigService;
 import com.ccloud.module.infra.service.db.DatabaseTableService;
 import com.ccloud.module.infra.service.db.dto.TableInfo;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -78,7 +82,7 @@ public class CodegenServiceImpl implements CodegenService {
     @Transactional(rollbackFor = Exception.class)
     public void updateCodegen(CodegenUpdateReqVO reqVO) {
         CodegenTableSaveReqVO tableVO = reqVO.getTable();
-        validateCodegenTableExists(tableVO.getId());
+        CodegenTableDO table = validateCodegenTableExists(tableVO.getId());
         Map<Long, CodegenColumnDO> columns = CollectionUtils.convertMap(
                 codegenColumnMapper.selectListByTableId(tableVO.getId()), CodegenColumnDO::getId);
         for (CodegenColumnSaveReqVO columnVO : reqVO.getColumns()) {
@@ -98,11 +102,27 @@ public class CodegenServiceImpl implements CodegenService {
                 throw exception(BAD_REQUEST);
             }
         }
+        validateMergedCodegen(table, columns, reqVO);
 
         codegenTableMapper.updateById(BeanUtils.toBean(tableVO, CodegenTableDO.class));
         for (CodegenColumnSaveReqVO columnVO : reqVO.getColumns()) {
             codegenColumnMapper.updateById(BeanUtils.toBean(columnVO, CodegenColumnDO.class));
         }
+    }
+
+    /**
+     * 按 updateById 的语义（忽略为 null 的属性）合并出保存后的完整配置，用与生成代码时相同的规则校验，
+     * 避免保存一份无法生成、或会生成坏代码的配置
+     */
+    private static void validateMergedCodegen(CodegenTableDO table, Map<Long, CodegenColumnDO> columns,
+                                              CodegenUpdateReqVO reqVO) {
+        CopyOptions ignoreNull = CopyOptions.create().ignoreNullValue();
+        CodegenTableDO mergedTable = BeanUtil.copyProperties(table, CodegenTableDO.class);
+        BeanUtil.copyProperties(reqVO.getTable(), mergedTable, ignoreNull);
+        Map<Long, CodegenColumnDO> mergedColumns = new LinkedHashMap<>();
+        columns.forEach((id, column) -> mergedColumns.put(id, BeanUtil.copyProperties(column, CodegenColumnDO.class)));
+        reqVO.getColumns().forEach(columnVO -> BeanUtil.copyProperties(columnVO, mergedColumns.get(columnVO.getId()), ignoreNull));
+        CodegenValidator.validate(mergedTable, new ArrayList<>(mergedColumns.values()));
     }
 
     /**

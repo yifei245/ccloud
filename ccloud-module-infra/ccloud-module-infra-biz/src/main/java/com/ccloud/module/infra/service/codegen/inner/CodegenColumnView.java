@@ -22,7 +22,7 @@ public class CodegenColumnView {
     private final String javaFieldUpper;
     /** 用于 Java 字符串字面量，已转义 */
     private final String comment;
-    /** 用于 Javadoc，已去掉注释结束符 */
+    /** 用于 Javadoc，已处理反斜杠与注释结束符 */
     private final String javadoc;
     /** 用于校验提示，取注释第一个分隔符前的部分，已转义 */
     private final String label;
@@ -34,7 +34,7 @@ public class CodegenColumnView {
     /** 时间类字段的格式，其他类型为 null */
     private final String dateTimePattern;
     private final String queryMethod;
-    /** 为空串时为 null，模板用 #if 判断 */
+    /** 为空串时为 null，模板用 #if 判断；用于 Java 字符串字面量，已转义 */
     private final String dictType;
     private final String example;
     /** 字符类型的最大长度，由 dataType（如 varchar(100)）解析，其他为 null */
@@ -48,7 +48,7 @@ public class CodegenColumnView {
         this.javaField = column.getJavaField();
         this.javaFieldUpper = StrUtil.upperFirst(column.getJavaField());
         this.comment = escapeJava(column.getColumnComment());
-        this.javadoc = column.getColumnComment().replace("*/", "* /");
+        this.javadoc = escapeJavadoc(column.getColumnComment());
         this.label = escapeJava(column.getColumnComment().trim().split("[，,（(：:；;。]", 2)[0].trim());
         this.primaryKey = Boolean.TRUE.equals(column.getPrimaryKey());
         this.nullable = Boolean.TRUE.equals(column.getNullable());
@@ -62,7 +62,7 @@ public class CodegenColumnView {
             default -> null;
         };
         this.queryMethod = CodegenColumnListConditionEnum.valueOfCondition(column.getListOperationCondition()).getQueryMethod();
-        this.dictType = StrUtil.emptyToNull(column.getDictType());
+        this.dictType = StrUtil.isEmpty(column.getDictType()) ? null : escapeJava(column.getDictType());
         this.example = StrUtil.isEmpty(column.getExample()) ? null : escapeJava(column.getExample());
         this.maxLength = parseLength(column.getDataType());
         this.sampleValue = treeParent ? "0L" : sampleValue(javaType, column.getDataType(), maxLength);
@@ -70,6 +70,14 @@ public class CodegenColumnView {
 
     static String escapeJava(String text) {
         return text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\r", " ").replace("\n", " ");
+    }
+
+    /**
+     * 用于 Javadoc 等注释。javac 在词法分析之前就翻译 \\uXXXX，注释里的 \\u002a/ 等同于 *&#47;，
+     * 所以先把反斜杠换成 HTML 实体（Javadoc 中显示为反斜杠），再拆开注释结束符
+     */
+    static String escapeJavadoc(String text) {
+        return text.replace("\\", "&#92;").replace("*/", "* /");
     }
 
     private static Integer parseLength(String dataType) {

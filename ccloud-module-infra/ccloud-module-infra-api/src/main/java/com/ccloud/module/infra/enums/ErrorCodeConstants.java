@@ -37,6 +37,7 @@ public interface ErrorCodeConstants {
     ErrorCode CODEGEN_TREE_COLUMN_REQUIRED = new ErrorCode(1_002_004_011, "树表须指定本表中类型为 Long 的父编号字段，以及名称字段");
     ErrorCode CODEGEN_PRIMARY_KEY_REQUIRED = new ErrorCode(1_002_004_012, "表须有且只有一个 bigint 类型的自增主键");
     ErrorCode CODEGEN_TABLE_NAME_INVALID = new ErrorCode(1_002_004_013, "表名须为 模块_业务 格式，如 member_point_record");
+    ErrorCode CODEGEN_INVALID_IDENTIFIER = new ErrorCode(1_002_004_014, "代码生成配置不合法：{}");
 
     // ========== 消息死信 1-002-005-000 ==========
     ErrorCode MESSAGE_DEAD_LETTER_NOT_EXISTS = new ErrorCode(1_002_005_000, "死信不存在");

@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * ${classJavadoc} Service 测试
  *
- * @author ${author}
+ * @author ${authorJavadoc}
  */
 @Import(${className}ServiceImpl.class)
 class ${className}ServiceImplTest extends Base${moduleUpper}DbUnitTest {
@@ -78,7 +78,7 @@ class ${className}ServiceImplTest extends Base${moduleUpper}DbUnitTest {
     void create${className}_父节点不存在() {
         ${saveReqVO} reqVO = newSaveReqVO();
         reqVO.set${parentUpper}(-1L);
-        assertServiceException(() -> ${classNameVar}Service.create${className}(reqVO), ${errorCodePrefix}_PARENT_NOT_EXITS);
+        assertServiceException(() -> ${classNameVar}Service.create${className}(reqVO), ${errorCodePrefix}_PARENT_NOT_EXISTS);
     }
 
     @Test
@@ -105,7 +105,7 @@ class ${className}ServiceImplTest extends Base${moduleUpper}DbUnitTest {
         ${saveReqVO} childReqVO = newSaveReqVO();
         childReqVO.set${parentUpper}(parentId);
         ${classNameVar}Service.create${className}(childReqVO);
-        assertServiceException(() -> ${classNameVar}Service.delete${className}(parentId), ${errorCodePrefix}_EXITS_CHILDREN);
+        assertServiceException(() -> ${classNameVar}Service.delete${className}(parentId), ${errorCodePrefix}_EXISTS_CHILDREN);
     }
 #else
     @Test

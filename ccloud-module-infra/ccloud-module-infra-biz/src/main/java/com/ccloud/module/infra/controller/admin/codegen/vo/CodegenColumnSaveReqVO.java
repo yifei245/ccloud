@@ -1,8 +1,10 @@
 package com.ccloud.module.infra.controller.admin.codegen.vo;
 
+import com.ccloud.module.infra.service.codegen.inner.CodegenValidator;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -22,11 +24,13 @@ public class CodegenColumnSaveReqVO {
     @Schema(description = "Java 属性类型", requiredMode = Schema.RequiredMode.REQUIRED, example = "Integer")
     @NotBlank(message = "Java 属性类型不能为空")
     @Size(max = 32, message = "Java 属性类型长度不能超过 32 个字符")
+    @Pattern(regexp = CodegenValidator.JAVA_TYPE_REGEX, message = "Java 属性类型不支持")
     private String javaType;
 
     @Schema(description = "Java 属性名", requiredMode = Schema.RequiredMode.REQUIRED, example = "userAge")
     @NotBlank(message = "Java 属性名不能为空")
     @Size(max = 64, message = "Java 属性名长度不能超过 64 个字符")
+    @Pattern(regexp = CodegenValidator.JAVA_FIELD_REGEX, message = "Java 属性名须为小写字母开头的字母与数字")
     private String javaField;
 
     @Schema(description = "字典类型", example = "system_user_sex")

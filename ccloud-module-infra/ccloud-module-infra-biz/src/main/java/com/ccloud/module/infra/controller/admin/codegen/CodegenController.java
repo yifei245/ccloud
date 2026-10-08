@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
@@ -29,6 +30,7 @@ import java.util.zip.ZipOutputStream;
 import static com.ccloud.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.ccloud.framework.common.pojo.CommonResult.success;
+import static com.ccloud.module.infra.enums.ErrorCodeConstants.CODEGEN_INVALID_IDENTIFIER;
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.CODEGEN_TABLE_NOT_EXISTS;
 
 @Tag(name = "管理后台 - 代码生成")
@@ -133,6 +135,7 @@ public class CodegenController {
             throw exception(CODEGEN_TABLE_NOT_EXISTS);
         }
         Map<String, String> codes = codegenService.generationCodes(tableId);
+        codes.keySet().forEach(CodegenController::validateZipEntryName);
         response.setContentType("application/zip");
         // 表名为 ASCII 时输出普通的 filename 参数，其余情况按 RFC 5987 编码
         String filename = "codegen-" + table.getTableName() + ".zip";
@@ -145,6 +148,16 @@ public class CodegenController {
                 zip.write(code.getValue().getBytes(StandardCharsets.UTF_8));
                 zip.closeEntry();
             }
+        }
+    }
+
+    /**
+     * 纵深防御：条目名须为压缩包内的相对路径，不能以 .. 逃出根目录（生成配置已校验过标识符）
+     */
+    static void validateZipEntryName(String path) {
+        Path normalized = Path.of(path).normalize();
+        if (normalized.isAbsolute() || normalized.startsWith("..") || path.contains("\\")) {
+            throw exception(CODEGEN_INVALID_IDENTIFIER, "文件路径 " + path);
         }
     }
 }

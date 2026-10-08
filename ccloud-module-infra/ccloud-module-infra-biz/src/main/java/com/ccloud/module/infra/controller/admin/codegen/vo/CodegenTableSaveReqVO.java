@@ -1,8 +1,10 @@
 package com.ccloud.module.infra.controller.admin.codegen.vo;
 
+import com.ccloud.module.infra.service.codegen.inner.CodegenValidator;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -30,16 +32,19 @@ public class CodegenTableSaveReqVO {
     @Schema(description = "模块名", requiredMode = Schema.RequiredMode.REQUIRED, example = "infra")
     @NotBlank(message = "模块名不能为空")
     @Size(max = 30, message = "模块名长度不能超过 30 个字符")
+    @Pattern(regexp = CodegenValidator.PACKAGE_REGEX, message = "模块名须为小写字母开头的小写字母与数字")
     private String moduleName;
 
     @Schema(description = "业务名", requiredMode = Schema.RequiredMode.REQUIRED, example = "demo")
     @NotBlank(message = "业务名不能为空")
     @Size(max = 30, message = "业务名长度不能超过 30 个字符")
+    @Pattern(regexp = CodegenValidator.PACKAGE_REGEX, message = "业务名须为小写字母开头的小写字母与数字")
     private String businessName;
 
     @Schema(description = "类名", requiredMode = Schema.RequiredMode.REQUIRED, example = "DemoStudent")
     @NotBlank(message = "类名不能为空")
     @Size(max = 100, message = "类名长度不能超过 100 个字符")
+    @Pattern(regexp = CodegenValidator.CLASS_NAME_REGEX, message = "类名须为大写字母开头的字母与数字")
     private String className;
 
     @Schema(description = "类描述", requiredMode = Schema.RequiredMode.REQUIRED)

@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * ${classJavadoc} Mapper
  *
- * @author ${author}
+ * @author ${authorJavadoc}
  */
 @Mapper
 public interface ${className}Mapper extends BaseMapperX<${className}DO> {

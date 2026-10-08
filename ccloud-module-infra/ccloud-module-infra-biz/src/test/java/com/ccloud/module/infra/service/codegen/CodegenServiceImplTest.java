@@ -162,6 +162,47 @@ class CodegenServiceImplTest extends BaseInfraDbUnitTest {
         assertBadRequest(badCondition);
     }
 
+    @Test
+    void updateCodegen_标识符或字段配置会生成坏代码时报配置不合法_不保存() {
+        Long tableId = importOne(STUDENT);
+
+        CodegenUpdateReqVO badBusiness = updateReq(tableId);
+        badBusiness.getTable().setBusinessName("../x");
+        assertServiceException(() -> codegenService.updateCodegen(badBusiness), CODEGEN_INVALID_IDENTIFIER);
+
+        CodegenUpdateReqVO likeOnInteger = updateReq(tableId);
+        columnVO(likeOnInteger, "sex").setListOperationCondition("LIKE");
+        assertServiceException(() -> codegenService.updateCodegen(likeOnInteger), CODEGEN_INVALID_IDENTIFIER);
+
+        CodegenUpdateReqVO badType = updateReq(tableId);
+        columnVO(badType, "sex").setJavaType("Short");
+        assertServiceException(() -> codegenService.updateCodegen(badType), CODEGEN_INVALID_IDENTIFIER);
+
+        // 只提交部分字段时，按合并后的完整配置校验：属性名与未提交的字段重复
+        CodegenUpdateReqVO duplicate = updateReq(tableId);
+        CodegenColumnSaveReqVO sex = columnVO(duplicate, "sex");
+        sex.setJavaField("name");
+        duplicate.setColumns(List.of(sex));
+        assertServiceException(() -> codegenService.updateCodegen(duplicate), CODEGEN_INVALID_IDENTIFIER);
+
+        // 树表的父字段须用于新增与修改
+        Long categoryId = importOne(CATEGORY);
+        CodegenUpdateReqVO tree = updateReq(categoryId);
+        tree.getTable().setTemplateType(CodegenTemplateTypeEnum.TREE.getType());
+        tree.getTable().setTreeParentColumnId(column(categoryId, "parent_id").getId());
+        tree.getTable().setTreeNameColumnId(column(categoryId, "name").getId());
+        columnVO(tree, "parentId").setUpdateOperation(false);
+        assertServiceException(() -> codegenService.updateCodegen(tree), CODEGEN_INVALID_IDENTIFIER);
+
+        assertThat(codegenTableMapper.selectById(tableId).getBusinessName()).isEqualTo("demo");
+        assertThat(column(tableId, "sex").getJavaType()).isEqualTo("Integer");
+        assertThat(column(categoryId, "parent_id").getUpdateOperation()).isTrue();
+    }
+
+    private static CodegenColumnSaveReqVO columnVO(CodegenUpdateReqVO reqVO, String javaField) {
+        return reqVO.getColumns().stream().filter(c -> c.getJavaField().equals(javaField)).findFirst().orElseThrow();
+    }
+
     private void assertBadRequest(CodegenUpdateReqVO reqVO) {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> codegenService.updateCodegen(reqVO))
                 .isInstanceOf(ServiceException.class)

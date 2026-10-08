@@ -29,9 +29,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static com.ccloud.module.infra.enums.ErrorCodeConstants.CODEGEN_TREE_COLUMN_REQUIRED;
-
 /**
  * 代码生成引擎：按表与字段定义渲染 Velocity 模板。只做渲染，不访问数据库，便于单测
  */
@@ -71,10 +68,8 @@ public class CodegenEngine {
 
     private Map<String, Object> buildContext(CodegenTableDO table, List<CodegenColumnDO> columns) {
         CodegenSceneEnum scene = CodegenSceneEnum.valueOf(table.getScene());
+        CodegenValidator.validate(table, columns);
         boolean tree = CodegenTemplateTypeEnum.TREE.getType().equals(table.getTemplateType());
-        if (tree) {
-            validateTreeColumns(table, columns);
-        }
         List<CodegenColumnDO> sorted = columns.stream()
                 .sorted(Comparator.comparing(CodegenColumnDO::getOrdinalPosition)).toList();
         Map<Long, CodegenColumnView> views = new LinkedHashMap<>();
@@ -97,9 +92,9 @@ public class CodegenEngine {
         ctx.put("className", className);
         ctx.put("classNameVar", StrUtil.lowerFirst(className));
         ctx.put("classComment", CodegenColumnView.escapeJava(table.getClassComment()));
-        ctx.put("classJavadoc", table.getClassComment().replace("*/", "* /"));
+        ctx.put("classJavadoc", CodegenColumnView.escapeJavadoc(table.getClassComment()));
         ctx.put("sqlClassComment", escapeSql(table.getClassComment()));
-        ctx.put("author", table.getAuthor());
+        ctx.put("authorJavadoc", CodegenColumnView.escapeJavadoc(table.getAuthor()));
         ctx.put("kebab", kebab);
         ctx.put("permissionPrefix", module + ":" + kebab);
         ctx.put("isAdmin", scene == CodegenSceneEnum.ADMIN);
@@ -139,9 +134,9 @@ public class CodegenEngine {
         String comment = table.getClassComment();
         errors.add(error(errorPrefix + "_NOT_EXISTS", tableNo, 0, comment + "不存在", className + " does not exist"));
         if (tree) {
-            errors.add(error(errorPrefix + "_EXITS_CHILDREN", tableNo, 1, "存在子" + comment + "，无法删除",
+            errors.add(error(errorPrefix + "_EXISTS_CHILDREN", tableNo, 1, "存在子" + comment + "，无法删除",
                     className + " has children and cannot be deleted"));
-            errors.add(error(errorPrefix + "_PARENT_NOT_EXITS", tableNo, 2, "父级" + comment + "不存在",
+            errors.add(error(errorPrefix + "_PARENT_NOT_EXISTS", tableNo, 2, "父级" + comment + "不存在",
                     "The parent " + className + " does not exist"));
             errors.add(error(errorPrefix + "_PARENT_ERROR", tableNo, 3, "不能设置自己为父" + comment,
                     className + " cannot be its own parent"));
@@ -152,22 +147,6 @@ public class CodegenEngine {
         ctx.put("errorCodes", errors);
         ctx.put("parentMenuId", ObjectUtil.defaultIfNull(table.getParentMenuId(), 0L));
         return ctx;
-    }
-
-    /**
-     * 树表的父编号字段、名称字段须在本表字段中，父编号须为 Long（生成的父节点校验按 Long 编写）。
-     * 表定义可能在字段同步后残留已删除字段的编号，这里报业务错误而不是空指针
-     */
-    private static void validateTreeColumns(CodegenTableDO table, List<CodegenColumnDO> columns) {
-        CodegenColumnDO parent = findColumn(columns, table.getTreeParentColumnId());
-        CodegenColumnDO name = findColumn(columns, table.getTreeNameColumnId());
-        if (parent == null || name == null || !"Long".equals(parent.getJavaType())) {
-            throw exception(CODEGEN_TREE_COLUMN_REQUIRED);
-        }
-    }
-
-    private static CodegenColumnDO findColumn(List<CodegenColumnDO> columns, Long id) {
-        return id == null ? null : columns.stream().filter(c -> id.equals(c.getId())).findFirst().orElse(null);
     }
 
     private static Map<String, String> error(String name, long tableNo, int index, String zh, String en) {

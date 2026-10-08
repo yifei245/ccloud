@@ -130,7 +130,7 @@ API 日志的消息主题常量（`ApiLogTopics`）放在 `infra-api`；消息�
   - `operateModule / operateName / operateType`。
 - 脱敏：查询参数与 JSON 请求体中的嵌套字段，凡字段名匹配 `DesensitizeUtils` 的敏感规则或列入注解 `sanitizeKeys`，值替换为 `***`。
 - multipart 请求不记录请求体。
-- `GlobalExceptionHandler` 写入异常日志的请求参数做同样的脱敏。
+- `GlobalExceptionHandler` 写入异常日志的请求参数做同样的脱敏，并同样读取处理方法上的 `@ApiAccessLog`（`sanitizeKeys`、是否记录请求参数）。
 
 ### 5.2 发送（system、member 等业务服务）
 
@@ -163,6 +163,7 @@ API 日志的消息主题常量（`ApiLogTopics`）放在 `infra-api`；消息�
 
 - 管理端 `/admin-api/infra/message-dead-letter`：`page`（权限 `infra:message-dead-letter:query`）；`update-handled`、`resend`（权限 `infra:message-dead-letter:update`）。
 - `resend`：用原消息编号把死信发回其主题的 Redis Stream，然后标记为已处理。消费侧已按消息编号幂等。
+- 实现：死信 Mapper 在接口上忽略租户条件并显式写入原消息的租户，因此管理端查询天然跨租户，服务层无需 `@TenantIgnore`（starter-mq 不依赖 biz-tenant）。
 
 ## 7. 数据源与数据库文档
 
@@ -213,6 +214,11 @@ API 日志的消息主题常量（`ApiLogTopics`）放在 `infra-api`；消息�
   - `datetime / timestamp` → `LocalDateTime`，`date` → `LocalDate`；
   - `char / varchar / text` → `String`；
   - 其余类型报错，提示不支持。
+- 导入校验（实现时补充）：
+  - 表名须为 `模块_业务` 格式（至少两段、小写字母数字下划线），否则拒绝；表名导入后不可在编辑中修改；
+  - 表须有且只有一个 `bigint` 自增主键，否则拒绝；
+  - 模块名、业务名、类名、字段名、字典类型、作者等会进入文件路径或源码的配置项都做标识符校验，不合法时拒绝（`CODEGEN_INVALID_IDENTIFIER`），注释文本中的反斜杠与 Unicode 转义被中和，防止生成代码被注入、压缩包条目越界；
+  - 树表须在本表中指定类型为 `Long` 的父编号字段与名称字段（`CODEGEN_TREE_COLUMN_REQUIRED`），父编号字段须参与新增与修改，否则生成的代码无法编译。
 - 公共字段（`creator / create_time / updater / update_time / deleted / tenant_id`）由 `BaseDO` / `TenantBaseDO` 提供，不参与增改查；有 `tenant_id` 列则继承 `TenantBaseDO`。
 - 主键不参与新增；其他列默认参与新增、修改与列表结果。
 - `name / title` 类字段默认作为查询条件，用模糊匹配；时间类字段默认用区间；`status / type` 类字段默认用等值。
@@ -220,7 +226,7 @@ API 日志的消息主题常量（`ApiLogTopics`）放在 `infra-api`；消息�
 
 ### 8.3 同步
 
-新增的列补上、删除的列移除、类型 / 注释 / 可空变化的列更新；其余列保留用户的编辑。
+新增的列补上、删除的列移除、类型 / 注释 / 可空变化的列更新；其余列保留用户的编辑。Java 类型仅在数据库的基础类型（`dataType`）变化时才重置为推断值，其余变化（如长度、注释）不改动用户已选的 Java 类型。
 
 ### 8.4 模板（Velocity）
 
@@ -230,10 +236,11 @@ API 日志的消息主题常量（`ApiLogTopics`）放在 `infra-api`；消息�
 | Service、ServiceImpl | `service/{business}/` |
 | 控制器与三个 VO（分页查询、返回、保存） | 后台：`controller/admin/{business}/`；App：`controller/app/{business}/`，类名加 `App` 前缀 |
 | Service 测试（本机 MySQL，写法同现有测试） | `src/test/.../service/{business}/` |
-| 错误码片段 | `{module}-api/.../enums/ErrorCodeConstants_{Class}.java.txt`，默认编号取预留区间 `1-099-xxx-xxx`，合并时由使用者重新编号 |
+| 错误码片段 | `{module}-api/.../enums/ErrorCodeConstants_{Class}.java.txt`，默认编号取预留区间 `1-099-xxx-xxx`，合并时由使用者重新编号；错误码名为 `{CLASS}_NOT_EXISTS`、`{CLASS}_EXISTS` 等 |
 | SQL | 菜单与按钮权限（挂在 `parent_menu_id` 下，编号由数据库自增）、错误码文案 |
 
 - 字典类型用于返回 VO 的 Excel 字典转换注解。
+- 每张表共生成 11 个文件：DO、Mapper、Service、ServiceImpl、控制器、分页查询 / 返回 / 保存三个 VO（树表为列表查询 VO）、Service 测试、错误码片段、SQL（`sql/codegen/{表名}.sql`）。
 - 树表：
   - 生成 `list` 而不是 `page`；
   - 保存时校验父节点存在、不以自身为父、不形成环；
@@ -261,7 +268,7 @@ API 日志的消息主题常量（`ApiLogTopics`）放在 `infra-api`；消息�
 ## 10. 部署
 
 - 容器编排：应用由 4 个变为 5 个；infra 的本地磁盘存储挂 ccloud 自己的具名数据卷，`docker-down.sh` 不删除。
-- Nacos：新增 `ccloud-infra-server.yaml`，由 `nacos-import.sh` 导入。
+- Nacos：新增 `ccloud-infra-server.yaml`（文件大小上限、日志保留天数等），由 `nacos-import.sh` 导入。
 - `docker-up.sh init`：登记 infra 执行器与两个清理任务。
 
 ## 11. 测试与验收
@@ -299,8 +306,9 @@ API 日志的消息主题常量（`ApiLogTopics`）放在 `infra-api`；消息�
   - 后台与 App 头像上传；
 - 日志：
   - 请求后能查到访问日志，登录请求中的密码已脱敏；
-  - 触发异常后能查到异常日志。
-- 数据源连接测试、数据库文档导出、代码生成预览、死信重新投递。
+  - 向 infra 的异常日志主题写入一条消息，确认消费写库并可标记为已处理（不依赖构造真实的服务端异常）；
+- 数据源连接测试、数据库文档导出、代码生成预览（11 个文件）、死信重新投递。
+- 脚本中途失败时，通过 `trap` 恢复被改动的参数配置（初始密码 123456、注册开关 false）、删除创建的账号与测试数据。
 
 ## 12. 文档
 

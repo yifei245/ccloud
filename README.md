@@ -8,8 +8,9 @@
 ccloud 是一个基于 Spring Cloud 的微服务中台：多租户、多终端（Web / App / 小程序 / H5）、多用户类型（管理员 / 会员 / 开放平台应用），
 内置自研 OAuth2 与 SSO、按钮级权限、部门数据权限、国际化、本地消息表最终一致性。
 
-当前交付的是 **P1 阶段**：框架层 16 个模块、网关、system（系统管理）、member（会员）、monitor（服务监控），以及 docker 编排与 Nacos 配置包。
-infra、open、pay、bpm、商城、AI 等模块在后续阶段交付，见[项目结构](#项目结构)。
+当前已交付 P1 基础平台与 P2 的 member 会员运营、infra 基础设施：框架层 16 个模块、网关、system（系统管理）、member（会员）、
+infra（参数配置、文件、API 日志、代码生成等）、monitor（服务监控），以及 docker 编排与 Nacos 配置包。
+open、pay、bpm、商城、AI 等模块在后续阶段交付，见[项目结构](#项目结构)。
 
 环境：JDK 21 · Spring Boot 3.5.16 · Spring Cloud 2025.0.3 · Spring Cloud Alibaba 2025.0.0.0 · Nacos 3.2.4 · MySQL 8.4 · Redis 7
 
@@ -53,15 +54,16 @@ ccloud
 ├── ccloud-monitor                        #   服务健康面板（Spring Boot Admin）
 ├── ccloud-module-system/  (api, biz)     # ★ 认证 / OAuth2 / SSO / 用户 / 角色 / 菜单 / 部门 / 岗位 / 字典 / 租户 /
 │                                         #   社交登录 / 短信 / 邮件 / 站内信 / 通知公告 / 国际化 / 操作与登录日志
-├── ccloud-module-member/  (api, biz)     # ★ C 端会员与认证（密码、短信、社交、小程序一键登录）
+├── ccloud-module-member/  (api, biz)     # ★ C 端会员与认证（密码、短信、社交、小程序一键登录）与会员运营
+├── ccloud-module-infra/   (api, biz)     # ★ 参数配置 / 文件（数据库、本地磁盘、S3 兼容）/ API 日志 / 消息死信 /
+│                                         #   数据源 / 数据库文档 / 代码生成
 ├── docker/                               # docker compose 编排、中间件配置、Nacos 配置包
 ├── sql/mysql/                            # 建表与初始化数据
 ├── scripts/                              # 构建、部署与校验脚本
 └── docs/                                 # 使用文档与设计文档
 ```
 
-后续阶段的模块（尚未包含在仓库中）：`ccloud-module-infra`（★ 文件、配置、代码生成、定时任务管理）、
-`ccloud-module-open`（★ 开放平台）、`ccloud-module-pay`、`ccloud-module-bpm`、商城（product / trade / promotion）、`ccloud-module-ai`。
+后续阶段的模块（尚未包含在仓库中）：`ccloud-module-open`（★ 开放平台）、`ccloud-module-pay`、`ccloud-module-bpm`、商城（product / trade / promotion）、`ccloud-module-ai`。
 
 `★` 为核心模块，必须保留。**裁剪非核心模块**：删除模块目录，从根 `pom.xml` 的 `<modules>` 中移除，
 再删除 `docker/docker-compose.yml` 中对应的服务即可。模块之间只通过 `-api` 子模块（DTO、Feign 接口、错误码）耦合，
@@ -72,7 +74,7 @@ ccloud
 需要 JDK 21、Maven 3.9+、Docker（含 compose v2），以及本机已有的 MySQL、Redis、Nacos、Zipkin、XXL-Job 调度中心
 （ccloud 直接连接它们，不再自带一套，约定见 [docs/快速开始.md](docs/快速开始.md#本机中间件)）。三种方式：
 
-1. **一键启动全部**（网关 + system + member + monitor，连接本机中间件）：
+1. **一键启动全部**（网关 + system + infra + member + monitor 共 5 个应用，连接本机中间件）：
 
    ```bash
    scripts/docker-up.sh
@@ -87,7 +89,7 @@ ccloud
    scripts/docker-up.sh init
    ```
 
-   然后以 `local` profile 依次运行 `SystemServerApplication`、`MemberServerApplication`、`GatewayServerApplication`。
+   然后以 `local` profile 依次运行 `SystemServerApplication`、`InfraServerApplication`、`MemberServerApplication`、`GatewayServerApplication`。
 
 3. **从源码构建**：
 
@@ -123,9 +125,9 @@ ccloud 应用的端口见 `docker/.env`，除网关外只绑定本机 127.0.0.1�
 | 接口文档 | http://127.0.0.1:28080/doc.html | 聚合各服务的管理端、用户端、开放接口三组文档；生产环境关闭 |
 | 服务监控 | http://127.0.0.1:28182 | Spring Boot Admin，从 Nacos 发现全部服务 |
 | Nacos | http://127.0.0.1:8848/nacos | 本机 Nacos，ccloud 的服务与配置在 `ccloud` 命名空间 |
-| XXL-Job 控制台 | http://127.0.0.1:48180/xxl-job-admin | 已登记 system 的执行器与两个消息重投任务 |
+| XXL-Job 控制台 | http://127.0.0.1:48180/xxl-job-admin | 已登记 system、infra 的执行器及其消息重投、日志清理任务 |
 | Zipkin | http://127.0.0.1:9411 | 链路追踪 |
-| system / member | http://127.0.0.1:28081 、 http://127.0.0.1:28083 | 仅供本机调试，前端不要直连 |
+| system / infra / member | http://127.0.0.1:28081 、 http://127.0.0.1:28082 、 http://127.0.0.1:28083 | 仅供本机调试，前端不要直连 |
 
 ## 接口与鉴权
 
@@ -184,6 +186,10 @@ P1 阶段开放平台服务尚未交付：应用在 Nacos 的 `ccloud-gateway.ya
 **管理端登录需要验证码吗？** `local` 与 `dev` profile 默认关闭验证码，便于调试；生产默认开启，由环境变量 `CCLOUD_CAPTCHA_ENABLED` 控制。
 
 **用管理员令牌调用 /app-api 返回 401。** 预期行为：管理员与会员是两套用户体系、编号会重复，服务端按路径校验令牌的用户类型。
+
+**上传的文件存在哪里。** 默认存在数据库（`infra_file_content` 表），开箱即用，适合开发与小文件。生产环境建议在管理端「文件配置」里新增一个
+S3 兼容存储（AWS S3 或阿里云 OSS）并设为主配置，文件由存储桶（或前置 CDN）直接对外提供读取；配置示例见 [docs/模块说明.md](docs/模块说明.md#文件存储)。
+也可以选择本地磁盘存储，容器部署时目录挂载在名为 `infra-files` 的数据卷上，`scripts/docker-down.sh` 不会删除它。
 
 **修改了代码，镜像里还是旧逻辑。** 打包必须带 `clean`：只有依赖（如 framework）变化时，Maven 会认为应用 jar 未过期而跳过重新打包。`scripts/docker-up.sh` 已经这样做。
 

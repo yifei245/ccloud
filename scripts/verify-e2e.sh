@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 端到端验收（P1 基础平台 + P2 会员运营）：除会员内部接口外全部经网关调用。
+# 端到端验收（P1 基础平台 + P2 会员运营 + P2 基础设施）：除会员内部接口外全部经网关调用。
 # 前置：scripts/docker-up.sh 已启动全部服务。端口取自 docker/.env，可用同名环境变量覆盖。
 set -euo pipefail
 
@@ -140,6 +140,130 @@ AFTER=$(member_point)
 ok "内部接口加积分，同一业务编号只生效一次"
 CODE=$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$GW/rpc-api/member/point/add?userId=$MEMBER_ID&point=5&bizType=10&bizId=x")
 [ "$CODE" = "403" ] || die "经网关可访问会员内部接口，返回 $CODE"; ok "会员内部接口经网关已阻断"
+
+echo "==> 基础设施"
+TMP=$(mktemp -d)
+AT=$(admin_login admin admin123 | jq -r '.data.accessToken')
+AUTH="Authorization: Bearer $AT"
+update_config() {  # $1=编号 $2=名称 $3=键 $4=值 $5=是否可见
+  curl -s -X PUT "$GW/admin-api/infra/config/update" -H "$AUTH" -H "$JSON" \
+    -d "{\"id\":$1,\"category\":\"biz\",\"name\":\"$2\",\"key\":\"$3\",\"value\":\"$4\",\"visible\":$5}" | jq -r '.code'
+}
+delete_admin_user() {  # $1=账号
+  local id
+  id=$(curl -s "$GW/admin-api/system/user/page?pageNo=1&pageSize=1&username=$1" -H "$AUTH" | jq -r '.data.list[0].id // empty')
+  if [ -n "$id" ]; then curl -s -X DELETE "$GW/admin-api/system/user/delete?id=$id" -H "$AUTH" >/dev/null; fi
+}
+REG="e2ereg$(date +%s)"
+TID=""
+DLID=""
+ERR_APP=""
+# 无论本节在哪一步失败，都把改动过的参数恢复、删除创建的账号与测试数据
+infra_cleanup() {
+  set +e
+  update_config 1 '用户管理-账号初始密码' system.user.init-password 123456 false >/dev/null
+  update_config 2 '管理后台-是否开放注册' system.auth.register-enabled false true >/dev/null
+  for u in demo01 demo02 "$REG" "${REG}x"; do delete_admin_user "$u"; done
+  [ -z "$TID" ] || curl -s -X DELETE "$GW/admin-api/infra/codegen/delete?tableId=$TID" -H "$AUTH" >/dev/null
+  [ -z "$DLID" ] || lq "DELETE FROM ccloud.infra_message_dead_letter WHERE id=$DLID;" >/dev/null
+  redis_cli DEL ccloud:stream:e2e.topic >/dev/null 2>&1
+  rm -rf "$TMP"
+}
+trap infra_cleanup EXIT
+redis_cli() { docker exec "$REDIS_CONTAINER" redis-cli --no-auth-warning -a "$REDIS_PASSWORD" -n "$REDIS_DATABASE" "$@"; }
+
+
+# 参数配置：导入用户使用参数中的初始密码
+for u in demo01 demo02; do delete_admin_user "$u"; done
+INIT_PW="E2e$(date +%s)"
+[ "$(update_config 1 '用户管理-账号初始密码' system.user.init-password "$INIT_PW" false)" = "0" ] || die "修改初始密码参数失败"
+curl -s "$GW/admin-api/system/user/get-import-template" -H "$AUTH" -o "$TMP/users.xls"
+IMPORT=$(curl -s -X POST "$GW/admin-api/system/user/import" -H "$AUTH" -F "file=@$TMP/users.xls")
+echo "$IMPORT" | jq -e '.data.createUsernames | index("demo01")' >/dev/null || die "导入用户失败：$IMPORT"
+[ -n "$(admin_login demo01 "$INIT_PW" | jq -r '.data.accessToken // empty')" ] || die "导入的用户不能用参数中的初始密码登录"
+ok "导入用户使用参数配置中的初始密码"
+update_config 1 '用户管理-账号初始密码' system.user.init-password 123456 false >/dev/null
+for u in demo01 demo02; do delete_admin_user "$u"; done
+
+# 参数配置：注册开关
+register() { curl -s -X POST "$GW/admin-api/system/auth/register" -H "$JSON" -H "$TENANT" \
+  -d "{\"username\":\"$1\",\"nickname\":\"e2e\",\"password\":\"E2e123456\"}" | jq -r '.code'; }
+[ "$(update_config 2 '管理后台-是否开放注册' system.auth.register-enabled true true)" = "0" ] || die "打开注册开关失败"
+[ "$(register "$REG")" = "0" ] || die "注册开关打开后注册失败"
+update_config 2 '管理后台-是否开放注册' system.auth.register-enabled false true >/dev/null
+[ "$(register "${REG}x")" = "1001000010" ] || die "注册开关关闭后仍可注册"
+delete_admin_user "$REG"
+ok "注册开关由参数配置控制"
+
+# 文件：上传、免登录读取、类型拦截、头像
+python3 -c "import base64,sys; sys.stdout.buffer.write(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='))" > "$TMP/a.png"
+printf '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' > "$TMP/a.svg"
+URL=$(curl -s -X POST "$GW/admin-api/infra/file/upload" -H "$AUTH" -F "file=@$TMP/a.png" | jq -r '.data // empty')
+[ -n "$URL" ] || die "管理端上传文件失败"
+curl -s -D "$TMP/h" -o "$TMP/b.png" "$URL" || die "无法读取上传的文件：$URL（检查文件配置的访问域名是否指向网关）"
+cmp -s "$TMP/a.png" "$TMP/b.png" || die "免登录读取的内容与上传的不一致：$URL"
+grep -qi '^x-content-type-options: nosniff' "$TMP/h" || die "文件读取缺少 nosniff 头"
+ok "上传文件并免登录读取"
+R=$(curl -s -X POST "$GW/admin-api/infra/file/upload" -H "$AUTH" -F "file=@$TMP/a.svg;filename=a.png" | jq -r '.code')
+[ "$R" = "1002007001" ] || die "SVG 改名后上传返回 $R，期望被拒绝"; ok "SVG 改名上传被拒绝"
+R=$(curl -s -X POST "$GW/app-api/infra/file/upload" -H "Authorization: Bearer $MT" -F "file=@$TMP/a.png" | jq -r '.code')
+[ "$R" = "0" ] || die "会员上传文件返回 $R"; ok "会员上传文件"
+AVATAR=$(curl -s -X PUT "$GW/admin-api/system/user/profile/update-avatar" -H "$AUTH" -F "avatarFile=@$TMP/a.png" | jq -r '.data // empty')
+[ -n "$AVATAR" ] && [ "$(curl -s "$GW/admin-api/system/user/profile/get" -H "$AUTH" | jq -r '.data.avatar')" = "$AVATAR" ] \
+  || die "管理员上传头像失败"
+AVATAR=$(curl -s -X PUT "$GW/app-api/member/user/update-avatar" -H "Authorization: Bearer $MT" -F "avatarFile=@$TMP/a.png" | jq -r '.data // empty')
+[ -n "$AVATAR" ] && [ "$(curl -s "$GW/app-api/member/user/get" -H "Authorization: Bearer $MT" | jq -r '.data.avatar')" = "$AVATAR" ] \
+  || die "会员上传头像失败"
+ok "管理员与会员上传头像"
+
+# API 日志：登录请求已记录且密码已脱敏
+deadline=$((SECONDS + 60))
+until LOG=$(curl -s "$GW/admin-api/infra/api-access-log/page?pageNo=1&pageSize=1&applicationName=ccloud-system-server&requestUrl=/admin-api/system/auth/login" -H "$AUTH") \
+      && [ "$(echo "$LOG" | jq -r '.data.total // 0')" -gt 0 ]; do
+  [ $SECONDS -lt $deadline ] || die "60 秒内未查到登录接口的访问日志"
+  sleep 3
+done
+PARAMS=$(echo "$LOG" | jq -r '.data.list[0].requestParams')
+echo "$PARAMS" | grep -q 'admin123' && die "访问日志中出现了明文密码"
+echo "$PARAMS" | grep -q '\*\*\*\*\*\*' || die "访问日志中的密码未替换为掩码：$PARAMS"
+ok "其他服务的访问日志经消息流写入 infra，密码已脱敏"
+ERR_APP="e2e-$(date +%s)"
+redis_cli XADD ccloud:stream:infra.api-error-log '*' messageId "$ERR_APP" \
+  payload "{\"applicationName\":\"$ERR_APP\",\"tenantId\":1,\"exceptionName\":\"java.lang.IllegalStateException\"}" >/dev/null
+deadline=$((SECONDS + 30))
+until ERR_ID=$(curl -s "$GW/admin-api/infra/api-error-log/page?pageNo=1&pageSize=1&applicationName=$ERR_APP" -H "$AUTH" \
+      | jq -r '.data.list[0].id // empty') && [ -n "$ERR_ID" ]; do
+  [ $SECONDS -lt $deadline ] || die "30 秒内未查到异常日志"
+  sleep 3
+done
+R=$(curl -s -X PUT "$GW/admin-api/infra/api-error-log/update-status?id=$ERR_ID&processStatus=1" -H "$AUTH" | jq -r '.code')
+[ "$R" = "0" ] || die "标记异常日志为已处理返回 $R"; ok "异常日志消费写库并可处理"
+
+# 数据源、数据库文档、代码生成
+curl -s "$GW/admin-api/infra/data-source-config/list" -H "$AUTH" | jq -e '.data[0].id == 0' >/dev/null || die "数据源列表首位不是主数据源"
+R=$(curl -s -X POST "$GW/admin-api/infra/data-source-config/create" -H "$AUTH" -H "$JSON" \
+  -d '{"name":"E2E","url":"jdbc:mysql://host.docker.internal:3306/ccloud","username":"root","password":"wrong-password"}' | jq -r '.code')
+[ "$R" = "1002003001" ] || die "连不上的数据源返回 $R，期望拒绝保存"; ok "数据源保存前测试连接"
+curl -s -D "$TMP/h" "$GW/admin-api/infra/db-doc/export-html" -H "$AUTH" -o "$TMP/doc.html"
+grep -q 'infra_demo_student' "$TMP/doc.html" && grep -qi "^content-security-policy: default-src 'none'" "$TMP/h" \
+  || die "数据库文档内容或安全头不正确"; ok "数据库文档导出"
+TID=$(curl -s -X POST "$GW/admin-api/infra/codegen/create-list" -H "$AUTH" -H "$JSON" \
+  -d '{"dataSourceConfigId":0,"tableNames":["infra_demo_student"]}' | jq -r '.data[0] // empty')
+[ -n "$TID" ] || die "代码生成导入演示表失败（若上次运行中断，先在管理端删除已导入的 infra_demo_student）"
+N=$(curl -s "$GW/admin-api/infra/codegen/preview?tableId=$TID" -H "$AUTH" | jq -r '.data | length')
+curl -s -X DELETE "$GW/admin-api/infra/codegen/delete?tableId=$TID" -H "$AUTH" >/dev/null; TID=""
+[ "$N" = "11" ] || die "代码生成预览文件数为 $N，期望 11"; ok "代码生成导入与预览"
+
+# 消息死信：重新投递到原主题
+MID="e2e-dead-$(date +%s)"
+lq "INSERT INTO ccloud.infra_message_dead_letter (message_id, topic, payload, retry_count, error_msg, handled, tenant_id)
+    VALUES ('$MID', 'e2e.topic', '{\"a\":1}', 5, 'e2e', b'0', 1);" >/dev/null
+DLID=$(lq "SELECT id FROM ccloud.infra_message_dead_letter WHERE message_id='$MID';")
+R=$(curl -s -X PUT "$GW/admin-api/infra/message-dead-letter/resend?id=$DLID" -H "$AUTH" | jq -r '.code')
+[ "$R" = "0" ] || die "死信重新投递返回 $R"
+redis_cli XRANGE ccloud:stream:e2e.topic - + | grep -q "$MID" || die "死信未投递到原主题的消息流"
+[ "$(lq "SELECT handled+0 FROM ccloud.infra_message_dead_letter WHERE id=$DLID;")" = "1" ] || die "重新投递后死信未标记为已处理"
+ok "死信重新投递并标记为已处理"
 
 echo "==> 文档、链路追踪、监控、定时任务"
 curl -sf -o /dev/null "$GW/doc.html" || die "接口文档聚合页不可访问"

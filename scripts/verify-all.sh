@@ -9,7 +9,7 @@ if [ "${1:-}" = "--with-tests" ]; then
   echo "######## mvn test"
   mvn -q test
 fi
-for step in "verify-deps.sh" "verify-framework.sh" "verify-sql.sh" "verify-docs.sh" \
+for step in "verify-deps.sh" "verify-framework.sh" "verify-sql.sh" "verify-codegen.sh" "verify-docs.sh" \
             "verify-docker.sh --full" "verify-nacos.sh --full" "verify-e2e.sh"; do
   echo "######## scripts/$step"
   # shellcheck disable=SC2086

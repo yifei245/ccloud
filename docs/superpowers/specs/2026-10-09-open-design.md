@@ -15,7 +15,7 @@
 | 配额 | 只做每秒限流（`open_app.rate_limit`），网关按应用令牌桶；不做每日总量 |
 | 开放业务接口 | member 的「按手机号查询会员基本信息」；删除演示数据中两条交易接口 |
 | 回调通知 | 通用机制 + 测试回调（`open.test` 事件），本期不接业务事件；交易、支付模块以后经内部接口发送 |
-| 调用日志 | 由提供开放接口的业务服务记录（框架访问日志过滤器），经 Redis Stream 发给 open 写库；被网关拒绝的调用不入表，网关打 warn 日志 |
+| 调用日志 | 由提供开放接口的业务服务记录（各服务的 `ApiLogFrameworkServiceImpl`），经 Redis Stream 发给 open 写库；被网关拒绝的调用不入表，网关打 warn 日志 |
 | 应用密钥 | 加密存储（`CCLOUD_ENCRYPT_KEY`），只在新建与重置时返回一次完整密钥，之后一律掩码 |
 | 租户划分 | 应用、应用接口授权、调用日志、回调日志按租户隔离，租户管理员自管；接口目录全局一份，增删改仅限系统租户 |
 | 网关取应用 | 按需调用 open 内部接口 + 本地 Caffeine 缓存 + Redis 发布订阅失效 |
@@ -51,7 +51,7 @@
 3. `RateLimitFilter`：按应用令牌桶，阈值取快照中的 `rateLimit`（容量同值）。
 4. 转发：网关用 `InternalHeaderWriter` 写入带签名的内部身份头，`LoginUser = {id: 应用编号, userType: OPEN_APP, tenantId: 应用租户, info: {appKey}}`，并设置 `X-Tenant-Id`；移除 `X-Open-Sign`。外部无法伪造该身份。
 5. member 的开放接口按应用租户查询并返回脱敏数据。
-6. member 的访问日志过滤器识别出开放应用调用，额外发送 `OpenApiLogMessage` 到 Redis Stream 主题 `open.api-log`；open 消费后按消息中的租户写 `open_api_log`。
+6. member 的 `ApiLogFrameworkServiceImpl` 识别出开放应用调用，把框架的 `ApiAccessLog`（`userId` 即应用编号）另发一份到 Redis Stream 主题 `open.api-log`；open 消费后按消息中的租户写 `open_api_log`，appKey 与接口编码由 open 反查。
 
 ### 2.3 网关缓存与失效
 
@@ -89,7 +89,7 @@
 
 - 普通套餐去掉接口目录的新增、修改、删除（215–217），保留开放应用、接口目录查询、调用日志、回调日志。
 - 新增按钮：`open:app:assign-api`（可调接口授权）、`open:app:test-notify`（发送测试回调），挂在开放应用菜单下，并加入普通套餐与系统管理员角色。
-- 服务端兜底：接口目录增删改要求系统租户。`SystemTenantValidator` 从 infra 移到 `ccloud-spring-boot-starter-biz-tenant`，infra 与 open 共用。
+- 服务端兜底：接口目录增删改要求系统租户。`SystemTenantValidator` 从 infra 移到 `ccloud-spring-boot-starter-biz-tenant`，infra 与 open 共用：`validate(ErrorCode)` 由调用方传入各自的错误码（infra 1_002_008_000、open 1_005_000_000），是否系统租户经新的租户契约方法 `TenantFrameworkService.isSystemTenant` 判断（system 本地查，其他服务经 `TenantApi.isSystemTenant`）。
 - 种子一致性测试同步更新（套餐不含 215–217）。
 
 ## 4. open 服务功能
@@ -146,19 +146,19 @@
 ### 5.2 框架
 
 - `UserTypeEnum` 新增 `OPEN_APP(3, "开放应用")`，`user_type` 字典同步。检查所有按用户类型分支处（令牌、权限校验 `@PreAuthorize`、操作日志、数据权限、租户安全过滤），开放应用身份不得被当作管理员或会员，不得通过管理端 / 用户端接口的权限校验。
-- 开放接口身份约束：在 starter-security 中按路径统一拦截（不用注解，避免漏标）——`/open-api/**` 要求当前 LoginUser 为 OPEN_APP，否则 403；OPEN_APP 身份访问其他路径一律 403。返回通用 403（`GlobalErrorCodeConstants.FORBIDDEN`）。
-- 访问日志过滤器（starter-web）：当前用户为 OPEN_APP 且路径以 `/open-api/` 开头时，额外发送 `OpenApiLogMessage {appId, appKey, requestMethod, requestUrl, requestParams(脱敏), resultCode, resultMsg, userIp, beginTime, endTime, duration, traceId, tenantId}` 到 `open.api-log`。主题常量与消息类放在框架（生产方与消费方都依赖）。
-- `SystemTenantValidator` 移到 biz-tenant starter（3.3）。
+- 开放接口身份约束：沿用框架已有的"按路径校验用户类型"机制（`WebFrameworkUtils.getUserTypeByUrl` + `LoginUserFilter`），不用注解，避免漏标——`/open-api/**` 只接受 OPEN_APP 身份，OPEN_APP 身份在其他路径一律不被接受；不被接受的身份视为未登录，由 Spring Security 返回 401。
+- 调用日志发送：框架访问日志过滤器不改；提供开放接口的服务在自己的 `ApiLogFrameworkServiceImpl` 中，对 OPEN_APP 且路径以 `/open-api/` 开头的访问日志另发一份到 `open.api-log`，消息体沿用框架的 `ApiAccessLog`（参数已脱敏）。主题常量 `OpenApiLogTopics` 放在 open-api（与 infra 的 `ApiLogTopics` 同一做法）。
+- `SystemTenantValidator` 移到 biz-tenant starter，租户契约新增 `isSystemTenant`（3.3）。
 
 ### 5.3 member
 
-- `OpenMemberUserController`：`GET /open-api/member/user/get?mobile=`，返回 `{id, nickname, avatar, levelName, point, status, mobile(脱敏 138****8000)}`；不存在报"会员不存在"。按 LoginUser 的租户查询。
-- 安全配置放行 `/open-api/**` 的 Spring Security 匿名访问（身份由网关内部头确定，由 5.2 的约束保证只能是开放应用）。
+- `OpenMemberUserController`：`GET /open-api/member/user/get?mobile=`，返回 `{id, nickname, avatar, levelName, point, status, mobile(脱敏 138****8000)}`；手机号未注册报 member 现有错误码 `USER_MOBILE_NOT_EXISTS`。按 LoginUser 的租户查询。
+- 不放行匿名访问：`/open-api/**` 仍要求已认证，而 5.2 的约束保证这里只能是开放应用身份；接口上不加 `@PreAuthorize`。
 
 ## 6. 错误码与国际化
 
-- open：`1_005_xxx_xxx`，按业务分段（应用 001、接口目录 002、回调 003），名称用 `_NOT_EXISTS / _EXISTS / _INVALID` 规范；包括：应用不存在、接口不存在、接口编码已存在、方法与路径已存在、接口路径不合法、接口已关闭不可授权、回调地址不合法、应用未配置回调地址、回调日志状态不允许重新通知、IP 白名单格式不合法。
-- member：「会员不存在」复用 member 现有错误码，不新增。开放应用身份约束用通用 403（5.2），不新增错误码。
+- open：`1_005_xxx_xxx`，按业务分段（通用 000、应用 001、接口目录 002、回调 003），通用段为「仅限系统租户」；名称用 `_NOT_EXISTS / _EXISTS / _INVALID` 规范；包括：应用不存在、接口不存在、接口编码已存在、方法与路径已存在、接口路径不合法、接口已关闭不可授权、回调地址不合法、应用未配置回调地址、回调日志状态不允许重新通知、IP 白名单格式不合法。
+- member：手机号未注册复用 member 现有错误码，不新增。开放应用身份约束返回 401（5.2），不新增错误码。
 - i18n id 从 377 起，中英文各一条，`ErrorCodeConstantsTest` 锁定编号与文案。
 
 ## 7. 部署

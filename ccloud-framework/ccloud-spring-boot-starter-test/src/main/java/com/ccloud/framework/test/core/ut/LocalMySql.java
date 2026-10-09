@@ -18,6 +18,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,6 +53,11 @@ public final class LocalMySql {
      * 正式业务库名，测试库不能是它
      */
     private static final String BUSINESS_DATABASE = "ccloud";
+
+    /**
+     * 只有以此结尾的库才会删除 DDL 中已不存在的表
+     */
+    private static final String TEST_DATABASE_SUFFIX = "_test";
 
     private static volatile boolean initialized;
 
@@ -137,12 +143,26 @@ public final class LocalMySql {
     }
 
     /**
-     * DDL 中已经删掉的表，在 DDL 脚本里没有对应的 DROP，会残留在长期存在的测试库中；这里删掉当前库中 DDL 不再包含的表
+     * DDL 中已经删掉的表，在 DDL 脚本里没有对应的 DROP，会残留在长期存在的测试库中；这里删掉当前库中 DDL 不再包含的表。
+     * 业务库直接报错；库名不以 _test 结尾时只打印提示、不删表；DDL 表名为空时报错、不删表
      */
     static void dropTablesNotInDdl(Connection connection) throws SQLException {
+        dropTablesNotInDdl(connection, ddlTableNames());
+    }
+
+    static void dropTablesNotInDdl(Connection connection, Set<String> ddlTables) throws SQLException {
         String database = connection.getCatalog();
         assertNotBusinessDatabase(database);
-        Set<String> ddlTables = ddlTableNames();
+        // 本机 MySQL 与其他项目共用：库名误配到其他项目的库时，删表不可恢复，只对 *_test 库执行
+        if (database == null || !database.toLowerCase(Locale.ROOT).endsWith(TEST_DATABASE_SUFFIX)) {
+            System.out.println("[LocalMySql] 库 " + database + " 不以 " + TEST_DATABASE_SUFFIX
+                    + " 结尾，跳过删除 DDL 中已不存在的表");
+            return;
+        }
+        // 表名集合为空说明 DDL 没读到，此时库中每张表都会被当成多余的表
+        if (ddlTables.isEmpty()) {
+            throw new IllegalStateException("未从 sql/mysql/ddl 中解析到任何表名，拒绝清理测试库 " + database);
+        }
         List<String> stale = new ArrayList<>();
         try (Statement statement = connection.createStatement();
              ResultSet rs = statement.executeQuery("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = '"

@@ -2,11 +2,13 @@ package com.ccloud.framework.test.core.ut;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -34,6 +36,45 @@ class LocalMySqlTest {
             assertThat(tableExists(connection, "ut_stale_table")).isFalse();
             assertThat(tableExists(connection, "infra_config")).isTrue();
         }
+    }
+
+    @Test
+    void 库名不以_test结尾时跳过删表_不抛异常() throws SQLException {
+        // 误配到本机共享 MySQL 中其他项目的库时，删表会清空该项目的数据且不可恢复：一条语句都不能执行
+        LocalMySql.dropTablesNotInDdl(connectionOf("other_project"), Set.of("infra_config"));
+        LocalMySql.dropTablesNotInDdl(connectionOf("ccloud_test_backup"), Set.of("infra_config"));
+        assertThatThrownBy(() -> LocalMySql.dropTablesNotInDdl(connectionOf("ccloud"), Set.of("infra_config")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("测试库不能是业务库 ccloud");
+    }
+
+    @Test
+    void DDL表名为空时拒绝删表() throws SQLException {
+        try (Connection connection = DriverManager.getConnection(
+                LocalMySql.jdbcUrl(), LocalMySql.username(), LocalMySql.password());
+             Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE IF NOT EXISTS ut_stale_table (id bigint primary key)");
+
+            assertThatThrownBy(() -> LocalMySql.dropTablesNotInDdl(connection, Set.of()))
+                    .isInstanceOf(IllegalStateException.class);
+
+            assertThat(tableExists(connection, "ut_stale_table")).isTrue();
+            assertThat(tableExists(connection, "infra_config")).isTrue();
+            statement.execute("DROP TABLE ut_stale_table");
+        }
+    }
+
+    /**
+     * 只回答库名的连接：执行任何语句都直接失败，用来证明没有发出删表语句
+     */
+    private static Connection connectionOf(String database) {
+        return (Connection) Proxy.newProxyInstance(LocalMySqlTest.class.getClassLoader(), new Class<?>[]{Connection.class},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("getCatalog")) {
+                        return database;
+                    }
+                    throw new AssertionError("不应调用 Connection#" + method.getName());
+                });
     }
 
     @Test

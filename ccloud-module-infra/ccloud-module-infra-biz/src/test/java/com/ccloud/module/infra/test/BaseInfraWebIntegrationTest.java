@@ -78,6 +78,8 @@ public abstract class BaseInfraWebIntegrationTest {
     @BeforeEach
     void stubCommonApis() {
         when(tenantApi.validTenant(anyLong())).thenReturn(CommonResult.success(true));
+        // 默认以系统租户访问；验证普通租户被拒的用例自行改桩
+        when(tenantApi.isSystemTenant(anyLong())).thenReturn(CommonResult.success(true));
         when(permissionApi.hasAnyPermissions(eq(ADMIN_ID), any())).thenReturn(CommonResult.success(true));
         when(permissionApi.hasAnyPermissions(eq(NO_PERM_ADMIN_ID), any())).thenReturn(CommonResult.success(false));
     }

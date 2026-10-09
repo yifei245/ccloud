@@ -6,6 +6,7 @@ import com.ccloud.framework.mq.outbox.core.DeadLetterDO;
 import com.ccloud.framework.mq.outbox.core.DeadLetterMapper;
 import com.ccloud.framework.mq.outbox.core.MessageSender;
 import com.ccloud.module.infra.controller.admin.mq.vo.MessageDeadLetterPageReqVO;
+import com.ccloud.module.infra.framework.tenant.core.SystemTenantValidator;
 import com.ccloud.module.infra.test.BaseInfraDbAndRedisUnitTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
@@ -15,10 +16,14 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.MESSAGE_DEAD_LETTER_HANDLED;
+import static com.ccloud.module.infra.enums.ErrorCodeConstants.ONLY_SYSTEM_TENANT;
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.MESSAGE_DEAD_LETTER_NOT_EXISTS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @Import(MessageDeadLetterServiceImpl.class)
@@ -33,6 +38,8 @@ class MessageDeadLetterServiceImplTest extends BaseInfraDbAndRedisUnitTest {
     private JdbcTemplate jdbcTemplate;
     @MockitoBean
     private MessageSender messageSender;
+    @MockitoBean
+    private SystemTenantValidator systemTenantValidator;
 
     @AfterEach
     void cleanUp() {
@@ -119,6 +126,18 @@ class MessageDeadLetterServiceImplTest extends BaseInfraDbAndRedisUnitTest {
     @Test
     void resendDeadLetter_不存在报错() {
         assertServiceException(() -> deadLetterService.resendDeadLetter(-1L), MESSAGE_DEAD_LETTER_NOT_EXISTS);
+    }
+
+    @Test
+    void 非系统租户不能查看处理或重投死信() {
+        Long id = insert("ut-dl-s", "t.topic", 2L);
+        doThrow(exception(ONLY_SYSTEM_TENANT)).when(systemTenantValidator).validate();
+
+        assertServiceException(() -> deadLetterService.getDeadLetterPage(new MessageDeadLetterPageReqVO()), ONLY_SYSTEM_TENANT);
+        assertServiceException(() -> deadLetterService.updateDeadLetterHandled(id), ONLY_SYSTEM_TENANT);
+        assertServiceException(() -> deadLetterService.resendDeadLetter(id), ONLY_SYSTEM_TENANT);
+        verify(messageSender, never()).send(any(), any(), any());
+        assertThat(deadLetterMapper.selectById(id).getHandled()).isFalse();
     }
 
     /**

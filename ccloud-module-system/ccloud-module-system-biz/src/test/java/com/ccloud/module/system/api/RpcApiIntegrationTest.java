@@ -288,6 +288,20 @@ class RpcApiIntegrationTest extends BaseSystemDbAndRedisUnitTest {
     }
 
     @Test
+    void isSystemTenant_套餐0为系统租户_普通租户与不存在的租户为false() throws Exception {
+        TenantDO normal = insertTenant("rpc-普通", CommonStatusEnum.ENABLE, LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(get("/rpc-api/system/tenant/is-system").param("id", TENANT_ID.toString()))
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data").value(true));
+        mockMvc.perform(get("/rpc-api/system/tenant/is-system").param("id", normal.getId().toString()))
+                .andExpect(jsonPath("$.data").value(false));
+        mockMvc.perform(get("/rpc-api/system/tenant/is-system").param("id", "-1"))
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data").value(false));
+    }
+
+    @Test
     void createLoginLog_应落库() throws Exception {
         mockMvc.perform(post("/rpc-api/system/login-log/create").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"logType\":100,\"traceId\":\"t1\",\"userId\":7,\"userType\":1,\"username\":\"m\","

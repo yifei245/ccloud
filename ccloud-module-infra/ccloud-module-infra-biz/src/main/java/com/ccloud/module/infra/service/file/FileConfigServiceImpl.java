@@ -15,6 +15,7 @@ import com.ccloud.module.infra.framework.file.core.FileClientFactory;
 import com.ccloud.module.infra.framework.file.core.FileConfigRefresher;
 import com.ccloud.module.infra.framework.file.core.client.FileClientConfig;
 import com.ccloud.module.infra.framework.file.core.enums.FileStorageEnum;
+import com.ccloud.module.infra.framework.tenant.core.SystemTenantValidator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import jakarta.annotation.Resource;
 import jakarta.validation.ConstraintViolation;
@@ -45,9 +46,12 @@ public class FileConfigServiceImpl implements FileConfigService {
     private FileConfigRefresher fileConfigRefresher;
     @Resource
     private Validator validator;
+    @Resource
+    private SystemTenantValidator systemTenantValidator;
 
     @Override
     public Long createFileConfig(FileConfigSaveReqVO reqVO) {
+        systemTenantValidator.validate();
         FileClientConfig config = parseConfig(reqVO.getStorage(), reqVO.getConfig(), null);
         FileConfigDO fileConfig = new FileConfigDO().setName(reqVO.getName()).setStorage(reqVO.getStorage())
                 .setRemark(reqVO.getRemark()).setConfig(JsonUtils.toJsonString(config))
@@ -60,6 +64,7 @@ public class FileConfigServiceImpl implements FileConfigService {
 
     @Override
     public void updateFileConfig(FileConfigSaveReqVO reqVO) {
+        systemTenantValidator.validate();
         FileConfigDO old = validateFileConfigExists(reqVO.getId());
         FileClientConfig config = parseConfig(reqVO.getStorage(), reqVO.getConfig(), old);
         fileConfigMapper.updateById(new FileConfigDO().setId(reqVO.getId()).setName(reqVO.getName())
@@ -70,6 +75,7 @@ public class FileConfigServiceImpl implements FileConfigService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateFileConfigMaster(Long id) {
+        systemTenantValidator.validate();
         validateFileConfigExists(id);
         fileConfigMapper.update(new FileConfigDO().setMaster(false),
                 new LambdaUpdateWrapper<FileConfigDO>().eq(FileConfigDO::getMaster, true));
@@ -79,6 +85,7 @@ public class FileConfigServiceImpl implements FileConfigService {
 
     @Override
     public void deleteFileConfig(Long id) {
+        systemTenantValidator.validate();
         FileConfigDO config = validateFileConfigExists(id);
         if (Boolean.TRUE.equals(config.getMaster())) {
             throw exception(FILE_CONFIG_DELETE_FAIL_MASTER);
@@ -99,6 +106,7 @@ public class FileConfigServiceImpl implements FileConfigService {
 
     @Override
     public String testFileConfig(Long id) {
+        systemTenantValidator.validate();
         validateFileConfigExists(id);
         byte[] content = ("ccloud 文件配置测试 " + LocalDateTime.now()).getBytes(StandardCharsets.UTF_8);
         String path = "test/" + DateUtil.format(new Date(), "yyyyMMddHHmmss") + "-" + IdUtil.fastSimpleUUID() + ".txt";

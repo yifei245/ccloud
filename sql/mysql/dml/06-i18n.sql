@@ -1,6 +1,6 @@
 -- ----------------------------------------------------------------------------
 -- 初始化数据：国际化文案
--- 错误码文案，key 为 error.code.{错误码}。全局 13 条、system 模块 105 条、member 模块 29 条、infra 模块 35 条，zh_CN 与 en_US 各一份
+-- 错误码文案，key 为 error.code.{错误码}。全局 13 条、system 模块 105 条、member 模块 29 条、infra 模块 36 条，zh_CN 与 en_US 各一份
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -378,5 +378,7 @@ INSERT INTO `system_i18n_message` (`id`, `locale`, `code`, `content`, `source`, 
   (367, 'zh_CN', 'error.code.1002007005', '文件存储失败：{}', 1, '1'),
   (368, 'en_US', 'error.code.1002007005', 'Failed to store the file: {}', 1, '1'),
   (369, 'zh_CN', 'error.code.1002004014', '代码生成配置不合法：{}', 1, '1'),
-  (370, 'en_US', 'error.code.1002004014', 'Invalid codegen configuration: {}', 1, '1');
+  (370, 'en_US', 'error.code.1002004014', 'Invalid codegen configuration: {}', 1, '1'),
+  (371, 'zh_CN', 'error.code.1002008000', '参数配置、文件配置与消息死信为全部租户共用，只有系统租户可以维护', 1, '1'),
+  (372, 'en_US', 'error.code.1002008000', 'Configs, file configs and dead letters are shared by all tenants and can only be maintained by the system tenant', 1, '1');
 

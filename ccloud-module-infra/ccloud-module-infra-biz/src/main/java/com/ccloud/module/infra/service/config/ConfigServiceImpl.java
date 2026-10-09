@@ -8,6 +8,7 @@ import com.ccloud.module.infra.dal.dataobject.config.ConfigDO;
 import com.ccloud.module.infra.dal.mysql.config.ConfigMapper;
 import com.ccloud.module.infra.dal.redis.RedisKeyConstants;
 import com.ccloud.module.infra.enums.config.ConfigTypeEnum;
+import com.ccloud.module.infra.framework.tenant.core.SystemTenantValidator;
 import jakarta.annotation.Resource;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -23,10 +24,13 @@ public class ConfigServiceImpl implements ConfigService {
 
     @Resource
     private ConfigMapper configMapper;
+    @Resource
+    private SystemTenantValidator systemTenantValidator;
 
     @Override
     @CacheEvict(cacheNames = RedisKeyConstants.CONFIG, allEntries = true)
     public Long createConfig(ConfigSaveReqVO reqVO) {
+        systemTenantValidator.validate();
         validateConfigKeyUnique(null, reqVO.getKey());
         ConfigDO config = toDO(reqVO).setType(ConfigTypeEnum.CUSTOM.getType());
         configMapper.insert(config);
@@ -36,6 +40,7 @@ public class ConfigServiceImpl implements ConfigService {
     @Override
     @CacheEvict(cacheNames = RedisKeyConstants.CONFIG, allEntries = true)
     public void updateConfig(ConfigSaveReqVO reqVO) {
+        systemTenantValidator.validate();
         ConfigDO old = validateConfigExists(reqVO.getId());
         // 系统内置参数的键名被代码引用，改了就等于删除
         if (ConfigTypeEnum.SYSTEM.getType().equals(old.getType()) && !old.getConfigKey().equals(reqVO.getKey())) {
@@ -48,6 +53,7 @@ public class ConfigServiceImpl implements ConfigService {
     @Override
     @CacheEvict(cacheNames = RedisKeyConstants.CONFIG, allEntries = true)
     public void deleteConfig(Long id) {
+        systemTenantValidator.validate();
         ConfigDO config = validateConfigExists(id);
         if (ConfigTypeEnum.SYSTEM.getType().equals(config.getType())) {
             throw exception(CONFIG_CAN_NOT_DELETE_SYSTEM_TYPE);

@@ -55,4 +55,7 @@ public interface ErrorCodeConstants {
     ErrorCode FILE_PATH_INVALID = new ErrorCode(1_002_007_003, "文件路径不合法");
     ErrorCode FILE_EMPTY = new ErrorCode(1_002_007_004, "文件内容为空");
     ErrorCode FILE_UPLOAD_FAILED = new ErrorCode(1_002_007_005, "文件存储失败：{}");
+
+    // ========== 通用 1-002-008-000 ==========
+    ErrorCode ONLY_SYSTEM_TENANT = new ErrorCode(1_002_008_000, "参数配置、文件配置与消息死信为全部租户共用，只有系统租户可以维护");
 }

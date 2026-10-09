@@ -8,6 +8,8 @@ import com.ccloud.module.infra.dal.mysql.file.FileConfigMapper;
 import com.ccloud.module.infra.framework.file.core.FileClientFactory;
 import com.ccloud.module.infra.framework.file.core.FileConfigRefresher;
 import com.ccloud.module.infra.framework.file.core.enums.FileStorageEnum;
+import com.ccloud.module.infra.framework.tenant.core.SystemTenantValidator;
+import com.ccloud.module.infra.controller.admin.file.vo.FileConfigPageReqVO;
 import com.ccloud.module.infra.test.BaseInfraDbUnitTest;
 import com.fasterxml.jackson.core.type.TypeReference;
 import jakarta.annotation.Resource;
@@ -23,7 +25,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.*;
+import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -38,6 +42,8 @@ class FileConfigServiceImplTest extends BaseInfraDbUnitTest {
     private FileClientFactory fileClientFactory;
     @MockitoBean
     private FileConfigRefresher fileConfigRefresher;
+    @MockitoBean
+    private SystemTenantValidator systemTenantValidator;
 
     @TempDir
     Path dir;
@@ -144,6 +150,21 @@ class FileConfigServiceImplTest extends BaseInfraDbUnitTest {
         Map<String, Object> noSecret = new HashMap<>(s3("real-secret"));
         noSecret.remove("accessSecret");
         assertServiceException(() -> fileConfigService.createFileConfig(save(null, 20, noSecret)), FILE_CONFIG_INVALID);
+    }
+
+    @Test
+    void 非系统租户不能增删改与测试_读取不受限() {
+        Long id = fileConfigService.createFileConfig(save(null, 10, local()));
+        doThrow(exception(ONLY_SYSTEM_TENANT)).when(systemTenantValidator).validate();
+
+        assertServiceException(() -> fileConfigService.createFileConfig(save(null, 10, local())), ONLY_SYSTEM_TENANT);
+        assertServiceException(() -> fileConfigService.updateFileConfig(save(id, 10, local())), ONLY_SYSTEM_TENANT);
+        assertServiceException(() -> fileConfigService.updateFileConfigMaster(id), ONLY_SYSTEM_TENANT);
+        assertServiceException(() -> fileConfigService.deleteFileConfig(id), ONLY_SYSTEM_TENANT);
+        assertServiceException(() -> fileConfigService.testFileConfig(id), ONLY_SYSTEM_TENANT);
+        assertThat(fileConfigMapper.selectMaster().getId()).isEqualTo(masterId);
+        assertThat(fileConfigService.getFileConfig(id)).isNotNull();
+        assertThat(fileConfigService.getFileConfigPage(new FileConfigPageReqVO()).getTotal()).isPositive();
     }
 
     private static Map<String, Object> s3(String secret) {

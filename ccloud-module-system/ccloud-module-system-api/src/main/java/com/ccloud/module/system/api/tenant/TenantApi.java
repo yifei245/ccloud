@@ -28,4 +28,11 @@ public interface TenantApi {
     @GetMapping(PREFIX + "/valid")
     @Operation(summary = "校验租户是否可用")
     CommonResult<Boolean> validTenant(@RequestParam("id") Long id);
+
+    /**
+     * 系统租户（套餐 0）可以维护全局数据，如参数配置、文件配置与跨租户的消息死信
+     */
+    @GetMapping(PREFIX + "/is-system")
+    @Operation(summary = "判断是否为系统租户", description = "租户不存在时返回 false")
+    CommonResult<Boolean> isSystemTenant(@RequestParam("id") Long id);
 }

@@ -5,13 +5,17 @@ import com.ccloud.module.infra.controller.admin.config.vo.ConfigSaveReqVO;
 import com.ccloud.module.infra.dal.dataobject.config.ConfigDO;
 import com.ccloud.module.infra.dal.mysql.config.ConfigMapper;
 import com.ccloud.module.infra.enums.config.ConfigTypeEnum;
+import com.ccloud.module.infra.framework.tenant.core.SystemTenantValidator;
 import com.ccloud.module.infra.test.BaseInfraDbUnitTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.*;
+import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
 
 @Import(ConfigServiceImpl.class)
 class ConfigServiceImplTest extends BaseInfraDbUnitTest {
@@ -20,6 +24,8 @@ class ConfigServiceImplTest extends BaseInfraDbUnitTest {
     private ConfigServiceImpl configService;
     @Resource
     private ConfigMapper configMapper;
+    @MockitoBean
+    private SystemTenantValidator systemTenantValidator;
 
     @Test
     void createConfig_新建为自定义类型_键名重复报错() {
@@ -71,6 +77,20 @@ class ConfigServiceImplTest extends BaseInfraDbUnitTest {
         reqVO.setConfigKey("ut.page");
         assertThat(configService.getConfigPage(reqVO).getList()).extracting(ConfigDO::getConfigKey)
                 .containsExactly("ut.page.x");
+    }
+
+    @Test
+    void 非系统租户不能增删改_读取不受限() {
+        Long id = configService.createConfig(save(null, "ut.g", "1"));
+        doThrow(exception(ONLY_SYSTEM_TENANT)).when(systemTenantValidator).validate();
+
+        assertServiceException(() -> configService.createConfig(save(null, "ut.h", "1")), ONLY_SYSTEM_TENANT);
+        assertServiceException(() -> configService.updateConfig(save(id, "ut.g", "2")), ONLY_SYSTEM_TENANT);
+        assertServiceException(() -> configService.deleteConfig(id), ONLY_SYSTEM_TENANT);
+        assertThat(configMapper.selectByKey("ut.h")).isNull();
+        assertThat(configService.getConfig(id).getValue()).isEqualTo("1");
+        assertThat(configService.getConfigByKey("ut.g")).isNotNull();
+        assertThat(configService.getConfigPage(new ConfigPageReqVO()).getTotal()).isPositive();
     }
 
     private Long insertSystemConfig(String key) {

@@ -6,6 +6,7 @@ import com.ccloud.framework.mq.outbox.core.DeadLetterMapper;
 import com.ccloud.framework.mq.outbox.core.MessageSender;
 import com.ccloud.framework.mybatis.core.query.LambdaQueryWrapperX;
 import com.ccloud.module.infra.controller.admin.mq.vo.MessageDeadLetterPageReqVO;
+import com.ccloud.module.infra.framework.tenant.core.SystemTenantValidator;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +17,7 @@ import static com.ccloud.module.infra.enums.ErrorCodeConstants.MESSAGE_DEAD_LETT
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.MESSAGE_DEAD_LETTER_NOT_EXISTS;
 
 /**
- * DeadLetterMapper 整体不参与多租户拦截，这里的查询与更新天然跨租户
+ * DeadLetterMapper 整体不参与多租户拦截，这里的查询与更新天然跨租户，因此全部操作只允许系统租户执行
  */
 @Service
 public class MessageDeadLetterServiceImpl implements MessageDeadLetterService {
@@ -25,9 +26,12 @@ public class MessageDeadLetterServiceImpl implements MessageDeadLetterService {
     private DeadLetterMapper deadLetterMapper;
     @Resource
     private MessageSender messageSender;
+    @Resource
+    private SystemTenantValidator systemTenantValidator;
 
     @Override
     public PageResult<DeadLetterDO> getDeadLetterPage(MessageDeadLetterPageReqVO reqVO) {
+        systemTenantValidator.validate();
         return deadLetterMapper.selectPage(reqVO, new LambdaQueryWrapperX<DeadLetterDO>()
                 .likeIfPresent(DeadLetterDO::getTopic, reqVO.getTopic())
                 .eqIfPresent(DeadLetterDO::getMessageId, reqVO.getMessageId())
@@ -38,6 +42,7 @@ public class MessageDeadLetterServiceImpl implements MessageDeadLetterService {
 
     @Override
     public void updateDeadLetterHandled(Long id) {
+        systemTenantValidator.validate();
         validateUnhandled(id);
         markHandled(id);
     }
@@ -47,6 +52,7 @@ public class MessageDeadLetterServiceImpl implements MessageDeadLetterService {
      */
     @Override
     public void resendDeadLetter(Long id) {
+        systemTenantValidator.validate();
         DeadLetterDO deadLetter = validateUnhandled(id);
         messageSender.send(deadLetter.getTopic(), deadLetter.getMessageId(), deadLetter.getPayload());
         markHandled(id);

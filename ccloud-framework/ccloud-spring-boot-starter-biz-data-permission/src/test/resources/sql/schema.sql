@@ -7,5 +7,5 @@ CREATE TABLE demo_user (
     create_time TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updater     VARCHAR(64)  DEFAULT '',
     update_time TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted     BOOLEAN      NOT NULL DEFAULT FALSE
+    deleted     BIGINT       NOT NULL DEFAULT 0
 );

@@ -1,5 +1,6 @@
 package com.ccloud.gateway.support;
 
+import com.ccloud.framework.test.core.ut.LocalRedis;
 import com.ccloud.framework.common.util.json.JsonUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,7 +10,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.containers.GenericContainer;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -39,15 +39,6 @@ public abstract class GatewayIntegrationTestSupport {
      */
     protected static final StubServer PROMOTION = new StubServer("promotion");
 
-    @SuppressWarnings("resource")
-    private static final GenericContainer<?> REDIS = startRedis();
-
-    private static GenericContainer<?> startRedis() {
-        GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
-        redis.start();
-        return redis;
-    }
-
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         Map.of("ccloud-system-server", SYSTEM, "ccloud-member-server", MEMBER, "ccloud-pay-server", PAY,
@@ -59,8 +50,7 @@ public abstract class GatewayIntegrationTestSupport {
                         () -> "http://127.0.0.1:" + server.port()));
         // 已注册但端口不通：模拟下游实例宕机、重启中
         registry.add("spring.cloud.discovery.client.simple.instances.ccloud-trade-server[0].uri", () -> "http://127.0.0.1:1");
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+        LocalRedis.register(registry);
     }
 
     @Autowired

@@ -2,7 +2,7 @@
 # Nacos 配置（ccloud-common.yaml / ccloud-gateway.yaml）在各 application-{profile}.yaml 中导入，优先级高于本文件与 profile 文件。
 # 路由规则在 RouteConfiguration 中以代码定义（便于测试与审查），不在配置中声明。
 server:
-  port: 48080
+  port: 28080
 
 spring:
   application:
@@ -95,6 +95,8 @@ ccloud:
       - /app-api/member/auth/weixin-mini-app-login
       - /app-api/member/auth/refresh-token
       - /app-api/member/auth/logout
+      # ---- infra ----
+      - GET /admin-api/infra/file/*/get/**
       # ---- 接口文档转发路由（ccloud.swagger.enable=false 时不注册） ----
       - /*/v3/api-docs/*
     # 登出后立即清除网关上该令牌的缓存

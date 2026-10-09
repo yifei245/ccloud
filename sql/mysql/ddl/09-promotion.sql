@@ -22,7 +22,7 @@ CREATE TABLE `promotion_banner` (
   `create_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='首页轮播图表';
@@ -38,7 +38,7 @@ CREATE TABLE `promotion_article_category` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文章分类表';
@@ -62,7 +62,7 @@ CREATE TABLE `promotion_article` (
   `create_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_category_id` (`category_id`)
@@ -98,7 +98,7 @@ CREATE TABLE `promotion_coupon_template` (
   `create_time`            datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`            datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='优惠劵模板表';
@@ -126,7 +126,7 @@ CREATE TABLE `promotion_coupon` (
   `create_time`            datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`            datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_status` (`user_id`, `status`),
@@ -153,7 +153,7 @@ CREATE TABLE `promotion_reward_activity` (
   `create_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='满减送活动表';
@@ -170,7 +170,7 @@ CREATE TABLE `promotion_discount_activity` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='限时折扣活动表';
@@ -192,7 +192,7 @@ CREATE TABLE `promotion_discount_product` (
   `create_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_activity_id` (`activity_id`),
@@ -214,7 +214,7 @@ CREATE TABLE `promotion_seckill_config` (
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='秒杀时段配置表';
@@ -238,7 +238,7 @@ CREATE TABLE `promotion_seckill_activity` (
   `create_time`          datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`              varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`          datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`              bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`              bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_spu_id` (`spu_id`)
@@ -260,7 +260,7 @@ CREATE TABLE `promotion_seckill_product` (
   `create_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_activity_id` (`activity_id`),
@@ -294,7 +294,7 @@ CREATE TABLE `promotion_bargain_activity` (
   `create_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='砍价活动表';
@@ -315,7 +315,7 @@ CREATE TABLE `promotion_bargain_record` (
   `create_time`           datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`           datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_activity_user` (`activity_id`, `user_id`)
@@ -332,7 +332,7 @@ CREATE TABLE `promotion_bargain_help` (
   `create_time`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_record_user` (`record_id`, `user_id`, `deleted`)
@@ -359,7 +359,7 @@ CREATE TABLE `promotion_combination_activity` (
   `create_time`          datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`              varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`          datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`              bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`              bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='拼团活动表';
@@ -378,7 +378,7 @@ CREATE TABLE `promotion_combination_product` (
   `create_time`           datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`           datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_activity_sku` (`activity_id`, `sku_id`, `deleted`)
@@ -410,7 +410,7 @@ CREATE TABLE `promotion_combination_record` (
   `create_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_head_id` (`head_id`),
@@ -434,7 +434,7 @@ CREATE TABLE `promotion_point_activity` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='积分商城活动表';
@@ -454,7 +454,7 @@ CREATE TABLE `promotion_point_product` (
   `create_time`       datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`       datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_activity_sku` (`activity_id`, `sku_id`, `deleted`)
@@ -476,7 +476,7 @@ CREATE TABLE `promotion_diy_template` (
   `create_time`        datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`        datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='装修模板表';
@@ -493,7 +493,7 @@ CREATE TABLE `promotion_diy_page` (
   `create_time`        datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`        datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_template_id` (`template_id`)
@@ -514,7 +514,7 @@ CREATE TABLE `promotion_kefu_conversation` (
   `create_time`                  datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                      varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`                  datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                      bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                      bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_user_id` (`user_id`, `tenant_id`, `deleted`)
@@ -535,7 +535,7 @@ CREATE TABLE `promotion_kefu_message` (
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_conversation_id` (`conversation_id`)

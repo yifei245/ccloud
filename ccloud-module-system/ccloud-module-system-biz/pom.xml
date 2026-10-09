@@ -12,12 +12,17 @@
     <artifactId>ccloud-module-system-biz</artifactId>
     <packaging>jar</packaging>
     <name>${project.artifactId}</name>
-    <description>system 服务实现，可执行应用，端口 48081。不被任何模块依赖</description>
+    <description>system 服务实现，可执行应用，端口 28081。不被任何模块依赖</description>
 
     <dependencies>
         <dependency>
             <groupId>com.ccloud</groupId>
             <artifactId>ccloud-module-system-api</artifactId>
+        </dependency>
+        <!-- 参数配置、文件存储经 RPC 由 infra 提供 -->
+        <dependency>
+            <groupId>com.ccloud</groupId>
+            <artifactId>ccloud-module-infra-api</artifactId>
         </dependency>
 
         <!-- ==================== 框架能力 ==================== -->
@@ -90,16 +95,6 @@
         <dependency>
             <groupId>com.ccloud</groupId>
             <artifactId>ccloud-spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-testcontainers</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

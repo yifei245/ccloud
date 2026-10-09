@@ -1,0 +1,38 @@
+# 开发/联调环境（docker compose）：地址全部来自环境变量，服务名作为默认值。
+spring:
+  config:
+    # 在 profile 文件中导入：导入的配置优先于导入它的文件。写在 application.yaml 里时，
+    # profile 文件会反过来覆盖 Nacos，控制台改的值对 profile 中已有的键不生效
+    import:
+      - optional:nacos:ccloud-common.yaml
+      - optional:nacos:ccloud-datasource.yaml
+      - optional:nacos:${spring.application.name}.yaml
+  datasource:
+    dynamic:
+      druid:
+        initial-size: 5
+        min-idle: 5
+        max-active: 30
+        max-wait: 60000
+        validation-query: SELECT 1
+        test-while-idle: true
+      datasource:
+        master:
+          url: jdbc:mysql://${MYSQL_HOST:ccloud-mysql}:${MYSQL_PORT:3306}/ccloud?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          username: ${MYSQL_USERNAME:root}
+          password: ${MYSQL_PASSWORD:root123}
+  data:
+    redis:
+      host: ${REDIS_HOST:ccloud-redis}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      password: ${REDIS_PASSWORD:}
+
+ccloud:
+  swagger:
+    expose-rpc: true
+
+logging:
+  file:
+    name: ${user.home}/logs/${spring.application.name}.log

@@ -12,7 +12,7 @@
     <artifactId>ccloud-module-member-biz</artifactId>
     <packaging>jar</packaging>
     <name>${project.artifactId}</name>
-    <description>member 服务实现，可执行应用，端口 48083。不被任何模块依赖</description>
+    <description>member 服务实现，可执行应用，端口 28083。不被任何模块依赖</description>
 
     <dependencies>
         <dependency>
@@ -23,6 +23,11 @@
         <dependency>
             <groupId>com.ccloud</groupId>
             <artifactId>ccloud-module-system-api</artifactId>
+        </dependency>
+        <!-- 头像经 RPC 由 infra 存储 -->
+        <dependency>
+            <groupId>com.ccloud</groupId>
+            <artifactId>ccloud-module-infra-api</artifactId>
         </dependency>
 
         <dependency><groupId>com.ccloud</groupId><artifactId>ccloud-spring-boot-starter-web</artifactId></dependency>
@@ -66,16 +71,6 @@
         <dependency>
             <groupId>com.ccloud</groupId>
             <artifactId>ccloud-spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-testcontainers</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

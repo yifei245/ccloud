@@ -13,6 +13,7 @@ import com.ccloud.module.system.framework.datapermission.config.DataPermissionCo
 import com.ccloud.module.system.service.dept.DeptServiceImpl;
 import com.ccloud.module.system.service.dept.PostServiceImpl;
 import com.ccloud.module.system.service.permission.PermissionServiceImpl;
+import com.ccloud.module.system.service.oauth2.OAuth2TokenService;
 import com.ccloud.module.system.service.tenant.TenantService;
 import com.ccloud.module.system.test.BaseSystemDbUnitTest;
 import jakarta.annotation.Resource;
@@ -64,6 +65,8 @@ class AdminUserServiceDataPermissionTest extends BaseSystemDbUnitTest {
 
     @MockitoBean
     private TenantService tenantService;
+    @MockitoBean
+    private OAuth2TokenService oauth2TokenService;
 
     private Long selfId;
 

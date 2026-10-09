@@ -28,6 +28,9 @@ xxl:
     enabled: false
 
 ccloud:
+  # 访问日志会经 Redis Stream 发给 infra 写库，测试不应向共享的 Redis 与测试库留下日志
+  access-log:
+    enable: false
   mybatis:
     encrypt-key: ccloud1234567890
   security:

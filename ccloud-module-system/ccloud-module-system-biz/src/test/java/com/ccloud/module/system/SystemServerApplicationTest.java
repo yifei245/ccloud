@@ -1,5 +1,6 @@
 package com.ccloud.module.system;
 
+import com.ccloud.framework.test.core.ut.LocalRedis;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.DataPermissionInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.InnerInterceptor;
@@ -10,6 +11,8 @@ import com.ccloud.framework.monitor.core.filter.TraceFilter;
 import com.ccloud.framework.security.core.filter.LoginUserFilter;
 import com.ccloud.framework.tenant.config.TenantProperties;
 import com.ccloud.framework.web.core.handler.GlobalExceptionHandler;
+import com.ccloud.module.infra.api.config.ConfigApi;
+import com.ccloud.module.infra.api.file.FileApi;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,9 +24,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -39,7 +39,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * system 服务整体装配测试：真实 Redis（Testcontainers）+ H2，关闭 Nacos / XXL-Job / SBA / 链路上报。
+ * system 服务整体装配测试：本机真实 Redis（见 LocalRedis）+ H2，关闭 Nacos / XXL-Job / SBA / 链路上报。
  */
 @SpringBootTest(classes = SystemServerApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -51,16 +51,11 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "spring.cloud.service-registry.auto-registration.enabled=false"
         })
 @ActiveProfiles("unit-test")
-@Testcontainers
 class SystemServerApplicationTest {
-
-    @Container
-    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
     @DynamicPropertySource
     static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+        LocalRedis.register(registry);
     }
 
     private static final Pattern CREATE_TABLE =
@@ -76,6 +71,12 @@ class SystemServerApplicationTest {
         assertThat(ctx.getEnvironment().getProperty("spring.application.name")).isEqualTo("ccloud-system-server");
         // 测试用随机端口，这里校验的是 application.yaml 声明的默认端口
         assertThat(ctx.getEnvironment().getProperty("server.port")).isNotBlank();
+    }
+
+    @Test
+    void 调用infra的Feign客户端已注册() {
+        assertThat(ctx.getBeanNamesForType(ConfigApi.class)).isNotEmpty();
+        assertThat(ctx.getBeanNamesForType(FileApi.class)).isNotEmpty();
     }
 
     @Test
@@ -101,6 +102,11 @@ class SystemServerApplicationTest {
         assertThat(ctx.getBean(com.ccloud.framework.operatelog.core.service.OperateLogFrameworkService.class))
                 .isInstanceOf(com.ccloud.module.system.service.logger.OperateLogFrameworkServiceImpl.class);
         assertThat(ctx.getBeansOfType(com.ccloud.framework.operatelog.core.aop.OperateLogAspect.class)).hasSize(1);
+        // API 访问日志与异常日志须经 Redis Stream 发给 infra 写库，而不是框架默认的只打日志
+        assertThat(ctx.getBean(com.ccloud.framework.apilog.core.service.ApiAccessLogFrameworkService.class))
+                .isInstanceOf(com.ccloud.module.system.framework.contract.ApiLogFrameworkServiceImpl.class);
+        assertThat(ctx.getBean(com.ccloud.framework.apilog.core.service.ApiErrorLogFrameworkService.class))
+                .isInstanceOf(com.ccloud.module.system.framework.contract.ApiLogFrameworkServiceImpl.class);
         // 数据库文案须被加载进 messageSource，并能收到其他节点的刷新通知
         assertThat(ctx.getBeansOfType(com.ccloud.framework.i18n.core.I18nMessageRefresher.class)).hasSize(1);
         // 多实例部署下站内信等实时推送必须经 Redis 广播，否则连接在其他节点上的用户收不到

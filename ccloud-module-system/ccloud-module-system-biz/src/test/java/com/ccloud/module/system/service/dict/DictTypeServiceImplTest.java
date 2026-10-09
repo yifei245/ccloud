@@ -72,13 +72,13 @@ class DictTypeServiceImplTest extends BaseSystemDbUnitTest {
     }
 
     @Test
-    void deleteDictType_成功_记录删除时间且可重新创建同类型() {
+    void deleteDictType_成功_同一类型可反复删除与重建() {
         Long id = dictTypeService.createDictType(newReqVO("临时", "demo_tmp"));
         dictTypeService.deleteDictType(id);
-
         assertThat(dictTypeMapper.selectById(id)).isNull();
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT deleted_time IS NOT NULL FROM system_dict_type WHERE id = ?", Boolean.class, id)).isTrue();
+
+        Long again = dictTypeService.createDictType(newReqVO("临时", "demo_tmp"));
+        dictTypeService.deleteDictType(again);
         assertThat(dictTypeService.createDictType(newReqVO("临时", "demo_tmp"))).isNotNull();
     }
 

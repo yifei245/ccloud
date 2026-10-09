@@ -37,8 +37,6 @@ ccloud:
   system:
     captcha:
       enable: ${CCLOUD_CAPTCHA_ENABLED:false}
-    user:
-      init-password: ${CCLOUD_USER_INIT_PASSWORD:123456}
   security:
     internal-sign-secret: ${CCLOUD_INTERNAL_SIGN_SECRET:ccloud-local-internal-sign-secret}
   swagger:

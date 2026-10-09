@@ -1,0 +1,18 @@
+-- ${sqlClassComment}：菜单、按钮权限与错误码文案（代码生成）。执行前确认上级菜单编号 ${parentMenuId} 正确，错误码编号与 Java 中一致
+#if ($isAdmin)
+INSERT INTO `system_menu` (`name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`)
+VALUES ('${sqlClassComment}', '', 2, 0, ${parentMenuId}, '${kebab}', '', '${module}/${classNameVar}/index', '${className}', 0, b'1', b'1', b'1', '1');
+SET @menu_id = LAST_INSERT_ID();
+INSERT INTO `system_menu` (`name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`) VALUES
+  ('${sqlClassComment}查询', '${permissionPrefix}:query', 3, 1, @menu_id, '', '', NULL, NULL, 0, b'1', b'1', b'1', '1'),
+  ('${sqlClassComment}新增', '${permissionPrefix}:create', 3, 2, @menu_id, '', '', NULL, NULL, 0, b'1', b'1', b'1', '1'),
+  ('${sqlClassComment}修改', '${permissionPrefix}:update', 3, 3, @menu_id, '', '', NULL, NULL, 0, b'1', b'1', b'1', '1'),
+  ('${sqlClassComment}删除', '${permissionPrefix}:delete', 3, 4, @menu_id, '', '', NULL, NULL, 0, b'1', b'1', b'1', '1'),
+  ('${sqlClassComment}导出', '${permissionPrefix}:export', 3, 5, @menu_id, '', '', NULL, NULL, 0, b'1', b'1', b'1', '1');
+#end
+INSERT INTO `system_i18n_message` (`locale`, `code`, `content`, `source`, `creator`) VALUES
+#foreach ($error in $errorCodes)
+  ('zh_CN', 'error.code.${error.code}', '${error.sqlZh}', 1, '1'),
+  ('en_US', 'error.code.${error.code}', '${error.sqlEn}', 1, '1')#if ($foreach.hasNext),#else;#end
+
+#end

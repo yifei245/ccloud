@@ -8,7 +8,6 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import lombok.experimental.Accessors;
 
-import java.time.LocalDateTime;
 
 /**
  * 字典类型，全局共享
@@ -32,8 +31,4 @@ public class DictTypeDO extends BaseDO {
      */
     private Integer status;
     private String remark;
-    /**
-     * 删除时间：唯一索引为 (type, deleted_time)，删除后可重新创建同一类型
-     */
-    private LocalDateTime deletedTime;
 }

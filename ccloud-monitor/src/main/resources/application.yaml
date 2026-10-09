@@ -1,6 +1,6 @@
 # ccloud-monitor：服务健康面板（Spring Boot Admin Server）
 server:
-  port: 48182
+  port: 28182
 
 spring:
   application:

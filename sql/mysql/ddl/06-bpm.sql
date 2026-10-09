@@ -21,7 +21,7 @@ CREATE TABLE `bpm_form` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='动态表单定义表';
@@ -38,7 +38,7 @@ CREATE TABLE `bpm_category` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_code` (`code`, `tenant_id`, `deleted`)
@@ -77,7 +77,7 @@ CREATE TABLE `bpm_process_definition_info` (
   `create_time`                    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                        varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`                    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                        bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                        bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_process_definition_id` (`process_definition_id`),
@@ -101,7 +101,7 @@ CREATE TABLE `bpm_process_instance_copy` (
   `create_time`             datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                 varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`             datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                 bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                 bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`),
@@ -121,7 +121,7 @@ CREATE TABLE `bpm_process_listener` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程监听器表';
@@ -136,7 +136,7 @@ CREATE TABLE `bpm_process_expression` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程表达式表';
@@ -152,7 +152,7 @@ CREATE TABLE `bpm_user_group` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='审批用户组表';
@@ -175,7 +175,7 @@ CREATE TABLE `bpm_oa_leave` (
   `create_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`)

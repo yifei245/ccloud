@@ -1,7 +1,12 @@
 package com.ccloud.module.system.service.user;
 
 import com.ccloud.framework.common.enums.CommonStatusEnum;
+import com.ccloud.framework.common.enums.UserTypeEnum;
+import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.common.pojo.PageResult;
+import com.ccloud.framework.common.exception.ServiceException;
+import com.ccloud.module.infra.api.config.ConfigApi;
+import com.ccloud.module.infra.api.file.FileApi;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdatePasswordReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdateReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.user.UserImportExcelVO;
@@ -18,16 +23,17 @@ import com.ccloud.module.system.dal.mysql.dept.UserPostMapper;
 import com.ccloud.module.system.dal.mysql.user.AdminUserMapper;
 import com.ccloud.module.system.service.dept.DeptServiceImpl;
 import com.ccloud.module.system.service.dept.PostServiceImpl;
+import com.ccloud.module.system.service.oauth2.OAuth2TokenService;
 import com.ccloud.module.system.service.permission.PermissionService;
 import com.ccloud.module.system.service.permission.PermissionServiceImpl;
 import com.ccloud.module.system.service.tenant.TenantInfoHandler;
 import com.ccloud.module.system.service.tenant.TenantService;
 import com.ccloud.module.system.test.BaseSystemDbUnitTest;
 import jakarta.annotation.Resource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
@@ -36,12 +42,17 @@ import java.util.Set;
 
 import static com.ccloud.module.system.enums.ErrorCodeConstants.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @Import({AdminUserServiceImpl.class, DeptServiceImpl.class, PostServiceImpl.class, PermissionServiceImpl.class,
         LocalValidatorFactoryBean.class})
-@TestPropertySource(properties = "ccloud.system.user.init-password=init123")
 class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
 
     @Resource
@@ -60,7 +71,18 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
     private PasswordEncoder passwordEncoder;
 
     @MockitoBean
+    private ConfigApi configApi;
+    @MockitoBean
+    private FileApi fileApi;
+    @MockitoBean
     private TenantService tenantService;
+    @MockitoBean
+    private OAuth2TokenService oauth2TokenService;
+
+    @BeforeEach
+    void stubInitPassword() {
+        when(configApi.getConfigValueByKey("system.user.init-password")).thenReturn(CommonResult.success("init123"));
+    }
 
     // ========== 创建 ==========
 
@@ -226,6 +248,8 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         AdminUserDO user = userMapper.selectById(id);
         assertThat(userService.isPasswordMatch("newpass", user.getPassword())).isTrue();
         assertThat(userService.isPasswordMatch("pass123", user.getPassword())).isFalse();
+        // 本人改密码也下线全部会话（含当前会话），需重新登录
+        verify(oauth2TokenService).removeAccessTokensByUser(id, UserTypeEnum.ADMIN.getValue());
     }
 
     @Test
@@ -235,6 +259,7 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         reqVO.setOldPassword("wrong");
         reqVO.setNewPassword("newpass");
         assertServiceException(() -> userService.updateUserPassword(id, reqVO), USER_PASSWORD_FAILED);
+        verify(oauth2TokenService, never()).removeAccessTokensByUser(anyLong(), anyInt());
     }
 
     @Test
@@ -242,6 +267,7 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         Long id = userService.createUser(newReqVO("reset", null, null));
         userService.resetUserPassword(id, "reset456");
         assertThat(passwordEncoder.matches("reset456", userMapper.selectById(id).getPassword())).isTrue();
+        verify(oauth2TokenService).removeAccessTokensByUser(id, UserTypeEnum.ADMIN.getValue());
     }
 
     @Test
@@ -249,7 +275,15 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         Long id = userService.createUser(newReqVO("status", null, null));
         userService.updateUserStatus(id, CommonStatusEnum.DISABLE.getStatus());
         assertThat(userMapper.selectById(id).getStatus()).isEqualTo(CommonStatusEnum.DISABLE.getStatus());
+        verify(oauth2TokenService).removeAccessTokensByUser(id, UserTypeEnum.ADMIN.getValue());
         assertServiceException(() -> userService.updateUserStatus(-1L, 0), USER_NOT_EXISTS);
+    }
+
+    @Test
+    void updateUserStatus_启用时不作废令牌() {
+        Long id = userService.createUser(newReqVO("enable", null, null));
+        userService.updateUserStatus(id, CommonStatusEnum.ENABLE.getStatus());
+        verify(oauth2TokenService, never()).removeAccessTokensByUser(anyLong(), anyInt());
     }
 
     // ========== 删除 ==========
@@ -267,6 +301,7 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         assertThat(userMapper.selectById(id)).isNull();
         assertThat(permissionService.getUserRoleIdListByUserId(id)).isEmpty();
         assertThat(userPostMapper.selectListByUserId(id)).isEmpty();
+        verify(oauth2TokenService).removeAccessTokensByUser(id, UserTypeEnum.ADMIN.getValue());
     }
 
     @Test
@@ -275,11 +310,24 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
     }
 
     @Test
+    void deleteUser_同一账号可反复删除与重建() {
+        for (int i = 0; i < 3; i++) {
+            Long id = userService.createUser(newReqVO("zhang", "13700000009", "zhang@ccloud.local"));
+            userService.deleteUser(id);
+        }
+        assertThat(userService.createUser(newReqVO("zhang", "13700000009", "zhang@ccloud.local"))).isNotNull();
+        // 未删除的账号仍受唯一约束
+        assertServiceException(() -> userService.createUser(newReqVO("zhang", null, null)), USER_USERNAME_EXISTS);
+    }
+
+    @Test
     void deleteUserList() {
         Long a = userService.createUser(newReqVO("dela", null, null));
         Long b = userService.createUser(newReqVO("delb", null, null));
         userService.deleteUserList(List.of(a, b));
         assertThat(userMapper.selectCount()).isZero();
+        verify(oauth2TokenService).removeAccessTokensByUser(a, UserTypeEnum.ADMIN.getValue());
+        verify(oauth2TokenService).removeAccessTokensByUser(b, UserTypeEnum.ADMIN.getValue());
     }
 
     // ========== 查询 ==========
@@ -360,6 +408,16 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
     }
 
     @Test
+    void importUserList_参数未配置或infra不可用时拒绝导入() {
+        List<UserImportExcelVO> list = List.of(importRow("import_none", null));
+        when(configApi.getConfigValueByKey("system.user.init-password")).thenReturn(CommonResult.success(null));
+        assertServiceException(() -> userService.importUserList(list, false), USER_IMPORT_INIT_PASSWORD);
+        when(configApi.getConfigValueByKey("system.user.init-password")).thenThrow(new RuntimeException("connect refused"));
+        assertServiceException(() -> userService.importUserList(list, false), USER_IMPORT_INIT_PASSWORD);
+        assertThat(userMapper.selectByUsername("import_none")).isNull();
+    }
+
+    @Test
     void importUserList_逐行返回新增_更新_失败明细() {
         userService.createUser(newReqVO("exists", null, null));
         DeptDO disabledDept = insertDept("停用部", 0L, CommonStatusEnum.DISABLE);
@@ -383,7 +441,31 @@ class AdminUserServiceImplTest extends BaseSystemDbUnitTest {
         assertThat(userMapper.selectByUsername("exists").getMobile()).isEqualTo("13700000042");
     }
 
+    // ========== 头像 ==========
+
+    @Test
+    void updateUserAvatar_存储后更新头像地址_用户不存在报错() {
+        AdminUserDO user = insertUser("avatar_user");
+        when(fileApi.createFile(any())).thenReturn(CommonResult.success("http://f/avatar.png"));
+        assertThat(userService.updateUserAvatar(user.getId(), "a.png", new byte[]{1, 2})).isEqualTo("http://f/avatar.png");
+        assertThat(userMapper.selectById(user.getId()).getAvatar()).isEqualTo("http://f/avatar.png");
+        assertServiceException(() -> userService.updateUserAvatar(-1L, "a.png", new byte[]{1}), USER_NOT_EXISTS);
+    }
+
+    @Test
+    void updateUserAvatar_文件被拒绝时不改头像() {
+        AdminUserDO user = insertUser("avatar_user2");
+        when(fileApi.createFile(any())).thenReturn(CommonResult.error(1_002_007_001, "不支持上传该类型的文件：image/svg+xml"));
+        assertThatThrownBy(() -> userService.updateUserAvatar(user.getId(), "a.svg", new byte[]{1}))
+                .isInstanceOf(ServiceException.class).extracting("code").isEqualTo(1_002_007_001);
+        assertThat(userMapper.selectById(user.getId()).getAvatar()).isEqualTo(user.getAvatar());
+    }
+
     // ========== 工具 ==========
+
+    private AdminUserDO insertUser(String username) {
+        return userMapper.selectById(userService.createUser(newReqVO(username, null, null)));
+    }
 
     private void createUserInDept(String username, DeptDO dept) {
         UserSaveReqVO reqVO = newReqVO(username, null, null);

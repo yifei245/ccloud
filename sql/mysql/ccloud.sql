@@ -46,7 +46,7 @@ CREATE TABLE `system_dept` (
   `create_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_parent_id` (`parent_id`)
@@ -65,7 +65,7 @@ CREATE TABLE `system_post` (
   `create_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='岗位表';
@@ -93,7 +93,7 @@ CREATE TABLE `system_users` (
   `create_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   -- 唯一性必须带上 tenant_id 与 deleted：不同租户可以有同名账号，
   -- 且逻辑删除后该账号应能被重新注册
@@ -119,7 +119,7 @@ CREATE TABLE `system_role` (
   `create_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='角色表';
@@ -144,7 +144,7 @@ CREATE TABLE `system_menu` (
   `create_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_parent_id` (`parent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='菜单权限表，全局共享不做租户隔离，租户可见范围由套餐限定';
@@ -159,7 +159,7 @@ CREATE TABLE `system_user_role` (
   `create_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_role_id` (`role_id`),
@@ -176,7 +176,7 @@ CREATE TABLE `system_role_menu` (
   `create_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_role_id` (`role_id`),
   KEY `idx_menu_id` (`menu_id`),
@@ -193,7 +193,7 @@ CREATE TABLE `system_user_post` (
   `create_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_tenant_id` (`tenant_id`)
@@ -217,7 +217,7 @@ CREATE TABLE `system_tenant` (
   `create_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`         varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`         bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`         bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='租户表，自身不做租户隔离';
 
@@ -232,7 +232,7 @@ CREATE TABLE `system_tenant_package` (
   `create_time` datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time` datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='租户套餐表';
 
@@ -245,14 +245,13 @@ CREATE TABLE `system_dict_type` (
   `type`         varchar(100) NOT NULL DEFAULT '' COMMENT '字典类型',
   `status`       tinyint      NOT NULL DEFAULT 0 COMMENT '状态：0 开启 1 关闭',
   `remark`       varchar(500) DEFAULT NULL COMMENT '备注',
-  `deleted_time` datetime     DEFAULT NULL COMMENT '删除时间',
   `creator`      varchar(64)  DEFAULT '' COMMENT '创建者',
   `create_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`      varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`      bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`      bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_type` (`type`, `deleted_time`)
+  UNIQUE KEY `uk_type` (`type`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='字典类型表，全局共享';
 
 DROP TABLE IF EXISTS `system_dict_data`;
@@ -270,7 +269,7 @@ CREATE TABLE `system_dict_data` (
   `create_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_dict_type` (`dict_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='字典数据表，全局共享';
@@ -299,7 +298,7 @@ CREATE TABLE `system_oauth2_client` (
   `create_time`                     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                         varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`                     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                         bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                         bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_client_id` (`client_id`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='OAuth2 客户端表，每个终端一条记录';
@@ -320,7 +319,7 @@ CREATE TABLE `system_oauth2_access_token` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_access_token` (`access_token`),
   KEY `idx_refresh_token` (`refresh_token`),
@@ -342,7 +341,7 @@ CREATE TABLE `system_oauth2_refresh_token` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_refresh_token` (`refresh_token`),
   KEY `idx_tenant_id` (`tenant_id`)
@@ -364,7 +363,7 @@ CREATE TABLE `system_oauth2_code` (
   `create_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`      varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`      bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`      bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_code` (`code`),
   KEY `idx_tenant_id` (`tenant_id`)
@@ -384,7 +383,7 @@ CREATE TABLE `system_oauth2_approve` (
   `create_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`      varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`      bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`      bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_user` (`user_id`, `user_type`),
   KEY `idx_tenant_id` (`tenant_id`)
@@ -407,7 +406,7 @@ CREATE TABLE `system_social_client` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='社交客户端表';
@@ -429,7 +428,7 @@ CREATE TABLE `system_social_user` (
   `create_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_type_openid` (`type`, `openid`),
   KEY `idx_tenant_id` (`tenant_id`)
@@ -447,7 +446,7 @@ CREATE TABLE `system_social_user_bind` (
   `create_time`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_user` (`user_id`, `user_type`),
   KEY `idx_social_user_id` (`social_user_id`),
@@ -470,7 +469,7 @@ CREATE TABLE `system_sms_channel` (
   `create_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`      varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`      bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`      bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='短信渠道表';
 
@@ -491,7 +490,7 @@ CREATE TABLE `system_sms_template` (
   `create_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`         varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`         bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`         bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_code` (`code`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='短信模板表';
@@ -525,7 +524,7 @@ CREATE TABLE `system_sms_log` (
   `create_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_mobile` (`mobile`),
   KEY `idx_tenant_id` (`tenant_id`),
@@ -548,7 +547,7 @@ CREATE TABLE `system_sms_code` (
   `create_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_mobile` (`mobile`),
   KEY `idx_tenant_id` (`tenant_id`)
@@ -570,7 +569,7 @@ CREATE TABLE `system_mail_account` (
   `create_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`         varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`         bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`         bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='邮箱账号表';
 
@@ -590,7 +589,7 @@ CREATE TABLE `system_mail_template` (
   `create_time` datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time` datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_code` (`code`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='邮件模板表';
@@ -618,7 +617,7 @@ CREATE TABLE `system_mail_log` (
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='邮件日志表';
@@ -640,7 +639,7 @@ CREATE TABLE `system_notify_template` (
   `create_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_code` (`code`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='站内信模板表';
@@ -663,7 +662,7 @@ CREATE TABLE `system_notify_message` (
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_user_read` (`user_id`, `user_type`, `read_status`),
   KEY `idx_tenant_id` (`tenant_id`)
@@ -681,7 +680,7 @@ CREATE TABLE `system_notice` (
   `create_time` datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time` datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='通知公告表';
@@ -704,7 +703,7 @@ CREATE TABLE `system_login_log` (
   `create_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_username` (`username`),
   KEY `idx_tenant_id` (`tenant_id`),
@@ -732,7 +731,7 @@ CREATE TABLE `system_operate_log` (
   `create_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_biz` (`type`, `biz_id`),
@@ -756,7 +755,7 @@ CREATE TABLE `system_i18n_message` (
   `create_time` datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`     varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time` datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`     bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`     bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_locale_code` (`locale`, `code`, `deleted`),
   KEY `idx_biz` (`biz_type`, `biz_id`)
@@ -764,7 +763,7 @@ CREATE TABLE `system_i18n_message` (
 
 -- >>>>>>>>>> ddl/02-infra.sql <<<<<<<<<<
 -- ----------------------------------------------------------------------------
--- infra 模块：配置、文件、定时任务、API 日志、代码生成、数据源、本地消息表
+-- infra 模块：配置、文件、API 日志、代码生成、数据源、代码生成演示、本地消息表
 -- 本文件由 DDL 生成器产出，公共约定与 01-system.sql 一致
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
@@ -785,7 +784,7 @@ CREATE TABLE `infra_config` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_config_key` (`config_key`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='参数配置表，全局共享';
@@ -804,7 +803,7 @@ CREATE TABLE `infra_file_config` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件存储配置表，全局共享';
 DROP TABLE IF EXISTS `infra_file`;
@@ -821,7 +820,7 @@ CREATE TABLE `infra_file` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_config_path` (`config_id`, `path`)
@@ -836,53 +835,10 @@ CREATE TABLE `infra_file_content` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_config_path` (`config_id`, `path`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件内容表，仅数据库存储器使用';
-
--- ========================= 定时任务 =========================
-
-DROP TABLE IF EXISTS `infra_job`;
-CREATE TABLE `infra_job` (
-  `id`                bigint       NOT NULL AUTO_INCREMENT COMMENT '任务编号',
-  `name`              varchar(32)  NOT NULL COMMENT '任务名称',
-  `status`            tinyint      NOT NULL COMMENT '任务状态：0 初始化 1 开启 2 暂停',
-  `handler_name`      varchar(64)  NOT NULL COMMENT '处理器名，对应 @XxlJob 的 value',
-  `handler_param`     varchar(255) DEFAULT NULL COMMENT '处理器参数',
-  `cron_expression`   varchar(32)  NOT NULL COMMENT 'CRON 表达式',
-  `retry_count`       int          NOT NULL DEFAULT 0 COMMENT '重试次数',
-  `retry_interval`    int          NOT NULL DEFAULT 0 COMMENT '重试间隔，单位毫秒',
-  `monitor_timeout`   int          NOT NULL DEFAULT 0 COMMENT '监控超时时间，单位毫秒',
-  `creator`           varchar(64)  DEFAULT '' COMMENT '创建者',
-  `create_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater`           varchar(64)  DEFAULT '' COMMENT '更新者',
-  `update_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_handler_name` (`handler_name`, `deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='定时任务表，调度由 XXL-Job 执行，本表记录任务元数据';
-DROP TABLE IF EXISTS `infra_job_log`;
-CREATE TABLE `infra_job_log` (
-  `id`              bigint        NOT NULL AUTO_INCREMENT COMMENT '日志编号',
-  `job_id`          bigint        NOT NULL COMMENT '任务编号',
-  `handler_name`    varchar(64)   NOT NULL COMMENT '处理器名',
-  `handler_param`   varchar(255)  DEFAULT NULL COMMENT '处理器参数',
-  `execute_index`   tinyint       NOT NULL DEFAULT 1 COMMENT '第几次执行，重试时递增',
-  `begin_time`      datetime      NOT NULL COMMENT '开始执行时间',
-  `end_time`        datetime      DEFAULT NULL COMMENT '结束执行时间',
-  `duration`        int           DEFAULT NULL COMMENT '执行时长，单位毫秒',
-  `status`          tinyint       NOT NULL COMMENT '执行状态：0 运行中 1 成功 2 失败',
-  `result`          varchar(4000) DEFAULT '' COMMENT '结果数据',
-  `creator`         varchar(64)   DEFAULT '' COMMENT '创建者',
-  `create_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater`         varchar(64)   DEFAULT '' COMMENT '更新者',
-  `update_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`         bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
-  PRIMARY KEY (`id`),
-  KEY `idx_job_id` (`job_id`),
-  KEY `idx_begin_time` (`begin_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='定时任务日志表';
 
 -- ========================= API 日志 =========================
 
@@ -912,7 +868,7 @@ CREATE TABLE `infra_api_access_log` (
   `create_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_create_time` (`create_time`),
@@ -947,7 +903,7 @@ CREATE TABLE `infra_api_error_log` (
   `create_time`                    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                        varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`                    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                        bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                        bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_create_time` (`create_time`),
@@ -981,7 +937,7 @@ CREATE TABLE `infra_codegen_table` (
   `create_time`             datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                 varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`             datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                 bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                 bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='代码生成表定义';
 DROP TABLE IF EXISTS `infra_codegen_column`;
@@ -1008,7 +964,7 @@ CREATE TABLE `infra_codegen_column` (
   `create_time`                datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                    varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`                datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                    bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                    bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_table_id` (`table_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='代码生成字段定义';
@@ -1026,9 +982,40 @@ CREATE TABLE `infra_data_source_config` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='数据源配置表';
+
+-- ========================= 代码生成演示 =========================
+
+DROP TABLE IF EXISTS `infra_demo_student`;
+CREATE TABLE `infra_demo_student` (
+  `id`            bigint        NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `name`          varchar(100)  NOT NULL COMMENT '姓名',
+  `sex`           tinyint       NOT NULL COMMENT '性别：1 男 2 女',
+  `birthday`      datetime      DEFAULT NULL COMMENT '出生日期',
+  `description`   varchar(1000) DEFAULT NULL COMMENT '简介',
+  `status`        tinyint       NOT NULL DEFAULT 0 COMMENT '状态：0 开启 1 关闭',
+  `creator`       varchar(64)   DEFAULT '' COMMENT '创建者',
+  `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
+  `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='演示学生表，代码生成单表模板的演示与验收用';
+DROP TABLE IF EXISTS `infra_demo_category`;
+CREATE TABLE `infra_demo_category` (
+  `id`            bigint        NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `name`          varchar(100)  NOT NULL COMMENT '名称',
+  `parent_id`     bigint        NOT NULL DEFAULT 0 COMMENT '父编号，0 表示根节点',
+  `sort`          int           NOT NULL DEFAULT 0 COMMENT '显示顺序',
+  `creator`       varchar(64)   DEFAULT '' COMMENT '创建者',
+  `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
+  `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='演示分类表，代码生成树表模板的演示与验收用';
 
 -- ========================= 本地消息表（最终一致性） =========================
 
@@ -1051,7 +1038,7 @@ CREATE TABLE `infra_message_outbox` (
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_message_id` (`message_id`),
@@ -1067,7 +1054,7 @@ CREATE TABLE `infra_message_consume_log` (
   `create_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_message_consumer` (`message_id`, `consumer`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='消息消费记录表。不带 tenant_id，必须列入 ccloud.tenant.ignore-tables';
@@ -1086,7 +1073,7 @@ CREATE TABLE `infra_message_dead_letter` (
   `create_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_message_id` (`message_id`),
@@ -1129,7 +1116,7 @@ CREATE TABLE `member_user` (
   `create_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_mobile` (`mobile`, `tenant_id`, `deleted`)
@@ -1148,7 +1135,7 @@ CREATE TABLE `member_address` (
   `create_time`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`          varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`          bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`          bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`)
@@ -1167,7 +1154,7 @@ CREATE TABLE `member_group` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员分组表';
@@ -1180,7 +1167,7 @@ CREATE TABLE `member_tag` (
   `create_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员标签表';
@@ -1202,7 +1189,7 @@ CREATE TABLE `member_level` (
   `create_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员等级表';
@@ -1222,7 +1209,7 @@ CREATE TABLE `member_level_record` (
   `create_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`)
@@ -1242,7 +1229,7 @@ CREATE TABLE `member_experience_record` (
   `create_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`),
@@ -1266,7 +1253,7 @@ CREATE TABLE `member_point_record` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`),
@@ -1284,7 +1271,7 @@ CREATE TABLE `member_config` (
   `create_time`                     datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                         varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`                     datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                         bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                         bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员配置表，每个租户一条';
@@ -1303,7 +1290,7 @@ CREATE TABLE `member_sign_in_config` (
   `create_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_day` (`day`, `tenant_id`, `deleted`)
@@ -1320,7 +1307,7 @@ CREATE TABLE `member_sign_in_record` (
   `create_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_create_time` (`user_id`, `create_time`)
@@ -1354,7 +1341,7 @@ CREATE TABLE `open_app` (
   `create_time`      datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`          varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`      datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`          bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`          bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_key` (`app_key`, `deleted`)
@@ -1369,7 +1356,7 @@ CREATE TABLE `open_app_scope` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_scope` (`app_id`, `scope`, `deleted`)
@@ -1388,7 +1375,7 @@ CREATE TABLE `open_api` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_code` (`code`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='开放接口目录表，全局共享';
@@ -1402,7 +1389,7 @@ CREATE TABLE `open_app_api` (
   `create_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_api` (`app_id`, `api_id`, `deleted`)
@@ -1432,7 +1419,7 @@ CREATE TABLE `open_api_log` (
   `create_time`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`          varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`          bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`          bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_app_create_time` (`app_id`, `create_time`),
@@ -1454,7 +1441,7 @@ CREATE TABLE `open_notify_log` (
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_status_retry` (`status`, `next_retry_time`)
@@ -1487,7 +1474,7 @@ CREATE TABLE `pay_app` (
   `create_time`           datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`           datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_key` (`app_key`, `tenant_id`, `deleted`)
@@ -1506,7 +1493,7 @@ CREATE TABLE `pay_channel` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_code` (`app_id`, `code`, `deleted`)
@@ -1541,7 +1528,7 @@ CREATE TABLE `pay_order` (
   `create_time`         datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`         datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_merchant_order` (`app_id`, `merchant_order_id`, `deleted`),
@@ -1565,7 +1552,7 @@ CREATE TABLE `pay_order_extension` (
   `create_time`           datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`           datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_no` (`no`),
@@ -1602,7 +1589,7 @@ CREATE TABLE `pay_refund` (
   `create_time`           datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`           datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_merchant_refund` (`app_id`, `merchant_refund_id`, `deleted`),
@@ -1638,7 +1625,7 @@ CREATE TABLE `pay_transfer` (
   `create_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_merchant_transfer` (`app_id`, `merchant_transfer_id`, `deleted`),
@@ -1667,7 +1654,7 @@ CREATE TABLE `pay_notify_task` (
   `create_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_status_next` (`status`, `next_notify_time`),
@@ -1685,7 +1672,7 @@ CREATE TABLE `pay_notify_log` (
   `create_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_task_id` (`task_id`)
@@ -1707,7 +1694,7 @@ CREATE TABLE `pay_wallet` (
   `create_time`      datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`          varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`      datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`          bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`          bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_user` (`user_id`, `user_type`, `tenant_id`, `deleted`)
@@ -1727,7 +1714,7 @@ CREATE TABLE `pay_wallet_transaction` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_wallet_biz` (`wallet_id`, `biz_type`, `biz_id`, `deleted`),
@@ -1745,7 +1732,7 @@ CREATE TABLE `pay_wallet_recharge_package` (
   `create_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='钱包充值套餐表';
@@ -1772,7 +1759,7 @@ CREATE TABLE `pay_wallet_recharge` (
   `create_time`          datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`              varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`          datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`              bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`              bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_wallet_id` (`wallet_id`),
@@ -1803,7 +1790,7 @@ CREATE TABLE `bpm_form` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='动态表单定义表';
@@ -1820,7 +1807,7 @@ CREATE TABLE `bpm_category` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_code` (`code`, `tenant_id`, `deleted`)
@@ -1859,7 +1846,7 @@ CREATE TABLE `bpm_process_definition_info` (
   `create_time`                    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                        varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`                    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                        bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                        bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_process_definition_id` (`process_definition_id`),
@@ -1883,7 +1870,7 @@ CREATE TABLE `bpm_process_instance_copy` (
   `create_time`             datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                 varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`             datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                 bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                 bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`),
@@ -1903,7 +1890,7 @@ CREATE TABLE `bpm_process_listener` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程监听器表';
@@ -1918,7 +1905,7 @@ CREATE TABLE `bpm_process_expression` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='流程表达式表';
@@ -1934,7 +1921,7 @@ CREATE TABLE `bpm_user_group` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='审批用户组表';
@@ -1957,7 +1944,7 @@ CREATE TABLE `bpm_oa_leave` (
   `create_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`)
@@ -1987,7 +1974,7 @@ CREATE TABLE `product_category` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_parent_id` (`parent_id`)
@@ -2005,7 +1992,7 @@ CREATE TABLE `product_brand` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商品品牌表';
@@ -2022,7 +2009,7 @@ CREATE TABLE `product_property` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商品属性项表，如颜色、尺码';
@@ -2037,7 +2024,7 @@ CREATE TABLE `product_property_value` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_property_id` (`property_id`)
@@ -2075,7 +2062,7 @@ CREATE TABLE `product_spu` (
   `create_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_category_id` (`category_id`),
@@ -2102,7 +2089,7 @@ CREATE TABLE `product_sku` (
   `create_time`              datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                  varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`              datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                  bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                  bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_spu_id` (`spu_id`)
@@ -2139,7 +2126,7 @@ CREATE TABLE `product_comment` (
   `create_time`          datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`              varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`          datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`              bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`              bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_spu_id` (`spu_id`),
@@ -2155,7 +2142,7 @@ CREATE TABLE `product_favorite` (
   `create_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_user_spu` (`user_id`, `spu_id`, `deleted`)
@@ -2171,7 +2158,7 @@ CREATE TABLE `product_browse_history` (
   `create_time`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_create_time` (`user_id`, `create_time`)
@@ -2209,7 +2196,7 @@ CREATE TABLE `trade_config` (
   `create_time`                      datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                          varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`                      datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                          bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                          bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='交易中心配置表，每个租户一条';
@@ -2229,7 +2216,7 @@ CREATE TABLE `trade_cart` (
   `create_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_user_sku` (`user_id`, `sku_id`, `deleted`)
@@ -2297,7 +2284,7 @@ CREATE TABLE `trade_order` (
   `create_time`                   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`                   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_no` (`no`),
@@ -2335,7 +2322,7 @@ CREATE TABLE `trade_order_item` (
   `create_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_order_id` (`order_id`),
@@ -2356,7 +2343,7 @@ CREATE TABLE `trade_order_log` (
   `create_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`         varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`         bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`         bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_order_id` (`order_id`)
@@ -2400,7 +2387,7 @@ CREATE TABLE `trade_after_sale` (
   `create_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_no` (`no`),
@@ -2422,7 +2409,7 @@ CREATE TABLE `trade_after_sale_log` (
   `create_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`         varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`         bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`         bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_after_sale_id` (`after_sale_id`)
@@ -2443,7 +2430,7 @@ CREATE TABLE `trade_delivery_express` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='快递公司表';
@@ -2458,7 +2445,7 @@ CREATE TABLE `trade_delivery_express_template` (
   `create_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`   datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='运费模板表';
@@ -2477,7 +2464,7 @@ CREATE TABLE `trade_delivery_express_template_charge` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_template_id` (`template_id`)
@@ -2494,7 +2481,7 @@ CREATE TABLE `trade_delivery_express_template_free` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_template_id` (`template_id`)
@@ -2520,7 +2507,7 @@ CREATE TABLE `trade_delivery_pick_up_store` (
   `create_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='自提门店表';
@@ -2541,7 +2528,7 @@ CREATE TABLE `trade_brokerage_user` (
   `create_time`         datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`         datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_bind_user_id` (`bind_user_id`)
@@ -2566,7 +2553,7 @@ CREATE TABLE `trade_brokerage_record` (
   `create_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_user_biz` (`user_id`, `biz_type`, `biz_id`, `deleted`),
@@ -2598,7 +2585,7 @@ CREATE TABLE `trade_brokerage_withdraw` (
   `create_time`             datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                 varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`             datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                 bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                 bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`)
@@ -2629,7 +2616,7 @@ CREATE TABLE `promotion_banner` (
   `create_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='首页轮播图表';
@@ -2645,7 +2632,7 @@ CREATE TABLE `promotion_article_category` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文章分类表';
@@ -2669,7 +2656,7 @@ CREATE TABLE `promotion_article` (
   `create_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_category_id` (`category_id`)
@@ -2705,7 +2692,7 @@ CREATE TABLE `promotion_coupon_template` (
   `create_time`            datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`            datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='优惠劵模板表';
@@ -2733,7 +2720,7 @@ CREATE TABLE `promotion_coupon` (
   `create_time`            datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`            datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_status` (`user_id`, `status`),
@@ -2760,7 +2747,7 @@ CREATE TABLE `promotion_reward_activity` (
   `create_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='满减送活动表';
@@ -2777,7 +2764,7 @@ CREATE TABLE `promotion_discount_activity` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='限时折扣活动表';
@@ -2799,7 +2786,7 @@ CREATE TABLE `promotion_discount_product` (
   `create_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_activity_id` (`activity_id`),
@@ -2821,7 +2808,7 @@ CREATE TABLE `promotion_seckill_config` (
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='秒杀时段配置表';
@@ -2845,7 +2832,7 @@ CREATE TABLE `promotion_seckill_activity` (
   `create_time`          datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`              varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`          datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`              bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`              bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_spu_id` (`spu_id`)
@@ -2867,7 +2854,7 @@ CREATE TABLE `promotion_seckill_product` (
   `create_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_activity_id` (`activity_id`),
@@ -2901,7 +2888,7 @@ CREATE TABLE `promotion_bargain_activity` (
   `create_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='砍价活动表';
@@ -2922,7 +2909,7 @@ CREATE TABLE `promotion_bargain_record` (
   `create_time`           datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`           datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_activity_user` (`activity_id`, `user_id`)
@@ -2939,7 +2926,7 @@ CREATE TABLE `promotion_bargain_help` (
   `create_time`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_record_user` (`record_id`, `user_id`, `deleted`)
@@ -2966,7 +2953,7 @@ CREATE TABLE `promotion_combination_activity` (
   `create_time`          datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`              varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`          datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`              bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`              bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='拼团活动表';
@@ -2985,7 +2972,7 @@ CREATE TABLE `promotion_combination_product` (
   `create_time`           datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`               varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`           datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`               bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`               bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_activity_sku` (`activity_id`, `sku_id`, `deleted`)
@@ -3017,7 +3004,7 @@ CREATE TABLE `promotion_combination_record` (
   `create_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`         datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_head_id` (`head_id`),
@@ -3041,7 +3028,7 @@ CREATE TABLE `promotion_point_activity` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='积分商城活动表';
@@ -3061,7 +3048,7 @@ CREATE TABLE `promotion_point_product` (
   `create_time`       datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`       datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_activity_sku` (`activity_id`, `sku_id`, `deleted`)
@@ -3083,7 +3070,7 @@ CREATE TABLE `promotion_diy_template` (
   `create_time`        datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`        datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='装修模板表';
@@ -3100,7 +3087,7 @@ CREATE TABLE `promotion_diy_page` (
   `create_time`        datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`        datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_template_id` (`template_id`)
@@ -3121,7 +3108,7 @@ CREATE TABLE `promotion_kefu_conversation` (
   `create_time`                  datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                      varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`                  datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                      bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                      bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_user_id` (`user_id`, `tenant_id`, `deleted`)
@@ -3142,7 +3129,7 @@ CREATE TABLE `promotion_kefu_message` (
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_conversation_id` (`conversation_id`)
@@ -3170,7 +3157,7 @@ CREATE TABLE `ai_api_key` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='AI API 密钥表';
@@ -3192,7 +3179,7 @@ CREATE TABLE `ai_model` (
   `create_time`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64) DEFAULT '' COMMENT '更新者',
   `update_time`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)      NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint      NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_key_id` (`key_id`)
@@ -3216,7 +3203,7 @@ CREATE TABLE `ai_chat_role` (
   `create_time`      datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`          varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`      datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`          bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`          bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='AI 聊天角色表';
@@ -3242,7 +3229,7 @@ CREATE TABLE `ai_chat_conversation` (
   `create_time`      datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`          varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`      datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`          bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`          bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`)
@@ -3265,7 +3252,7 @@ CREATE TABLE `ai_chat_message` (
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_conversation_id` (`conversation_id`)
@@ -3296,7 +3283,7 @@ CREATE TABLE `ai_image` (
   `create_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`         varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`         bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`         bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`)
@@ -3326,7 +3313,7 @@ CREATE TABLE `ai_music` (
   `create_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`         varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`         bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`         bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`)
@@ -3352,7 +3339,7 @@ CREATE TABLE `ai_write` (
   `create_time`         datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`         datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`)
@@ -3372,7 +3359,7 @@ CREATE TABLE `ai_mind_map` (
   `create_time`         datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`             varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`         datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`             bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`             bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_user_id` (`user_id`)
@@ -3395,7 +3382,7 @@ CREATE TABLE `ai_knowledge` (
   `create_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='AI 知识库表';
@@ -3416,7 +3403,7 @@ CREATE TABLE `ai_knowledge_document` (
   `create_time`          datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`              varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`          datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`              bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`              bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_knowledge_id` (`knowledge_id`)
@@ -3437,7 +3424,7 @@ CREATE TABLE `ai_knowledge_segment` (
   `create_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_document_id` (`document_id`),
@@ -3452,7 +3439,7 @@ CREATE TABLE `ai_knowledge_segment` (
 USE `ccloud`;
 
 INSERT INTO `system_tenant_package` (`id`, `name`, `status`, `remark`, `menu_ids`) VALUES
-  (1, '普通套餐', 0, '新建租户的默认套餐，不含租户管理与开发工具类菜单', '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,110,111,112,113,114,115,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,144,145,146,147,148,149,150,151,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,335,336,337,338,339,340,341,342,343,344,345,346,347,348,349,350,351,352,353,354,355,356,357,358,359,360,361,362,363,364,365,366,367,368,369,370,371,372,373,374,375,376,377,378,379,380,381,382,383,384,385,386,387,388,389,390,391,392,393,394,395,396,397,398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417,418,419,420,421,422,423,424,425,426,427,428,429,430,431,432,433,434,435,436,437,438,439,440,441,442,443,444,445,446,447,448,449,450,451,452,453,454,455,456,457,458,459,460,461,462,463,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492]');
+  (1, '普通套餐', 0, '新建租户的默认套餐，不含租户管理、开发工具类菜单，以及参数配置、文件配置、消息死信等全局 / 跨租户管理菜单', '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,110,111,112,113,114,115,121,122,123,124,125,144,145,146,147,148,149,150,151,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,335,336,337,338,339,340,341,342,343,344,345,346,347,348,349,350,351,352,353,354,355,356,357,358,359,360,361,362,363,364,365,366,367,368,369,370,371,372,373,374,375,376,377,378,379,380,381,382,383,384,385,386,387,388,389,390,391,392,393,394,395,396,397,398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417,418,419,420,421,422,423,424,425,426,427,428,429,430,431,432,433,434,435,436,437,438,439,440,441,442,443,444,445,446,447,448,449,450,451,452,453,454,455,456,457,458,459,460,461,462,463,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492]');
 
 INSERT INTO `system_tenant` (`id`, `name`, `contact_user_id`, `contact_name`, `contact_mobile`, `status`, `website`, `package_id`, `expire_time`, `account_count`, `creator`) VALUES
   (1, 'ccloud 总部', 1, '超级管理员', '13800000000', 0, 'localhost', 0, '2099-12-31 23:59:59', 9999, '1');
@@ -3480,14 +3467,14 @@ INSERT INTO `system_user_post` (`id`, `user_id`, `post_id`, `tenant_id`, `creato
   (1, 1, 1, 1, '1'),
   (2, 2, 2, 1, '1');
 
-INSERT INTO `member_user` (`id`, `mobile`, `password`, `status`, `register_ip`, `register_terminal`, `nickname`, `avatar`, `sex`, `point`, `experience`, `tenant_id`, `creator`) VALUES
-  (1, '13800138000', '$2a$04$M0ie1r3Ux77ugXGaO9gfXe4SSHx6RARZ.QhcWXDUb9ErN8o5.sefi', 0, '127.0.0.1', 31, '演示会员', '', 0, 100, 0, 1, '1');
+INSERT INTO `member_user` (`id`, `mobile`, `password`, `status`, `register_ip`, `register_terminal`, `nickname`, `avatar`, `sex`, `point`, `experience`, `level_id`, `tenant_id`, `creator`) VALUES
+  (1, '13800138000', '$2a$04$M0ie1r3Ux77ugXGaO9gfXe4SSHx6RARZ.QhcWXDUb9ErN8o5.sefi', 0, '127.0.0.1', 31, '演示会员', '', 0, 100, 0, 1, 1, '1');
 
 
 -- >>>>>>>>>> dml/02-menu.sql <<<<<<<<<<
 -- ----------------------------------------------------------------------------
 -- 初始化数据：菜单
--- 共 492 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
+-- 共 485 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -3630,13 +3617,6 @@ INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_i
   (134, '参数配置修改', 'infra:config:update', 3, 3, 131, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (135, '参数配置删除', 'infra:config:delete', 3, 4, 131, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (136, '参数配置导出', 'infra:config:export', 3, 5, 131, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (137, '定时任务', '', 2, 3, 121, 'job', 'fa-solid:tasks', 'infra/job/index', 'Job', 0, b'1', b'1', b'1', '1'),
-  (138, '定时任务查询', 'infra:job:query', 3, 1, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (139, '定时任务新增', 'infra:job:create', 3, 2, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (140, '定时任务修改', 'infra:job:update', 3, 3, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (141, '定时任务删除', 'infra:job:delete', 3, 4, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (142, '定时任务导出', 'infra:job:export', 3, 5, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (143, '定时任务触发执行', 'infra:job:trigger', 3, 6, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (144, 'API 日志', '', 1, 4, 121, 'log', 'fa:tasks', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (145, '访问日志', '', 2, 1, 144, 'api-access-log', '#', 'infra/apiAccessLog/index', 'Api-Access-Log', 0, b'1', b'1', b'1', '1'),
   (146, '访问日志查询', 'infra:api-access-log:query', 3, 1, 145, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
@@ -4146,13 +4126,6 @@ INSERT INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `tenant_id`, `creato
   (134, 1, 134, 1, '1'),
   (135, 1, 135, 1, '1'),
   (136, 1, 136, 1, '1'),
-  (137, 1, 137, 1, '1'),
-  (138, 1, 138, 1, '1'),
-  (139, 1, 139, 1, '1'),
-  (140, 1, 140, 1, '1'),
-  (141, 1, 141, 1, '1'),
-  (142, 1, 142, 1, '1'),
-  (143, 1, 143, 1, '1'),
   (144, 1, 144, 1, '1'),
   (145, 1, 145, 1, '1'),
   (146, 1, 146, 1, '1'),
@@ -4575,9 +4548,6 @@ INSERT INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `tenant_id`, `creato
   (559, 2, 131, 1, '1'),
   (560, 2, 132, 1, '1'),
   (561, 2, 136, 1, '1'),
-  (562, 2, 137, 1, '1'),
-  (563, 2, 138, 1, '1'),
-  (564, 2, 142, 1, '1'),
   (565, 2, 144, 1, '1'),
   (566, 2, 145, 1, '1'),
   (567, 2, 146, 1, '1'),
@@ -4789,7 +4759,6 @@ INSERT INTO `system_dict_type` (`id`, `name`, `type`, `status`, `remark`, `creat
   (17, '社交类型', 'system_social_type', 0, NULL, '1'),
   (18, 'OAuth2 授权类型', 'system_oauth2_grant_type', 0, NULL, '1'),
   (19, '是否', 'infra_boolean_string', 0, NULL, '1'),
-  (20, '任务状态', 'infra_job_status', 0, NULL, '1'),
   (21, '文件存储器', 'infra_file_storage', 0, NULL, '1'),
   (22, '参数类型', 'infra_config_type', 0, NULL, '1'),
   (23, '代码生成模板类型', 'infra_codegen_template_type', 0, NULL, '1'),
@@ -4892,20 +4861,13 @@ INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `st
   (71, 6, '社交登录', 'social', 'system_oauth2_grant_type', 0, '', '', NULL, '1'),
   (72, 1, '是', 'true', 'infra_boolean_string', 0, 'danger', '', NULL, '1'),
   (73, 2, '否', 'false', 'infra_boolean_string', 0, 'info', '', NULL, '1'),
-  (74, 1, '初始化', '0', 'infra_job_status', 0, 'info', '', NULL, '1'),
-  (75, 2, '开启', '1', 'infra_job_status', 0, 'success', '', NULL, '1'),
-  (76, 3, '暂停', '2', 'infra_job_status', 0, 'danger', '', NULL, '1'),
   (77, 1, '数据库', '1', 'infra_file_storage', 0, '', '', NULL, '1'),
   (78, 2, '本地磁盘', '10', 'infra_file_storage', 0, '', '', NULL, '1'),
-  (79, 3, 'FTP', '11', 'infra_file_storage', 0, '', '', NULL, '1'),
-  (80, 4, 'SFTP', '12', 'infra_file_storage', 0, '', '', NULL, '1'),
   (81, 5, 'S3 兼容存储', '20', 'infra_file_storage', 0, '', '', NULL, '1'),
   (82, 1, '系统内置', '1', 'infra_config_type', 0, 'danger', '', NULL, '1'),
   (83, 2, '自定义', '2', 'infra_config_type', 0, 'primary', '', NULL, '1'),
   (84, 1, '单表', '1', 'infra_codegen_template_type', 0, '', '', NULL, '1'),
   (85, 2, '树表', '2', 'infra_codegen_template_type', 0, '', '', NULL, '1'),
-  (86, 3, '主子表-主表', '10', 'infra_codegen_template_type', 0, '', '', NULL, '1'),
-  (87, 4, '主子表-子表', '11', 'infra_codegen_template_type', 0, '', '', NULL, '1'),
   (88, 1, '未处理', '0', 'infra_api_error_log_process_status', 0, 'warning', '', NULL, '1'),
   (89, 2, '已处理', '1', 'infra_api_error_log_process_status', 0, 'success', '', NULL, '1'),
   (90, 3, '已忽略', '2', 'infra_api_error_log_process_status', 0, 'danger', '', NULL, '1'),
@@ -5029,7 +4991,7 @@ INSERT INTO `system_oauth2_client` (`id`, `client_id`, `secret`, `name`, `logo`,
 -- >>>>>>>>>> dml/06-i18n.sql <<<<<<<<<<
 -- ----------------------------------------------------------------------------
 -- 初始化数据：国际化文案
--- 错误码文案，key 为 error.code.{错误码}。全局 13 条、system 模块 105 条，zh_CN 与 en_US 各一份
+-- 错误码文案，key 为 error.code.{错误码}。全局 13 条、system 模块 105 条、member 模块 29 条、infra 模块 38 条，zh_CN 与 en_US 各一份
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -5303,7 +5265,117 @@ INSERT INTO `system_i18n_message` (`id`, `locale`, `code`, `content`, `source`, 
   (263, 'zh_CN', 'error.code.1004003008', '该社交账号未绑定用户，请先用手机号登录后绑定', 1, '1'),
   (264, 'en_US', 'error.code.1004003008', 'The social account is not bound, please log in with your mobile number and bind it first', 1, '1'),
   (265, 'zh_CN', 'error.code.1004003009', '登录失败次数过多，账号已锁定，请 {} 分钟后再试', 1, '1'),
-  (266, 'en_US', 'error.code.1004003009', 'Too many failed login attempts, the account is locked, please try again in {} minutes', 1, '1');
+  (266, 'en_US', 'error.code.1004003009', 'Too many failed login attempts, the account is locked, please try again in {} minutes', 1, '1'),
+  (267, 'zh_CN', 'error.code.1004004001', '收件地址最多 {} 个', 1, '1'),
+  (268, 'en_US', 'error.code.1004004001', 'At most {} shipping addresses are allowed', 1, '1'),
+  (269, 'zh_CN', 'error.code.1004006000', '用户标签不存在', 1, '1'),
+  (270, 'en_US', 'error.code.1004006000', 'The member tag does not exist', 1, '1'),
+  (271, 'zh_CN', 'error.code.1004006001', '用户标签已经存在', 1, '1'),
+  (272, 'en_US', 'error.code.1004006001', 'The member tag already exists', 1, '1'),
+  (273, 'zh_CN', 'error.code.1004006002', '用户标签下存在用户，无法删除', 1, '1'),
+  (274, 'en_US', 'error.code.1004006002', 'The member tag is in use and cannot be deleted', 1, '1'),
+  (275, 'zh_CN', 'error.code.1004008000', '积分业务类型与操作不符', 1, '1'),
+  (276, 'en_US', 'error.code.1004008000', 'The point business type does not match the operation', 1, '1'),
+  (277, 'zh_CN', 'error.code.1004009000', '签到规则不存在', 1, '1'),
+  (278, 'en_US', 'error.code.1004009000', 'The sign-in rule does not exist', 1, '1'),
+  (279, 'zh_CN', 'error.code.1004009001', '签到天数规则已存在', 1, '1'),
+  (280, 'en_US', 'error.code.1004009001', 'A sign-in rule for this day already exists', 1, '1'),
+  (281, 'zh_CN', 'error.code.1004010000', '今日已签到，请勿重复签到', 1, '1'),
+  (282, 'en_US', 'error.code.1004010000', 'Already signed in today', 1, '1'),
+  (283, 'zh_CN', 'error.code.1004011002', '用户等级值已被使用', 1, '1'),
+  (284, 'en_US', 'error.code.1004011002', 'The level value is already in use', 1, '1'),
+  (285, 'zh_CN', 'error.code.1004011003', '等级越高，升级所需经验必须越多', 1, '1'),
+  (286, 'en_US', 'error.code.1004011003', 'A higher level must require more experience', 1, '1'),
+  (287, 'zh_CN', 'error.code.1004011004', '用户等级下存在用户，无法删除', 1, '1'),
+  (288, 'en_US', 'error.code.1004011004', 'The member level is in use and cannot be deleted', 1, '1'),
+  (289, 'zh_CN', 'error.code.1004011005', '用户等级已停用', 1, '1'),
+  (290, 'en_US', 'error.code.1004011005', 'The member level is disabled', 1, '1'),
+  (291, 'zh_CN', 'error.code.1004012000', '用户分组不存在', 1, '1'),
+  (292, 'en_US', 'error.code.1004012000', 'The member group does not exist', 1, '1'),
+  (293, 'zh_CN', 'error.code.1004012001', '用户分组已经存在', 1, '1'),
+  (294, 'en_US', 'error.code.1004012001', 'The member group already exists', 1, '1'),
+  (295, 'zh_CN', 'error.code.1004012002', '用户分组下存在用户，无法删除', 1, '1'),
+  (296, 'en_US', 'error.code.1004012002', 'The member group is in use and cannot be deleted', 1, '1'),
+  (297, 'zh_CN', 'error.code.1004012003', '用户分组已停用', 1, '1'),
+  (298, 'en_US', 'error.code.1004012003', 'The member group is disabled', 1, '1'),
+  (299, 'zh_CN', 'error.code.1004013000', '经验业务类型与操作不符', 1, '1'),
+  (300, 'en_US', 'error.code.1004013000', 'The experience business type does not match the operation', 1, '1'),
+  (301, 'zh_CN', 'error.code.1002000001', '参数配置不存在', 1, '1'),
+  (302, 'en_US', 'error.code.1002000001', 'The config does not exist', 1, '1'),
+  (303, 'zh_CN', 'error.code.1002000002', '参数配置 key 重复', 1, '1'),
+  (304, 'en_US', 'error.code.1002000002', 'The config key already exists', 1, '1'),
+  (305, 'zh_CN', 'error.code.1002000003', '不能删除类型为系统内置的参数配置', 1, '1'),
+  (306, 'en_US', 'error.code.1002000003', 'Built-in configs cannot be deleted', 1, '1'),
+  (307, 'zh_CN', 'error.code.1002000004', '获取参数配置失败，原因：不允许获取不可见配置', 1, '1'),
+  (308, 'en_US', 'error.code.1002000004', 'Failed to get the config: invisible configs cannot be read', 1, '1'),
+  (309, 'zh_CN', 'error.code.1002000005', '不能修改系统内置参数的键名', 1, '1'),
+  (310, 'en_US', 'error.code.1002000005', 'The key of a built-in config cannot be changed', 1, '1'),
+  (311, 'zh_CN', 'error.code.1002002000', 'API 错误日志不存在', 1, '1'),
+  (312, 'en_US', 'error.code.1002002000', 'The API error log does not exist', 1, '1'),
+  (313, 'zh_CN', 'error.code.1002002001', 'API 错误日志已处理', 1, '1'),
+  (314, 'en_US', 'error.code.1002002001', 'The API error log has already been processed', 1, '1'),
+  (315, 'zh_CN', 'error.code.1002002002', '处理状态只能是已处理或已忽略', 1, '1'),
+  (316, 'en_US', 'error.code.1002002002', 'The process status must be processed or ignored', 1, '1'),
+  (317, 'zh_CN', 'error.code.1002003000', '数据源配置不存在', 1, '1'),
+  (318, 'en_US', 'error.code.1002003000', 'The data source config does not exist', 1, '1'),
+  (319, 'zh_CN', 'error.code.1002003001', '数据源配置不正确，无法进行连接', 1, '1'),
+  (320, 'en_US', 'error.code.1002003001', 'Cannot connect with the data source config', 1, '1'),
+  (321, 'zh_CN', 'error.code.1002003002', '主数据源取自应用配置，不能修改或删除', 1, '1'),
+  (322, 'en_US', 'error.code.1002003002', 'The master data source comes from the application config and cannot be changed', 1, '1'),
+  (323, 'zh_CN', 'error.code.1002003003', '数据源下存在已导入的代码生成表，无法删除', 1, '1'),
+  (324, 'en_US', 'error.code.1002003003', 'The data source has imported codegen tables and cannot be deleted', 1, '1'),
+  (325, 'zh_CN', 'error.code.1002004000', '表定义已经存在', 1, '1'),
+  (326, 'en_US', 'error.code.1002004000', 'The table definition already exists', 1, '1'),
+  (327, 'zh_CN', 'error.code.1002004001', '导入的表不存在', 1, '1'),
+  (328, 'en_US', 'error.code.1002004001', 'The table to import does not exist', 1, '1'),
+  (329, 'zh_CN', 'error.code.1002004004', '表定义不存在', 1, '1'),
+  (330, 'en_US', 'error.code.1002004004', 'The table definition does not exist', 1, '1'),
+  (331, 'zh_CN', 'error.code.1002004005', '字段定义不存在', 1, '1'),
+  (332, 'en_US', 'error.code.1002004005', 'The column definition does not exist', 1, '1'),
+  (333, 'zh_CN', 'error.code.1002004007', '同步失败，表结构没有变化', 1, '1'),
+  (334, 'en_US', 'error.code.1002004007', 'Sync failed: the table structure has not changed', 1, '1'),
+  (335, 'zh_CN', 'error.code.1002004008', '数据库的表注释未填写', 1, '1'),
+  (336, 'en_US', 'error.code.1002004008', 'The table comment is missing in the database', 1, '1'),
+  (337, 'zh_CN', 'error.code.1002004009', '数据库的表字段({})注释未填写', 1, '1'),
+  (338, 'en_US', 'error.code.1002004009', 'The comment of column ({}) is missing in the database', 1, '1'),
+  (339, 'zh_CN', 'error.code.1002004010', '字段({})的类型 {} 不支持代码生成', 1, '1'),
+  (340, 'en_US', 'error.code.1002004010', 'Column ({}) of type {} is not supported by codegen', 1, '1'),
+  (341, 'zh_CN', 'error.code.1002004011', '树表须指定本表中类型为 Long 的父编号字段，以及名称字段', 1, '1'),
+  (342, 'en_US', 'error.code.1002004011', 'A tree table requires a Long parent id column and a name column of the same table', 1, '1'),
+  (343, 'zh_CN', 'error.code.1002004012', '表须有且只有一个 bigint 类型的自增主键', 1, '1'),
+  (344, 'en_US', 'error.code.1002004012', 'The table must have exactly one auto-increment bigint primary key', 1, '1'),
+  (345, 'zh_CN', 'error.code.1002004013', '表名须为 模块_业务 格式，如 member_point_record', 1, '1'),
+  (346, 'en_US', 'error.code.1002004013', 'The table name must look like module_business, such as member_point_record', 1, '1'),
+  (347, 'zh_CN', 'error.code.1002005000', '死信不存在', 1, '1'),
+  (348, 'en_US', 'error.code.1002005000', 'The dead letter does not exist', 1, '1'),
+  (349, 'zh_CN', 'error.code.1002005001', '死信已处理', 1, '1'),
+  (350, 'en_US', 'error.code.1002005001', 'The dead letter has already been handled', 1, '1'),
+  (351, 'zh_CN', 'error.code.1002006000', '文件配置不存在', 1, '1'),
+  (352, 'en_US', 'error.code.1002006000', 'The file config does not exist', 1, '1'),
+  (353, 'zh_CN', 'error.code.1002006001', '该文件配置不允许删除，原因：它是主配置，删除会导致无法上传文件', 1, '1'),
+  (354, 'en_US', 'error.code.1002006001', 'The master file config cannot be deleted, otherwise files cannot be uploaded', 1, '1'),
+  (355, 'zh_CN', 'error.code.1002006002', '文件配置不正确：{}', 1, '1'),
+  (356, 'en_US', 'error.code.1002006002', 'Invalid file config: {}', 1, '1'),
+  (357, 'zh_CN', 'error.code.1002007000', '文件不存在', 1, '1'),
+  (358, 'en_US', 'error.code.1002007000', 'The file does not exist', 1, '1'),
+  (359, 'zh_CN', 'error.code.1002007001', '不支持上传该类型的文件：{}', 1, '1'),
+  (360, 'en_US', 'error.code.1002007001', 'File type not allowed: {}', 1, '1'),
+  (361, 'zh_CN', 'error.code.1002007002', '文件大小超过上限 {}', 1, '1'),
+  (362, 'en_US', 'error.code.1002007002', 'The file exceeds the size limit {}', 1, '1'),
+  (363, 'zh_CN', 'error.code.1002007003', '文件路径不合法', 1, '1'),
+  (364, 'en_US', 'error.code.1002007003', 'Invalid file path', 1, '1'),
+  (365, 'zh_CN', 'error.code.1002007004', '文件内容为空', 1, '1'),
+  (366, 'en_US', 'error.code.1002007004', 'The file is empty', 1, '1'),
+  (367, 'zh_CN', 'error.code.1002007005', '文件存储失败：{}', 1, '1'),
+  (368, 'en_US', 'error.code.1002007005', 'Failed to store the file: {}', 1, '1'),
+  (369, 'zh_CN', 'error.code.1002004014', '代码生成配置不合法：{}', 1, '1'),
+  (370, 'en_US', 'error.code.1002004014', 'Invalid codegen configuration: {}', 1, '1'),
+  (371, 'zh_CN', 'error.code.1002008000', '参数配置、文件配置与消息死信为全部租户共用，只有系统租户可以维护', 1, '1'),
+  (372, 'en_US', 'error.code.1002008000', 'Configs, file configs and dead letters are shared by all tenants and can only be maintained by the system tenant', 1, '1'),
+  (373, 'zh_CN', 'error.code.1002006003', '本地磁盘存储的根目录须位于 {} 之内', 1, '1'),
+  (374, 'en_US', 'error.code.1002006003', 'The base path of local disk storage must be inside {}', 1, '1'),
+  (375, 'zh_CN', 'error.code.1002005002', '死信的消息体为空，无法重新投递', 1, '1'),
+  (376, 'en_US', 'error.code.1002005002', 'The dead letter has no payload and cannot be resent', 1, '1');
 
 
 -- >>>>>>>>>> dml/07-demo.sql <<<<<<<<<<
@@ -5331,13 +5403,11 @@ INSERT INTO `system_notice` (`id`, `title`, `content`, `type`, `status`, `tenant
   (1, '欢迎使用 ccloud', '<p>ccloud 微服务平台已就绪。</p>', 2, 0, 1, '1');
 
 INSERT INTO `infra_file_config` (`id`, `name`, `storage`, `remark`, `master`, `config`, `creator`) VALUES
-  (1, '数据库存储', 1, '默认主配置，开箱即用；生产环境建议切换为 S3 兼容存储', b'1', '{"domain":"http://127.0.0.1:48080"}', '1');
+  (1, '数据库存储', 1, '默认主配置，开箱即用；生产环境建议切换为 S3 兼容存储', b'1', '{"domain":"http://127.0.0.1:28080"}', '1');
 
 INSERT INTO `infra_config` (`id`, `category`, `type`, `name`, `config_key`, `value`, `visible`, `remark`, `creator`) VALUES
-  (1, 'biz', 1, '用户管理-账号初始密码', 'system.user.init-password', '123456', b'0', '新建用户未指定密码时使用', '1'),
-  (2, 'biz', 1, '登录-是否开启图形验证码', 'system.captcha.enable', 'false', b'1', '本地开发默认关闭', '1'),
-  (3, 'biz', 1, '登录-连续失败锁定次数', 'system.login.max-fail-count', '5', b'1', NULL, '1'),
-  (4, 'biz', 1, '登录-锁定时长（分钟）', 'system.login.lock-minutes', '10', b'1', NULL, '1');
+  (1, 'biz', 1, '用户管理-账号初始密码', 'system.user.init-password', '123456', b'0', '导入用户时使用，不返回给前端', '1'),
+  (2, 'biz', 1, '管理后台-是否开放注册', 'system.auth.register-enabled', 'false', b'1', 'true 时登录页可自助注册管理员账号', '1');
 
 INSERT INTO `member_level` (`id`, `name`, `level`, `experience`, `discount_percent`, `icon`, `background_url`, `status`, `tenant_id`, `creator`) VALUES
   (1, '青铜会员', 1, 0, 100, '', '', 0, 1, '1'),
@@ -5367,8 +5437,8 @@ INSERT INTO `trade_delivery_express` (`id`, `code`, `name`, `logo`, `sort`, `sta
   (4, 'JD', '京东快递', '', 4, 0, 1, '1');
 
 INSERT INTO `pay_app` (`id`, `app_key`, `name`, `status`, `remark`, `order_notify_url`, `refund_notify_url`, `transfer_notify_url`, `tenant_id`, `creator`) VALUES
-  (1, 'mall', '商城', 0, '商城下单支付使用', 'http://127.0.0.1:48080/rpc-api/trade/order/update-paid', 'http://127.0.0.1:48080/rpc-api/trade/after-sale/update-refunded', 'http://127.0.0.1:48080/rpc-api/trade/brokerage/update-transferred', 1, '1'),
-  (2, 'wallet', '钱包充值', 0, '钱包充值使用', 'http://127.0.0.1:48080/rpc-api/pay/wallet/recharge/update-paid', 'http://127.0.0.1:48080/rpc-api/pay/wallet/recharge/update-refunded', NULL, 1, '1');
+  (1, 'mall', '商城', 0, '商城下单支付使用', 'http://127.0.0.1:28080/rpc-api/trade/order/update-paid', 'http://127.0.0.1:28080/rpc-api/trade/after-sale/update-refunded', 'http://127.0.0.1:28080/rpc-api/trade/brokerage/update-transferred', 1, '1'),
+  (2, 'wallet', '钱包充值', 0, '钱包充值使用', 'http://127.0.0.1:28080/rpc-api/pay/wallet/recharge/update-paid', 'http://127.0.0.1:28080/rpc-api/pay/wallet/recharge/update-refunded', NULL, 1, '1');
 
 INSERT INTO `pay_channel` (`id`, `code`, `status`, `remark`, `fee_rate`, `app_id`, `config`, `tenant_id`, `creator`) VALUES
   (1, 'mock', 0, '模拟支付：本地调试时直接支付成功', 0, 1, '{}', 1, '1'),

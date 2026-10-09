@@ -1,0 +1,29 @@
+package ${voPackage};
+
+import cn.idev.excel.annotation.ExcelIgnoreUnannotated;
+import cn.idev.excel.annotation.ExcelProperty;
+import com.ccloud.framework.excel.core.annotations.DictFormat;
+import com.ccloud.framework.excel.core.convert.DictConvert;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+#foreach ($import in $javaTypeImports)
+import ${import};
+#end
+
+@Schema(description = "${sceneLabel} - ${classComment} Response VO")
+@Data
+@ExcelIgnoreUnannotated
+public class ${respVO} {
+
+#foreach ($column in $resultColumns)
+    @Schema(description = "${column.comment}"#if (!$column.nullable), requiredMode = Schema.RequiredMode.REQUIRED#end#if ($column.example), example = "${column.example}"#end)
+#if ($column.dictType)
+    @ExcelProperty(value = "${column.label}", converter = DictConvert.class)
+    @DictFormat("${column.dictType}")
+#else
+    @ExcelProperty("${column.label}")
+#end
+    private ${column.javaType} ${column.javaField};
+
+#end
+}

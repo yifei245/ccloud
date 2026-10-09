@@ -12,7 +12,7 @@
     <artifactId>ccloud-monitor</artifactId>
     <packaging>jar</packaging>
     <name>${project.artifactId}</name>
-    <description>服务健康面板（Spring Boot Admin Server），端口 48182，从 Nacos 发现全部 ccloud 服务</description>
+    <description>服务健康面板（Spring Boot Admin Server），端口 28182，从 Nacos 发现全部 ccloud 服务</description>
 
     <dependencies>
         <dependency>

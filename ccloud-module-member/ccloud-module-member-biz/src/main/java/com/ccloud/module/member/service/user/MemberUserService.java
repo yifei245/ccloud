@@ -1,5 +1,8 @@
 package com.ccloud.module.member.service.user;
 
+import com.ccloud.framework.common.pojo.PageResult;
+import com.ccloud.module.member.controller.admin.user.vo.MemberUserPageReqVO;
+import com.ccloud.module.member.controller.admin.user.vo.MemberUserUpdateReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateMobileReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateReqVO;
 import com.ccloud.module.member.dal.dataobject.user.MemberUserDO;
@@ -33,6 +36,14 @@ public interface MemberUserService {
     void updateUser(Long id, AppMemberUserUpdateReqVO reqVO);
 
     /**
+     * 上传头像：文件交给 infra 存储，成功后更新头像地址
+     *
+     * @return 头像访问地址
+     * @throws com.ccloud.framework.common.exception.ServiceException 用户不存在，或文件被 infra 拒绝（类型、大小）
+     */
+    String updateUserAvatar(Long id, String name, byte[] content);
+
+    /**
      * 修改手机号：新旧手机号的验证码都要通过
      */
     void updateUserMobile(Long id, AppMemberUserUpdateMobileReqVO reqVO, String userIp);
@@ -42,4 +53,18 @@ public interface MemberUserService {
      * @throws com.ccloud.framework.common.exception.ServiceException 用户不存在时抛 USER_NOT_EXISTS
      */
     MemberUserDO validateUserExists(Long id);
+
+    // ========== 管理端 ==========
+
+    PageResult<MemberUserDO> getUserPage(MemberUserPageReqVO reqVO);
+
+    /**
+     * 管理员修改会员资料、标签与分组。改为关闭状态时作废该会员的全部令牌
+     */
+    void updateUserByAdmin(MemberUserUpdateReqVO reqVO);
+
+    /**
+     * 删除会员并作废其全部令牌
+     */
+    void deleteUser(Long id);
 }

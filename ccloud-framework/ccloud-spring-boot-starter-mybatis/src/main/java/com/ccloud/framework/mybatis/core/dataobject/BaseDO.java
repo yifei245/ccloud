@@ -32,9 +32,13 @@ public abstract class BaseDO implements Serializable {
     private String updater;
 
     /**
-     * 逻辑删除标记。不对外暴露，避免前端误用。
+     * 逻辑删除标记：0 表示未删除，删除时写入记录自身的编号。不对外暴露，避免前端误用。
+     *
+     * <p>各表的唯一索引都带 deleted 列（如 (username, tenant_id, deleted)）。若删除时统一写 1，
+     * 同一个值第二次被删除就会与第一次删除的记录冲突；写入各自的编号后，已删除的记录互不冲突，
+     * 未删除的记录 deleted 都为 0，仍受唯一约束。delval 按原样拼入 SQL（数值字段不加引号），即 SET deleted = id
      */
-    @TableLogic
+    @TableLogic(value = "0", delval = "id")
     @JsonIgnore
-    private Boolean deleted;
+    private Long deleted;
 }

@@ -1,5 +1,6 @@
 package com.ccloud.module.system.api.tenant;
 
+import com.ccloud.module.system.dal.dataobject.tenant.TenantDO;
 import com.ccloud.module.system.service.tenant.TenantService;
 import com.ccloud.framework.common.pojo.CommonResult;
 import jakarta.annotation.Resource;
@@ -29,5 +30,11 @@ public class TenantApiImpl implements TenantApi {
     public CommonResult<Boolean> validTenant(Long id) {
         tenantService.validTenant(id);
         return success(true);
+    }
+
+    @Override
+    public CommonResult<Boolean> isSystemTenant(Long id) {
+        TenantDO tenant = tenantService.getTenant(id);
+        return success(tenant != null && tenant.isSystem());
     }
 }

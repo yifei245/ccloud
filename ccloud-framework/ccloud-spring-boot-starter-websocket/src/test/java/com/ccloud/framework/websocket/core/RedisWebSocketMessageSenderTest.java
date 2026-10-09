@@ -1,6 +1,7 @@
 package com.ccloud.framework.websocket.core;
 
 import com.ccloud.framework.security.core.LoginUser;
+import com.ccloud.framework.test.core.ut.LocalRedis;
 import com.ccloud.framework.websocket.core.sender.RedisWebSocketMessageSender;
 import com.ccloud.framework.websocket.core.session.WebSocketSessionManagerImpl;
 import com.ccloud.framework.websocket.core.util.WebSocketFrameworkUtils;
@@ -17,7 +18,6 @@ import org.springframework.web.socket.WebSocketMessage;
 import org.mockito.ArgumentMatcher;
 import com.ccloud.framework.common.util.json.JsonUtils;
 import org.springframework.web.socket.WebSocketSession;
-import org.testcontainers.containers.GenericContainer;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -34,9 +34,6 @@ import static org.mockito.Mockito.*;
  */
 class RedisWebSocketMessageSenderTest {
 
-    @SuppressWarnings("resource")
-    private static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
-
     private static LettuceConnectionFactory connectionFactory;
 
     private Node nodeA;
@@ -44,9 +41,10 @@ class RedisWebSocketMessageSenderTest {
 
     @BeforeAll
     static void startRedis() {
-        REDIS.start();
-        connectionFactory = new LettuceConnectionFactory(
-                new RedisStandaloneConfiguration(REDIS.getHost(), REDIS.getMappedPort(6379)));
+        RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration(LocalRedis.host(), LocalRedis.port());
+        configuration.setPassword(LocalRedis.password());
+        configuration.setDatabase(LocalRedis.database());
+        connectionFactory = new LettuceConnectionFactory(configuration);
         connectionFactory.afterPropertiesSet();
         connectionFactory.start();
     }

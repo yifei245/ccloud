@@ -12,7 +12,7 @@
     <artifactId>ccloud-gateway</artifactId>
     <packaging>jar</packaging>
     <name>${project.artifactId}</name>
-    <description>API 网关，端口 48080：路由、CORS、鉴权与内部身份头下发、限流、接口文档聚合</description>
+    <description>API 网关，端口 28080：路由、CORS、鉴权与内部身份头下发、限流、接口文档聚合</description>
 
     <dependencies>
         <!-- 只依赖 common：网关基于 WebFlux，不能引入任何 Servlet 系的 starter -->
@@ -71,10 +71,17 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 测试连接本机已有的 Redis（LocalRedis）。只取本 jar，排除全部传递依赖，避免把 MyBatis 等带进测试类路径 -->
         <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <groupId>com.ccloud</groupId>
+            <artifactId>ccloud-spring-boot-starter-test</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 

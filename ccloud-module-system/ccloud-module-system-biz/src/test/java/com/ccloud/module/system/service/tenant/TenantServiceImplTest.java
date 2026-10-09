@@ -16,6 +16,7 @@ import com.ccloud.module.system.dal.mysql.tenant.TenantPackageMapper;
 import com.ccloud.module.system.dal.mysql.user.AdminUserMapper;
 import com.ccloud.module.system.enums.permission.RoleCodeEnum;
 import com.ccloud.module.system.enums.permission.RoleTypeEnum;
+import com.ccloud.module.system.service.oauth2.OAuth2TokenService;
 import com.ccloud.module.system.service.permission.PermissionService;
 import com.ccloud.module.system.service.permission.PermissionServiceImpl;
 import com.ccloud.module.system.service.permission.RoleServiceImpl;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,6 +62,9 @@ class TenantServiceImplTest extends BaseSystemDbUnitTest {
     private PasswordEncoder passwordEncoder;
     @Resource
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private OAuth2TokenService oauth2TokenService;
 
     // ========== 校验 ==========
 

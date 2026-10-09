@@ -27,11 +27,7 @@
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
         </dependency>
-        <!-- 数据库单测跑在真实 MySQL 上，加载与生产相同的 DDL -->
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>mysql</artifactId>
-        </dependency>
+        <!-- 数据库单测连接本机已有的 MySQL（见 LocalMySql），加载与生产相同的 DDL -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>

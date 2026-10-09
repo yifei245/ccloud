@@ -1,11 +1,24 @@
 package com.ccloud.module.member.service.user;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
+import com.ccloud.framework.common.enums.UserTypeEnum;
+import com.ccloud.framework.common.pojo.PageResult;
+import com.ccloud.module.infra.api.file.FileApi;
+import com.ccloud.module.infra.api.file.dto.FileCreateReqDTO;
+import com.ccloud.module.member.controller.admin.user.vo.MemberUserPageReqVO;
+import com.ccloud.module.member.controller.admin.user.vo.MemberUserUpdateReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateMobileReqVO;
 import com.ccloud.module.member.controller.app.user.vo.AppMemberUserUpdateReqVO;
+import com.ccloud.module.member.dal.dataobject.level.MemberLevelDO;
 import com.ccloud.module.member.dal.dataobject.user.MemberUserDO;
 import com.ccloud.module.member.dal.mysql.user.MemberUserMapper;
+import com.ccloud.module.member.service.group.MemberGroupService;
+import com.ccloud.module.member.service.level.MemberLevelService;
+import com.ccloud.module.member.service.tag.MemberTagService;
+import com.ccloud.module.system.api.oauth2.OAuth2TokenApi;
 import com.ccloud.module.system.api.sms.SmsCodeApi;
 import com.ccloud.module.system.api.sms.dto.SmsCodeUseReqDTO;
 import com.ccloud.module.system.enums.sms.SmsSceneEnum;
@@ -35,6 +48,16 @@ public class MemberUserServiceImpl implements MemberUserService {
     private PasswordEncoder passwordEncoder;
     @Resource
     private SmsCodeApi smsCodeApi;
+    @Resource
+    private MemberLevelService levelService;
+    @Resource
+    private MemberTagService tagService;
+    @Resource
+    private MemberGroupService groupService;
+    @Resource
+    private OAuth2TokenApi oauth2TokenApi;
+    @Resource
+    private FileApi fileApi;
 
     @Override
     public MemberUserDO getUser(Long id) {
@@ -68,6 +91,9 @@ public class MemberUserServiceImpl implements MemberUserService {
                 // 昵称会展示给其他用户（评价、拼团），不能直接用手机号
                 .setNickname("用户" + StrUtil.subSuf(mobile, mobile.length() - 4))
                 .setAvatar("");
+        // 新会员按 0 经验定初始等级
+        MemberLevelDO level = levelService.calculateLevel(0);
+        user.setPoint(0).setExperience(0).setLevelId(level == null ? null : level.getId());
         try {
             memberUserMapper.insert(user);
             return user;
@@ -108,6 +134,18 @@ public class MemberUserServiceImpl implements MemberUserService {
     }
 
     @Override
+    public String updateUserAvatar(Long id, String name, byte[] content) {
+        validateUserExists(id);
+        FileCreateReqDTO reqDTO = new FileCreateReqDTO();
+        reqDTO.setName(name);
+        reqDTO.setContent(content);
+        // 文件被拒绝（类型、大小）时 getCheckedData 抛出 infra 的错误码，头像保持不变
+        String url = fileApi.createFile(reqDTO).getCheckedData();
+        memberUserMapper.updateById(new MemberUserDO().setId(id).setAvatar(url));
+        return url;
+    }
+
+    @Override
     public void updateUserMobile(Long id, AppMemberUserUpdateMobileReqVO reqVO, String userIp) {
         MemberUserDO user = validateUserExists(id);
         // 先查占用再消费验证码：否则号码已被占用时验证码白白作废，用户只能重新获取
@@ -135,5 +173,49 @@ public class MemberUserServiceImpl implements MemberUserService {
             throw exception(USER_NOT_EXISTS);
         }
         return user;
+    }
+
+    // ========== 管理端 ==========
+
+    @Override
+    public PageResult<MemberUserDO> getUserPage(MemberUserPageReqVO reqVO) {
+        return memberUserMapper.selectPage(reqVO);
+    }
+
+    @Override
+    public void updateUserByAdmin(MemberUserUpdateReqVO reqVO) {
+        validateUserExists(reqVO.getId());
+        if (CollUtil.isNotEmpty(reqVO.getTagIds())) {
+            tagService.validateTagList(reqVO.getTagIds());
+        }
+        if (reqVO.getGroupId() != null) {
+            groupService.validateGroupEnabled(reqVO.getGroupId());
+        }
+        // 标签、分组允许清空，updateById 会忽略 null 字段，用 UpdateWrapper 显式写入
+        memberUserMapper.update(null, new LambdaUpdateWrapper<MemberUserDO>()
+                .eq(MemberUserDO::getId, reqVO.getId())
+                .set(MemberUserDO::getNickname, reqVO.getNickname())
+                .set(MemberUserDO::getAvatar, StrUtil.nullToEmpty(reqVO.getAvatar()))
+                .set(MemberUserDO::getStatus, reqVO.getStatus())
+                .set(MemberUserDO::getSex, reqVO.getSex())
+                .set(MemberUserDO::getBirthday, reqVO.getBirthday())
+                .set(MemberUserDO::getMark, reqVO.getMark())
+                .set(MemberUserDO::getTagIds, CollUtil.isEmpty(reqVO.getTagIds()) ? null : CollUtil.join(reqVO.getTagIds(), ","))
+                .set(MemberUserDO::getGroupId, reqVO.getGroupId()));
+        // 禁用后已登录的会话必须下线，否则被禁用的会员在令牌到期前仍可操作
+        if (CommonStatusEnum.isDisable(reqVO.getStatus())) {
+            removeUserTokens(reqVO.getId());
+        }
+    }
+
+    @Override
+    public void deleteUser(Long id) {
+        validateUserExists(id);
+        memberUserMapper.deleteById(id);
+        removeUserTokens(id);
+    }
+
+    private void removeUserTokens(Long id) {
+        oauth2TokenApi.removeAccessTokensByUser(id, UserTypeEnum.MEMBER.getValue()).checkError();
     }
 }

@@ -1,0 +1,128 @@
+package ${basePackage}.${module}.service.${business};
+
+import ${voPackage}.${queryReqVO};
+import ${voPackage}.${saveReqVO};
+import ${basePackage}.${module}.dal.dataobject.${business}.${className}DO;
+import ${basePackage}.${module}.dal.mysql.${business}.${className}Mapper;
+import ${basePackage}.${module}.test.Base${moduleUpper}DbUnitTest;
+import jakarta.annotation.Resource;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Import;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+
+import static ${basePackage}.${module}.enums.ErrorCodeConstants.*;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * ${classJavadoc} Service 测试
+ *
+ * @author ${authorJavadoc}
+ */
+@Import(${className}ServiceImpl.class)
+class ${className}ServiceImplTest extends Base${moduleUpper}DbUnitTest {
+
+    @Resource
+    private ${className}ServiceImpl ${classNameVar}Service;
+    @Resource
+    private ${className}Mapper ${classNameVar}Mapper;
+
+    @Test
+    void create${className}_成功() {
+        ${saveReqVO} reqVO = newSaveReqVO();
+        ${pkType} id = ${classNameVar}Service.create${className}(reqVO);
+        ${className}DO db = ${classNameVar}Mapper.selectById(id);
+        assertThat(db).isNotNull();
+#foreach ($column in $saveColumns)
+#if ($column.bigDecimal)
+        assertThat(db.get${column.javaFieldUpper}()).isEqualByComparingTo(reqVO.get${column.javaFieldUpper}());
+#else
+        assertThat(db.get${column.javaFieldUpper}()).isEqualTo(reqVO.get${column.javaFieldUpper}());
+#end
+#end
+    }
+
+    @Test
+    void update${className}_成功与不存在() {
+        ${pkType} id = ${classNameVar}Service.create${className}(newSaveReqVO());
+        ${saveReqVO} reqVO = newSaveReqVO();
+        reqVO.set${pkUpper}(id);
+        ${classNameVar}Service.update${className}(reqVO);
+        assertThat(${classNameVar}Mapper.selectById(id)).isNotNull();
+
+        ${saveReqVO} missing = newSaveReqVO();
+        missing.set${pkUpper}(-1L);
+        assertServiceException(() -> ${classNameVar}Service.update${className}(missing), ${errorCodePrefix}_NOT_EXISTS);
+    }
+
+    @Test
+    void delete${className}_成功与不存在() {
+        ${pkType} id = ${classNameVar}Service.create${className}(newSaveReqVO());
+        ${classNameVar}Service.delete${className}(id);
+        assertThat(${classNameVar}Mapper.selectById(id)).isNull();
+        assertServiceException(() -> ${classNameVar}Service.delete${className}(id), ${errorCodePrefix}_NOT_EXISTS);
+    }
+
+#if ($isTree)
+    @Test
+    void get${className}List_包含新建的节点() {
+        ${pkType} id = ${classNameVar}Service.create${className}(newSaveReqVO());
+        assertThat(${classNameVar}Service.get${className}List(new ${listReqVO}()))
+                .extracting(${className}DO::get${pkUpper}).contains(id);
+    }
+
+    @Test
+    void create${className}_父节点不存在() {
+        ${saveReqVO} reqVO = newSaveReqVO();
+        reqVO.set${parentUpper}(-1L);
+        assertServiceException(() -> ${classNameVar}Service.create${className}(reqVO), ${errorCodePrefix}_PARENT_NOT_EXISTS);
+    }
+
+    @Test
+    void update${className}_不能以自己或子孙为父() {
+        ${pkType} parentId = ${classNameVar}Service.create${className}(newSaveReqVO());
+        ${saveReqVO} childReqVO = newSaveReqVO();
+        childReqVO.set${parentUpper}(parentId);
+        ${pkType} childId = ${classNameVar}Service.create${className}(childReqVO);
+
+        ${saveReqVO} self = newSaveReqVO();
+        self.set${pkUpper}(parentId);
+        self.set${parentUpper}(parentId);
+        assertServiceException(() -> ${classNameVar}Service.update${className}(self), ${errorCodePrefix}_PARENT_ERROR);
+
+        ${saveReqVO} loop = newSaveReqVO();
+        loop.set${pkUpper}(parentId);
+        loop.set${parentUpper}(childId);
+        assertServiceException(() -> ${classNameVar}Service.update${className}(loop), ${errorCodePrefix}_PARENT_IS_CHILD);
+    }
+
+    @Test
+    void delete${className}_存在子节点时不能删除() {
+        ${pkType} parentId = ${classNameVar}Service.create${className}(newSaveReqVO());
+        ${saveReqVO} childReqVO = newSaveReqVO();
+        childReqVO.set${parentUpper}(parentId);
+        ${classNameVar}Service.create${className}(childReqVO);
+        assertServiceException(() -> ${classNameVar}Service.delete${className}(parentId), ${errorCodePrefix}_EXISTS_CHILDREN);
+    }
+#else
+    @Test
+    void get${className}Page_包含新建的记录() {
+        ${pkType} id = ${classNameVar}Service.create${className}(newSaveReqVO());
+        ${pageReqVO} reqVO = new ${pageReqVO}();
+        reqVO.setPageSize(100);
+        assertThat(${classNameVar}Service.get${className}Page(reqVO).getList())
+                .extracting(${className}DO::get${pkUpper}).contains(id);
+    }
+#end
+
+    private static ${saveReqVO} newSaveReqVO() {
+        ${saveReqVO} reqVO = new ${saveReqVO}();
+#foreach ($column in $saveColumns)
+        reqVO.set${column.javaFieldUpper}(${column.sampleValue});
+#end
+        return reqVO;
+    }
+}

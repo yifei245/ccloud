@@ -79,7 +79,7 @@ ccloud
 ├── ccloud-gateway                               # ★ 网关
 ├── ccloud-monitor                               # Spring Boot Admin Server
 ├── ccloud-module-system/   (api, biz)           # ★ 认证/OAuth2/SSO/用户/角色/菜单/部门/岗位/字典/租户/社交/短信/邮件/通知/i18n/日志
-├── ccloud-module-infra/    (api, biz)           # ★ 文件/配置/代码生成/API 日志/定时任务/数据源/DB 文档
+├── ccloud-module-infra/    (api, biz)           # ★ 文件/配置/代码生成/API 日志/数据源/DB 文档/消息死信
 ├── ccloud-module-member/   (api, biz)           # ★ C 端用户/认证/地址/等级/积分/签到/分组/标签
 ├── ccloud-module-open/     (api, biz)           # ★ 开放平台：应用/密钥/授权范围/配额/调用日志/回调通知
 ├── ccloud-module-pay/      (api, biz)           # 支付：应用/渠道/订单/退款/转账/钱包/回调
@@ -165,6 +165,11 @@ ccloud
 - 消费侧：`infra_message_consume_log`（消息 ID + 消费者标识唯一索引）保证幂等，重复投递直接丢弃。
 - 典型场景：下单扣库存、支付成功回调发货、退款回滚积分。
 
+**2026-09-30 调整**（见[基础设施模块设计](2026-09-30-infra-design.md)）：
+
+- 定时任务统一在 XXL-Job 控制台管理，infra 不再提供任务管理，删除 `infra_job`、`infra_job_log` 两张表及对应菜单、字典、文案。
+- 超过重试上限的本地消息，以及重投达到上限仍消费失败的 Stream 消息，都写入 `infra_message_dead_letter`，由 infra 管理端查看、标记已处理或重新投递到原主题。
+
 ## 7. 国际化
 
 - 基线：`messages_zh_CN.properties` / `messages_en_US.properties`（错误码、校验提示）
@@ -205,20 +210,24 @@ docker/
 
 | 服务 | 端口 | 服务 | 端口 |
 |---|---|---|---|
-| gateway | 48080 | product | 48087 |
-| system | 48081 | trade | 48088 |
-| infra | 48082 | promotion | 48089 |
-| member | 48083 | ai | 48090 |
-| open | 48084 | XXL-Job Admin | 48180 |
-| pay | 48085 | Sentinel Dashboard | 48181 |
-| bpm | 48086 | Spring Boot Admin | 48182 |
+| gateway | 28080 | product | 28087 |
+| system | 28081 | trade | 28088 |
+| infra | 28082 | promotion | 28089 |
+| member | 28083 | ai | 28090 |
+| open | 28084 | XXL-Job Admin | 48180 |
+| pay | 28085 | Sentinel Dashboard | 28181 |
+| bpm | 28086 | Spring Boot Admin | 28182 |
 
 中间件：MySQL 3306、Redis 6379、Nacos 8848/9848、Zipkin 9411
+
+> 2026-09-30 调整：应用端口由 48xxx 整体平移到 28xxx。原先沿用参考项目的 48xxx 约定，与本机同样参照该项目的 aicloud
+> （system 48081、infra 48082、member 48087 等）冲突，两个项目无法同时运行。选 28xxx 是因为它低于 macOS（49152 起）
+> 与 Linux 默认（32768 起）的临时端口范围，不会被出站连接随机占用。XXL-Job Admin 为本机共用的中间件，保持 48180。
 
 ## 10. API 文档
 
 - 每服务 `springdoc` + `Knife4j`，按 `admin-api / app-api / open-api` 分组
-- 网关聚合：`http://localhost:48080/doc.html`，从 Nacos 服务列表动态发现下游文档
+- 网关聚合：`http://localhost:28080/doc.html`，从 Nacos 服务列表动态发现下游文档
 - 生产环境通过配置关闭
 
 ## 11. 交付分期
@@ -228,7 +237,7 @@ docker/
 | 期 | 内容 | 完成标志 |
 |---|---|---|
 | **P1** | 根 POM + BOM + 16 个 framework starter + gateway + monitor + module-system 全量 + module-member 的用户与认证 + **全部 10 模块的完整 DDL 与初始化数据** + Docker 全家桶 + README + MIT LICENSE | `docker compose up` 后：三端（web/App/小程序）均可登录取 token，动态菜单与按钮权限生效，SSO 授权码流程跑通，Swagger 网关聚合可调，链路追踪与监控面板可见 |
-| **P2** | module-infra 全量（文件/配置/代码生成/API 日志/任务/数据源/DB 文档） + module-member 运营功能（等级/积分/签到/标签/分组） + module-open 全量（含签名鉴权与限流） | 三端接口齐备，开放 API 可签名调用，代码生成器可用 |
+| **P2** | module-infra 全量（文件/配置/代码生成/API 日志/数据源/DB 文档/消息死信） + module-member 运营功能（等级/积分/签到/标签/分组） + module-open 全量（含签名鉴权与限流） | 三端接口齐备，开放 API 可签名调用，代码生成器可用 |
 | **P3** | module-pay（微信/支付宝/钱包/退款/转账/回调重试） + module-bpm（Flowable 模型、表单、审批、抄送） | 可发起支付与审批流 |
 | **P4** | mall：product + trade + promotion | 可下单、支付、售后、用券，走通最终一致性链路 |
 | **P5** | module-ai + 全局补齐（单测、i18n 文案齐全、压测配置、文档完善） | 全量交付 |

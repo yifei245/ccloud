@@ -4,16 +4,16 @@
 # 因此这里直接对约束做行为测试，而不是只检查索引是否存在。
 set -uo pipefail
 cd "$(dirname "$0")/.."
-CID=ccloud-pay-uk; PW=root123; fail=0; ERR=$(mktemp)
-cleanup() { docker rm -f $CID >/dev/null 2>&1; rm -f "$ERR"; }
-trap cleanup EXIT; cleanup
+source scripts/lib/local-mysql.sh
+# 导入本机 MySQL 的校验库 ccloud_verify（每次运行覆盖）
+DB=ccloud_verify; fail=0; ERR=$(mktemp)
+trap 'rm -f "$ERR"' EXIT
 
-docker run -d --name $CID -e MYSQL_ROOT_PASSWORD=$PW mysql:8.4 >/dev/null
-until docker exec $CID mysqladmin ping -uroot -p$PW --silent >/dev/null 2>&1; do sleep 2; done
-cat sql/mysql/ddl/00-schema.sql sql/mysql/ddl/05-pay.sql | docker exec -i $CID mysql -uroot -p$PW 2>/dev/null
+reset_db $DB
+rename_db $DB < sql/mysql/ddl/05-pay.sql | lmysql $DB 2>/dev/null
 
 try() {  # $1=说明 $2=期望(ok|dup) $3=SQL
-  if docker exec $CID mysql -uroot -p$PW ccloud -e "$3" >/dev/null 2>"$ERR"; then got=ok; else got=dup; fi
+  if lmysql $DB -e "$3" >/dev/null 2>"$ERR"; then got=ok; else got=dup; fi
   if [ "$got" = "$2" ]; then echo "  OK   $1"; else echo "  FAIL $1（期望 $2，实际 $got）"; cat "$ERR"; fail=1; fi
 }
 ORDER="INSERT INTO pay_order (app_id,merchant_order_id,subject,notify_url,price,status,user_ip,expire_time) VALUES"
@@ -34,7 +34,7 @@ W="INSERT INTO pay_wallet (user_id,user_type,balance,total_expense,total_recharg
 try "用户首个钱包"                    ok  "$W (7,1,0,0,0,0)"
 try "同一用户重复开钱包被拒绝"        dup "$W (7,1,0,0,0,0)"
 
-r=$(docker exec $CID mysql -uroot -p$PW ccloud -N -e "UPDATE pay_wallet SET balance=500 WHERE user_id=7;
+r=$(lmysql $DB -N -e "UPDATE pay_wallet SET balance=500 WHERE user_id=7;
   UPDATE pay_wallet SET balance=balance-800 WHERE user_id=7 AND balance>=800;
   SELECT ROW_COUNT(), (SELECT balance FROM pay_wallet WHERE user_id=7);" 2>/dev/null)
 if [ "$r" = "$(printf '0\t500')" ]; then echo "  OK   余额不足时原子扣款影响 0 行，不会扣成负数"

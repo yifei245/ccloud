@@ -1,0 +1,171 @@
+# ccloud-infra-server 基础配置。与环境无关的项放这里，环境相关项放 application-{profile}.yaml。
+# Nacos 配置（ccloud-common.yaml / ccloud-datasource.yaml / ccloud-infra-server.yaml）在各 application-{profile}.yaml 中导入，优先级高于本文件与 profile 文件。
+server:
+  port: 28082
+
+spring:
+  application:
+    name: ccloud-infra-server
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  main:
+    allow-circular-references: false
+  cloud:
+    nacos:
+      server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        metadata:
+          # 供 Spring Boot Admin 发现 actuator 端点
+          management.context-path: /actuator
+      config:
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+  servlet:
+    multipart:
+      max-file-size: 16MB
+      max-request-size: 32MB
+  jackson:
+    serialization:
+      write-dates-as-timestamps: true
+      fail-on-empty-beans: false
+    deserialization:
+      fail-on-unknown-properties: false
+  cache:
+    type: redis
+    redis:
+      time-to-live: 1h
+  datasource:
+    dynamic:
+      primary: master
+      strict: false
+  boot:
+    admin:
+      client:
+        # 监控面板（ccloud-monitor）从 Nacos 发现本服务，默认不再主动注册：两种方式同时开启会出现两个相同实例，
+        # 且面板要求登录，未配置账号的主动注册会被拒绝。无注册中心的环境可设 SBA_CLIENT_ENABLED=true 并配置账号
+        enabled: ${SBA_CLIENT_ENABLED:false}
+        url: http://${SBA_HOST:127.0.0.1}:28182
+        username: admin
+        password: ${CCLOUD_MONITOR_PASSWORD:ccloud123}
+        instance:
+          prefer-ip: true
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.ccloud.module.infra.dal.dataobject
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+  tracing:
+    sampling:
+      probability: ${TRACING_PROBABILITY:1.0}
+  info:
+    env:
+      enabled: true
+  zipkin:
+    tracing:
+      endpoint: http://${ZIPKIN_HOST:127.0.0.1}:9411/api/v2/spans
+
+xxl:
+  job:
+    enabled: ${XXL_JOB_ENABLED:true}
+    access-token: ${XXL_JOB_ACCESS_TOKEN:default_token}
+    admin:
+      addresses: http://${XXL_JOB_HOST:127.0.0.1}:48180/xxl-job-admin
+    executor:
+      appname: ${spring.application.name}
+      port: 0
+      log-path: ${user.home}/logs/xxl-job/${spring.application.name}
+      log-retention-days: 30
+
+ccloud:
+  security:
+    # 网关与各服务共享的内部签名密钥，必须通过环境变量或 Nacos 注入，缺失时所有内部身份均被拒绝
+    internal-sign-secret: ${CCLOUD_INTERNAL_SIGN_SECRET:}
+  mybatis:
+    # 字段加密（EncryptTypeHandler）密钥，16 位
+    encrypt-key: ${CCLOUD_ENCRYPT_KEY:ccloud1234567890}
+  swagger:
+    title: ccloud 基础设施服务
+    description: 参数配置、文件、API 日志、消息死信、数据源、数据库文档、代码生成
+    version: 1.0.0
+  xss:
+    enable: true
+  i18n:
+    default-locale: zh_CN
+  infra:
+    file:
+      # 单个文件的大小上限。Spring 的 multipart 上限（16MB）须大于它
+      max-size: 10MB
+      # 本地磁盘存储的受控根目录，文件配置的 basePath 须等于它或位于其下。容器内为数据卷 /app/files
+      local-root: /app/files
+    api-log:
+      # 访问日志、异常日志的保留天数，由每日清理任务使用
+      access-retain-days: 30
+      error-retain-days: 90
+  tenant:
+    enable: true
+    # 文件读取为公开接口，不带租户；读取按存储路径进行，不查按租户隔离的 infra_file
+    ignore-urls:
+      - /admin-api/infra/file/*/get/**
+    # 租户校验结果本地缓存时长：每个请求都要经 RPC 校验租户，缓存期内租户状态变更不会立即生效
+    valid-cache-duration: 1m
+    # 缓存全局表数据的缓存名（不含 #ttl 后缀），不按租户隔离，否则各租户各缓存一份、修改后只清掉一份
+    ignore-caches:
+      - infra_config
+    # 不含 tenant_id 列的全局表，与 sql/mysql/ddl 保持一致（由 InfraServerApplicationTest 校验；与 system 共用一个库）
+    ignore-tables:
+      - system_menu
+      - system_tenant
+      - system_tenant_package
+      - system_dict_type
+      - system_dict_data
+      - system_oauth2_client
+      - system_sms_channel
+      - system_sms_template
+      - system_mail_account
+      - system_mail_template
+      - system_notify_template
+      - system_i18n_message
+      - infra_config
+      - infra_file_config
+      - infra_file_content
+      - infra_codegen_table
+      - infra_codegen_column
+      - infra_data_source_config
+      - infra_message_consume_log
+      - infra_demo_student
+      - infra_demo_category
+      - open_api
+
+debug: false

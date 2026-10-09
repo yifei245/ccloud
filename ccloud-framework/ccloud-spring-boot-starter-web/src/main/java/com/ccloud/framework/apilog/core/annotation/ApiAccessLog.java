@@ -29,7 +29,7 @@ public @interface ApiAccessLog {
     boolean responseEnable() default false;
 
     /**
-     * 敏感参数名，记录前会被替换为 ***
+     * 敏感参数名，记录前会被替换为 ******，与内置敏感词（密码、令牌等）叠加生效
      */
     String[] sanitizeKeys() default {};
 

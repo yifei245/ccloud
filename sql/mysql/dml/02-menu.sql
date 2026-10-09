@@ -1,6 +1,6 @@
 -- ----------------------------------------------------------------------------
 -- 初始化数据：菜单
--- 共 492 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
+-- 共 485 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -143,13 +143,6 @@ INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_i
   (134, '参数配置修改', 'infra:config:update', 3, 3, 131, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (135, '参数配置删除', 'infra:config:delete', 3, 4, 131, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (136, '参数配置导出', 'infra:config:export', 3, 5, 131, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (137, '定时任务', '', 2, 3, 121, 'job', 'fa-solid:tasks', 'infra/job/index', 'Job', 0, b'1', b'1', b'1', '1'),
-  (138, '定时任务查询', 'infra:job:query', 3, 1, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (139, '定时任务新增', 'infra:job:create', 3, 2, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (140, '定时任务修改', 'infra:job:update', 3, 3, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (141, '定时任务删除', 'infra:job:delete', 3, 4, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (142, '定时任务导出', 'infra:job:export', 3, 5, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (143, '定时任务触发执行', 'infra:job:trigger', 3, 6, 137, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (144, 'API 日志', '', 1, 4, 121, 'log', 'fa:tasks', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (145, '访问日志', '', 2, 1, 144, 'api-access-log', '#', 'infra/apiAccessLog/index', 'Api-Access-Log', 0, b'1', b'1', b'1', '1'),
   (146, '访问日志查询', 'infra:api-access-log:query', 3, 1, 145, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),

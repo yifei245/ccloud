@@ -1,5 +1,5 @@
 -- ----------------------------------------------------------------------------
--- infra 模块：配置、文件、定时任务、API 日志、代码生成、数据源、本地消息表
+-- infra 模块：配置、文件、API 日志、代码生成、数据源、代码生成演示、本地消息表
 -- 本文件由 DDL 生成器产出，公共约定与 01-system.sql 一致
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
@@ -20,7 +20,7 @@ CREATE TABLE `infra_config` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_config_key` (`config_key`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='参数配置表，全局共享';
@@ -39,7 +39,7 @@ CREATE TABLE `infra_file_config` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件存储配置表，全局共享';
 DROP TABLE IF EXISTS `infra_file`;
@@ -56,7 +56,7 @@ CREATE TABLE `infra_file` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_config_path` (`config_id`, `path`)
@@ -71,53 +71,10 @@ CREATE TABLE `infra_file_content` (
   `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_config_path` (`config_id`, `path`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件内容表，仅数据库存储器使用';
-
--- ========================= 定时任务 =========================
-
-DROP TABLE IF EXISTS `infra_job`;
-CREATE TABLE `infra_job` (
-  `id`                bigint       NOT NULL AUTO_INCREMENT COMMENT '任务编号',
-  `name`              varchar(32)  NOT NULL COMMENT '任务名称',
-  `status`            tinyint      NOT NULL COMMENT '任务状态：0 初始化 1 开启 2 暂停',
-  `handler_name`      varchar(64)  NOT NULL COMMENT '处理器名，对应 @XxlJob 的 value',
-  `handler_param`     varchar(255) DEFAULT NULL COMMENT '处理器参数',
-  `cron_expression`   varchar(32)  NOT NULL COMMENT 'CRON 表达式',
-  `retry_count`       int          NOT NULL DEFAULT 0 COMMENT '重试次数',
-  `retry_interval`    int          NOT NULL DEFAULT 0 COMMENT '重试间隔，单位毫秒',
-  `monitor_timeout`   int          NOT NULL DEFAULT 0 COMMENT '监控超时时间，单位毫秒',
-  `creator`           varchar(64)  DEFAULT '' COMMENT '创建者',
-  `create_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater`           varchar(64)  DEFAULT '' COMMENT '更新者',
-  `update_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_handler_name` (`handler_name`, `deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='定时任务表，调度由 XXL-Job 执行，本表记录任务元数据';
-DROP TABLE IF EXISTS `infra_job_log`;
-CREATE TABLE `infra_job_log` (
-  `id`              bigint        NOT NULL AUTO_INCREMENT COMMENT '日志编号',
-  `job_id`          bigint        NOT NULL COMMENT '任务编号',
-  `handler_name`    varchar(64)   NOT NULL COMMENT '处理器名',
-  `handler_param`   varchar(255)  DEFAULT NULL COMMENT '处理器参数',
-  `execute_index`   tinyint       NOT NULL DEFAULT 1 COMMENT '第几次执行，重试时递增',
-  `begin_time`      datetime      NOT NULL COMMENT '开始执行时间',
-  `end_time`        datetime      DEFAULT NULL COMMENT '结束执行时间',
-  `duration`        int           DEFAULT NULL COMMENT '执行时长，单位毫秒',
-  `status`          tinyint       NOT NULL COMMENT '执行状态：0 运行中 1 成功 2 失败',
-  `result`          varchar(4000) DEFAULT '' COMMENT '结果数据',
-  `creator`         varchar(64)   DEFAULT '' COMMENT '创建者',
-  `create_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater`         varchar(64)   DEFAULT '' COMMENT '更新者',
-  `update_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`         bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
-  PRIMARY KEY (`id`),
-  KEY `idx_job_id` (`job_id`),
-  KEY `idx_begin_time` (`begin_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='定时任务日志表';
 
 -- ========================= API 日志 =========================
 
@@ -147,7 +104,7 @@ CREATE TABLE `infra_api_access_log` (
   `create_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`            varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`            bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`            bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_create_time` (`create_time`),
@@ -182,7 +139,7 @@ CREATE TABLE `infra_api_error_log` (
   `create_time`                    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                        varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`                    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                        bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                        bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_create_time` (`create_time`),
@@ -216,7 +173,7 @@ CREATE TABLE `infra_codegen_table` (
   `create_time`             datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                 varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`             datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                 bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                 bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='代码生成表定义';
 DROP TABLE IF EXISTS `infra_codegen_column`;
@@ -243,7 +200,7 @@ CREATE TABLE `infra_codegen_column` (
   `create_time`                datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`                    varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`                datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                    bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`                    bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_table_id` (`table_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='代码生成字段定义';
@@ -261,9 +218,40 @@ CREATE TABLE `infra_data_source_config` (
   `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='数据源配置表';
+
+-- ========================= 代码生成演示 =========================
+
+DROP TABLE IF EXISTS `infra_demo_student`;
+CREATE TABLE `infra_demo_student` (
+  `id`            bigint        NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `name`          varchar(100)  NOT NULL COMMENT '姓名',
+  `sex`           tinyint       NOT NULL COMMENT '性别：1 男 2 女',
+  `birthday`      datetime      DEFAULT NULL COMMENT '出生日期',
+  `description`   varchar(1000) DEFAULT NULL COMMENT '简介',
+  `status`        tinyint       NOT NULL DEFAULT 0 COMMENT '状态：0 开启 1 关闭',
+  `creator`       varchar(64)   DEFAULT '' COMMENT '创建者',
+  `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
+  `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='演示学生表，代码生成单表模板的演示与验收用';
+DROP TABLE IF EXISTS `infra_demo_category`;
+CREATE TABLE `infra_demo_category` (
+  `id`            bigint        NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `name`          varchar(100)  NOT NULL COMMENT '名称',
+  `parent_id`     bigint        NOT NULL DEFAULT 0 COMMENT '父编号，0 表示根节点',
+  `sort`          int           NOT NULL DEFAULT 0 COMMENT '显示顺序',
+  `creator`       varchar(64)   DEFAULT '' COMMENT '创建者',
+  `create_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater`       varchar(64)   DEFAULT '' COMMENT '更新者',
+  `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`       bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='演示分类表，代码生成树表模板的演示与验收用';
 
 -- ========================= 本地消息表（最终一致性） =========================
 
@@ -286,7 +274,7 @@ CREATE TABLE `infra_message_outbox` (
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`           varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`           bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_message_id` (`message_id`),
@@ -302,7 +290,7 @@ CREATE TABLE `infra_message_consume_log` (
   `create_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)  DEFAULT '' COMMENT '更新者',
   `update_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_message_consumer` (`message_id`, `consumer`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='消息消费记录表。不带 tenant_id，必须列入 ccloud.tenant.ignore-tables';
@@ -321,7 +309,7 @@ CREATE TABLE `infra_message_dead_letter` (
   `create_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater`        varchar(64)   DEFAULT '' COMMENT '更新者',
   `update_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bit(1)        NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `deleted`        bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_message_id` (`message_id`),

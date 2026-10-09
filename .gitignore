@@ -1,0 +1,19 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+.DS_Store
+logs/
+*.log
+/data/
+
+# 个人全局忽略规则（core.excludesFile）可能忽略 README.md、.gitignore、Log/ 等；
+# 本文件的例外规则优先于全局规则，保证这些项目文件不会被悄悄漏提交
+!.gitignore
+!README.md
+!**/src/**/log/

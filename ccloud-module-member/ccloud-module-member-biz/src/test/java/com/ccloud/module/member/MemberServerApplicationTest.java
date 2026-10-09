@@ -1,5 +1,7 @@
 package com.ccloud.module.member;
 
+import com.ccloud.framework.test.core.ut.LocalRedis;
+import com.ccloud.framework.test.core.ut.LocalMySql;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.InnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
@@ -14,8 +16,10 @@ import com.ccloud.framework.security.core.service.SecurityFrameworkService;
 import com.ccloud.framework.tenant.config.TenantProperties;
 import com.ccloud.framework.tenant.core.service.TenantFrameworkService;
 import com.ccloud.framework.tenant.core.web.TenantSecurityWebFilter;
-import com.ccloud.framework.test.core.ut.MySqlTestContainer;
+import com.ccloud.framework.apilog.core.service.ApiAccessLogFrameworkService;
+import com.ccloud.framework.apilog.core.service.ApiErrorLogFrameworkService;
 import com.ccloud.module.member.framework.contract.*;
+import com.ccloud.module.infra.api.file.FileApi;
 import com.ccloud.module.system.api.oauth2.OAuth2TokenApi;
 import com.ccloud.module.system.api.permission.PermissionApi;
 import com.ccloud.module.system.api.tenant.TenantApi;
@@ -27,7 +31,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -57,24 +60,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("unit-test")
 class MemberServerApplicationTest {
 
-    @SuppressWarnings("resource")
-    private static final GenericContainer<?> REDIS = startRedis();
-
-    private static GenericContainer<?> startRedis() {
-        GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
-        redis.start();
-        return redis;
-    }
-
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        var mysql = MySqlTestContainer.get();
-        registry.add("spring.datasource.dynamic.datasource.master.url", mysql::getJdbcUrl);
-        registry.add("spring.datasource.dynamic.datasource.master.username", mysql::getUsername);
-        registry.add("spring.datasource.dynamic.datasource.master.password", mysql::getPassword);
-        registry.add("spring.datasource.dynamic.datasource.master.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+        LocalMySql.register(registry);
+        LocalRedis.register(registry);
     }
 
     private static final Pattern CREATE_TABLE =
@@ -97,6 +86,8 @@ class MemberServerApplicationTest {
         assertThat(ctx.getBean(DictFrameworkService.class)).isInstanceOf(DictFrameworkServiceImpl.class);
         assertThat(ctx.getBean(I18nMessageFrameworkService.class)).isInstanceOf(I18nMessageFrameworkServiceImpl.class);
         assertThat(ctx.getBean(OperateLogFrameworkService.class)).isInstanceOf(OperateLogFrameworkServiceImpl.class);
+        assertThat(ctx.getBean(ApiAccessLogFrameworkService.class)).isInstanceOf(ApiLogFrameworkServiceImpl.class);
+        assertThat(ctx.getBean(ApiErrorLogFrameworkService.class)).isInstanceOf(ApiLogFrameworkServiceImpl.class);
     }
 
     @Test
@@ -113,6 +104,7 @@ class MemberServerApplicationTest {
         assertThat(ctx.getBeanNamesForType(PermissionApi.class)).isNotEmpty();
         assertThat(ctx.getBeanNamesForType(TenantApi.class)).isNotEmpty();
         assertThat(ctx.getBeanNamesForType(OAuth2TokenApi.class)).isNotEmpty();
+        assertThat(ctx.getBeanNamesForType(FileApi.class)).as("头像经 infra 存储").isNotEmpty();
     }
 
     @Test
@@ -129,7 +121,7 @@ class MemberServerApplicationTest {
     @Test
     void 租户忽略表应恰好是DDL中所有不含tenant_id列的表() throws IOException {
         Set<String> withoutTenantId = new TreeSet<>();
-        try (Stream<Path> files = Files.list(MySqlTestContainer.locateDdlDir())) {
+        try (Stream<Path> files = Files.list(LocalMySql.locateDdlDir())) {
             for (Path file : files.filter(f -> f.toString().endsWith(".sql")).sorted().toList()) {
                 Matcher m = CREATE_TABLE.matcher(Files.readString(file));
                 while (m.find()) {

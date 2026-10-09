@@ -1,7 +1,7 @@
 # ccloud-member-server 基础配置。与环境无关的项放这里，环境相关项放 application-{profile}.yaml。
 # Nacos 配置（ccloud-common.yaml / ccloud-datasource.yaml / ccloud-member-server.yaml）在各 application-{profile}.yaml 中导入，优先级高于本文件与 profile 文件。
 server:
-  port: 48083
+  port: 28083
 
 spring:
   application:
@@ -49,7 +49,7 @@ spring:
         # 监控面板（ccloud-monitor）从 Nacos 发现本服务，默认不再主动注册：两种方式同时开启会出现两个相同实例，
         # 且面板要求登录，未配置账号的主动注册会被拒绝。无注册中心的环境可设 SBA_CLIENT_ENABLED=true 并配置账号
         enabled: ${SBA_CLIENT_ENABLED:false}
-        url: http://${SBA_HOST:127.0.0.1}:48182
+        url: http://${SBA_HOST:127.0.0.1}:28182
         username: admin
         password: ${CCLOUD_MONITOR_PASSWORD:ccloud123}
         instance:
@@ -64,9 +64,6 @@ mybatis-plus:
     banner: false
     db-config:
       id-type: auto
-      logic-delete-field: deleted
-      logic-delete-value: true
-      logic-not-delete-value: false
 
 springdoc:
   api-docs:
@@ -154,12 +151,12 @@ ccloud:
       - infra_config
       - infra_file_config
       - infra_file_content
-      - infra_job
-      - infra_job_log
       - infra_codegen_table
       - infra_codegen_column
       - infra_data_source_config
       - infra_message_consume_log
+      - infra_demo_student
+      - infra_demo_category
       - open_api
 
 debug: false

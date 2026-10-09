@@ -3,6 +3,8 @@ package com.ccloud.framework.mq.redis.config;
 import com.ccloud.framework.mq.redis.core.AbstractRedisStreamMessageListener;
 import com.ccloud.framework.mq.redis.core.RedisStreamMessageConsumer;
 import com.ccloud.framework.mq.redis.core.RedisStreamPendingMessageResendJob;
+import com.ccloud.framework.mq.outbox.core.DeadLetterMapper;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -33,8 +35,9 @@ public class CcloudRedisStreamAutoConfiguration {
             StringRedisTemplate stringRedisTemplate, List<AbstractRedisStreamMessageListener<?>> listeners,
             @Value("${spring.application.name}") String applicationName,
             @Value("${ccloud.mq.redis.pending-idle-timeout:5m}") Duration idleTimeout,
-            @Value("${ccloud.mq.redis.max-retry:5}") int maxRetry) {
+            @Value("${ccloud.mq.redis.max-retry:5}") int maxRetry,
+            ObjectProvider<DeadLetterMapper> deadLetterMapper) {
         return new RedisStreamPendingMessageResendJob(stringRedisTemplate, applicationName, listeners,
-                idleTimeout, maxRetry);
+                idleTimeout, maxRetry, deadLetterMapper);
     }
 }

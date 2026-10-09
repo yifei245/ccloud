@@ -3,6 +3,7 @@ package com.ccloud.module.system.service.user;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
+import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.exception.ServiceException;
 import com.ccloud.framework.common.pojo.PageResult;
 import com.ccloud.framework.common.util.collection.CollectionUtils;
@@ -10,6 +11,9 @@ import com.ccloud.framework.common.util.object.BeanUtils;
 import com.ccloud.framework.common.util.validation.ValidationUtils;
 import com.ccloud.framework.datapermission.core.annotation.DataPermission;
 import com.ccloud.framework.mybatis.core.query.LambdaQueryWrapperX;
+import com.ccloud.module.infra.api.config.ConfigApi;
+import com.ccloud.module.infra.api.file.FileApi;
+import com.ccloud.module.infra.api.file.dto.FileCreateReqDTO;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdatePasswordReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.profile.UserProfileUpdateReqVO;
 import com.ccloud.module.system.controller.admin.user.vo.user.UserImportExcelVO;
@@ -22,13 +26,13 @@ import com.ccloud.module.system.dal.mysql.dept.UserPostMapper;
 import com.ccloud.module.system.dal.mysql.user.AdminUserMapper;
 import com.ccloud.module.system.service.dept.DeptService;
 import com.ccloud.module.system.service.dept.PostService;
+import com.ccloud.module.system.service.oauth2.OAuth2TokenService;
 import com.ccloud.module.system.service.permission.PermissionService;
 import com.ccloud.module.system.service.tenant.TenantService;
 import jakarta.annotation.Resource;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -60,15 +64,23 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Lazy
     private TenantService tenantService;
     @Resource
+    private OAuth2TokenService oauth2TokenService;
+    @Resource
     private PasswordEncoder passwordEncoder;
     @Resource
     private Validator validator;
 
     /**
-     * 导入用户的初始密码。基础设施服务（配置中心 infra_config）上线后改由其提供
+     * 导入用户的初始密码，存于 infra 参数配置
      */
-    @Value("${ccloud.system.user.init-password:}")
-    private String initPassword;
+    static final String INIT_PASSWORD_CONFIG_KEY = "system.user.init-password";
+
+    @Resource
+    @Lazy
+    private ConfigApi configApi;
+    @Resource
+    @Lazy
+    private FileApi fileApi;
 
     // ========== 创建与修改 ==========
 
@@ -133,24 +145,54 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    public String updateUserAvatar(Long id, String name, byte[] content) {
+        validateUserExists(id);
+        FileCreateReqDTO reqDTO = new FileCreateReqDTO();
+        reqDTO.setName(name);
+        reqDTO.setContent(content);
+        // 文件被拒绝（类型、大小）时 getCheckedData 抛出 infra 的错误码，头像保持不变
+        String url = fileApi.createFile(reqDTO).getCheckedData();
+        userMapper.updateById(new AdminUserDO().setId(id).setAvatar(url));
+        return url;
+    }
+
+    /**
+     * 本人修改密码也作废全部令牌（含当前会话）：改密码往往是怀疑密码泄露，其他设备上的会话必须下线
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateUserPassword(Long id, UserProfileUpdatePasswordReqVO reqVO) {
         AdminUserDO user = validateUserExists(id);
         if (!isPasswordMatch(reqVO.getOldPassword(), user.getPassword())) {
             throw exception(USER_PASSWORD_FAILED);
         }
         userMapper.updateById(new AdminUserDO().setId(id).setPassword(encodePassword(reqVO.getNewPassword())));
+        removeUserTokens(id);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void resetUserPassword(Long id, String password) {
         validateUserExists(id);
         userMapper.updateById(new AdminUserDO().setId(id).setPassword(encodePassword(password)));
+        removeUserTokens(id);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateUserStatus(Long id, Integer status) {
         validateUserExists(id);
         userMapper.updateById(new AdminUserDO().setId(id).setStatus(status));
+        if (CommonStatusEnum.isDisable(status)) {
+            removeUserTokens(id);
+        }
+    }
+
+    /**
+     * 作废用户的全部访问令牌与刷新令牌。网关缓存令牌校验结果，已缓存的令牌最多还能用一个缓存周期
+     */
+    private void removeUserTokens(Long id) {
+        oauth2TokenService.removeAccessTokensByUser(id, UserTypeEnum.ADMIN.getValue());
     }
 
     // ========== 删除 ==========
@@ -162,6 +204,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         userMapper.deleteById(id);
         permissionService.processUserDeleted(id);
         userPostMapper.deleteByUserId(id);
+        removeUserTokens(id);
     }
 
     @Override
@@ -255,14 +298,12 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (CollUtil.isEmpty(importUsers)) {
             throw exception(USER_IMPORT_LIST_IS_EMPTY);
         }
-        if (StrUtil.isEmpty(initPassword)) {
-            throw exception(USER_IMPORT_INIT_PASSWORD);
-        }
+        String initPassword = getInitPassword();
         UserImportRespVO respVO = new UserImportRespVO();
         for (UserImportExcelVO importUser : importUsers) {
             String username = StrUtil.nullToEmpty(importUser.getUsername());
             try {
-                importUser(importUser, isUpdateSupport, respVO);
+                importUser(importUser, isUpdateSupport, initPassword, respVO);
             } catch (ConstraintViolationException ex) {
                 respVO.getFailureUsernames().put(username, ex.getConstraintViolations().iterator().next().getMessage());
             } catch (ServiceException ex) {
@@ -272,7 +313,8 @@ public class AdminUserServiceImpl implements AdminUserService {
         return respVO;
     }
 
-    private void importUser(UserImportExcelVO importUser, boolean isUpdateSupport, UserImportRespVO respVO) {
+    private void importUser(UserImportExcelVO importUser, boolean isUpdateSupport, String initPassword,
+                            UserImportRespVO respVO) {
         ValidationUtils.validate(validator, importUser);
         AdminUserDO existUser = userMapper.selectByUsername(importUser.getUsername());
         if (existUser == null) {
@@ -297,6 +339,23 @@ public class AdminUserServiceImpl implements AdminUserService {
         updateObj.setId(existUser.getId());
         userMapper.updateById(updateObj);
         respVO.getUpdateUsernames().add(importUser.getUsername());
+    }
+
+    /**
+     * 取不到值或 infra 不可用都拒绝导入：没有初始密码时生成的账号无法登录，也不能退回到某个硬编码的弱密码
+     */
+    private String getInitPassword() {
+        String password;
+        try {
+            password = configApi.getConfigValueByKey(INIT_PASSWORD_CONFIG_KEY).getCheckedData();
+        } catch (RuntimeException e) {
+            log.warn("[getInitPassword][读取参数 {} 失败]", INIT_PASSWORD_CONFIG_KEY, e);
+            throw exception(USER_IMPORT_INIT_PASSWORD);
+        }
+        if (StrUtil.isEmpty(password)) {
+            throw exception(USER_IMPORT_INIT_PASSWORD);
+        }
+        return password;
     }
 
     // ========== 校验 ==========

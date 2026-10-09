@@ -53,7 +53,7 @@ public interface AdminAuthService {
     AuthLoginRespVO socialBindLogin(@Valid AuthSocialBindLoginReqVO reqVO, String userIp, String userAgent);
 
     /**
-     * 注册并直接登录；是否开放注册由 ccloud.system.auth.register-enabled 控制
+     * 注册并直接登录；是否开放注册由 infra 参数 system.auth.register-enabled 控制
      */
     AuthLoginRespVO register(@Valid AuthRegisterReqVO reqVO, String userIp, String userAgent);
 

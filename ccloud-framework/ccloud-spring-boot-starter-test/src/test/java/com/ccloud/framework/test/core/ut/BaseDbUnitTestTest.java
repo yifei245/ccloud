@@ -18,8 +18,11 @@ class BaseDbUnitTestTest extends BaseDbUnitTest {
     @Test
     @Order(1)
     void 应加载仓库正式DDL中的全部表() {
+        // 连的是本机 MySQL 上的测试专用库，不是正式库 ccloud
+        assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
+                .isEqualTo(LocalMySql.database()).isNotEqualTo("ccloud");
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'ccloud'", Integer.class);
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()", Integer.class);
         assertThat(count).isEqualTo(143);
     }
 

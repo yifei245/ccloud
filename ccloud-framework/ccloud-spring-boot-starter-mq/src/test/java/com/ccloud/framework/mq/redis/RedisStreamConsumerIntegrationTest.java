@@ -34,6 +34,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -155,6 +158,64 @@ class RedisStreamConsumerIntegrationTest {
         assertThat(deadLetter.getRetryCount()).isEqualTo(2);
         assertThat(deadLetter.getErrorMsg()).isEqualTo("消费重试 2 次仍失败");
         assertThat(deadLetter.getHandled()).isFalse();
+    }
+
+    /**
+     * 写死信失败（如库不可用、字段超长）时不能让整轮任务中断：待处理列表每轮都从头取，
+     * 否则这条消息会永远排在队首，同一服务的其他消息与其他主题都得不到重投
+     */
+    @Test
+    void 写死信失败时跳过该条且不ACK_后续消息与其他主题照常处理() {
+        RecordingListener failing = new RecordingListener("demo.dl.fail", Integer.MAX_VALUE);
+        RecordingListener other = new RecordingListener("demo.dl.other", Integer.MAX_VALUE);
+        consumer = new RedisStreamMessageConsumer(redisTemplate, GROUP, List.of(failing, other));
+        consumer.start();
+        RedisStreamMessageSender sender = new RedisStreamMessageSender(redisTemplate);
+        String payload = JsonUtils.toJsonString(new DemoMessage(7L, "dl"));
+        sender.send("demo.dl.fail", "bad", payload);
+        sender.send("demo.dl.fail", "good", payload);
+        sender.send("demo.dl.other", "other", payload);
+        await().atMost(Duration.ofSeconds(10)).until(() -> failing.attempts.get() == 2 && other.attempts.get() == 1);
+        await().atMost(Duration.ofSeconds(5)).until(() -> pendingCount("demo.dl.fail") == 2 && pendingCount("demo.dl.other") == 1);
+
+        DeadLetterMapper deadLetterMapper = mock(DeadLetterMapper.class);
+        doThrow(new IllegalStateException("写库失败")).when(deadLetterMapper)
+                .insert(argThat((DeadLetterDO deadLetter) -> "bad".equals(deadLetter.getMessageId())));
+        RedisStreamPendingMessageResendJob job = new RedisStreamPendingMessageResendJob(redisTemplate, GROUP,
+                List.of(failing, other), Duration.ZERO, 0, deadLetterProvider(deadLetterMapper));
+
+        String result = job.execute();
+
+        assertThat(result).contains("丢弃 2 条").contains("失败 1 条");
+        ArgumentCaptor<DeadLetterDO> captor = ArgumentCaptor.forClass(DeadLetterDO.class);
+        verify(deadLetterMapper, times(3)).insert(captor.capture());
+        assertThat(captor.getAllValues()).extracting(DeadLetterDO::getMessageId).containsExactly("bad", "good", "other");
+        // 失败的那条留在待处理列表，下一轮再试
+        assertThat(pendingCount("demo.dl.fail")).isEqualTo(1);
+        assertThat(pendingCount("demo.dl.other")).isZero();
+        assertThat(job.execute()).contains("失败 1 条");
+    }
+
+    @Test
+    void 超长字段写死信前按列宽截断() {
+        RecordingListener listener = new RecordingListener("demo.dl.long", Integer.MAX_VALUE);
+        start(listener);
+        String messageId = "m".repeat(100);
+        // 消息体须能解析，否则消费端直接 ACK 丢弃，进不了重投
+        new RedisStreamMessageSender(redisTemplate).send("demo.dl.long", messageId,
+                JsonUtils.toJsonString(new DemoMessage(8L, "x".repeat(70_000))));
+        await().atMost(Duration.ofSeconds(10)).until(() -> listener.attempts.get() == 1);
+        await().atMost(Duration.ofSeconds(5)).until(() -> pendingCount("demo.dl.long") == 1);
+        DeadLetterMapper deadLetterMapper = mock(DeadLetterMapper.class);
+
+        new RedisStreamPendingMessageResendJob(redisTemplate, GROUP, List.of(listener), Duration.ZERO, 0,
+                deadLetterProvider(deadLetterMapper)).execute();
+
+        ArgumentCaptor<DeadLetterDO> captor = ArgumentCaptor.forClass(DeadLetterDO.class);
+        verify(deadLetterMapper).insert(captor.capture());
+        assertThat(captor.getValue().getMessageId()).hasSize(DeadLetterDO.MESSAGE_ID_MAX_LENGTH);
+        assertThat(captor.getValue().getPayload()).hasSize(DeadLetterDO.PAYLOAD_MAX_BYTES);
+        assertThat(pendingCount("demo.dl.long")).isZero();
     }
 
     @Test

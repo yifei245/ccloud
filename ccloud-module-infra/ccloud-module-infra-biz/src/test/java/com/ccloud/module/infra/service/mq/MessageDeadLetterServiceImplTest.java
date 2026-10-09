@@ -140,6 +140,27 @@ class MessageDeadLetterServiceImplTest extends BaseInfraDbAndRedisUnitTest {
         assertThat(deadLetterMapper.selectById(id).getHandled()).isFalse();
     }
 
+    @Test
+    void 超长字段按列宽截断后可写入MySQL() {
+        // text 列上限 65535 字节：中文 3 字节一个，3 万字约 9 万字节
+        DeadLetterDO deadLetter = new DeadLetterDO();
+        deadLetter.setMessageId("ut-dl-long-" + "m".repeat(100));
+        deadLetter.setTopic("t".repeat(200));
+        deadLetter.setPayload("中".repeat(30_000));
+        deadLetter.setRetryCount(5);
+        deadLetter.setErrorMsg("e".repeat(2000));
+        deadLetter.setHandled(false);
+        deadLetter.setTenantId(0L);
+
+        deadLetterMapper.insert(deadLetter.truncateToColumnWidth());
+
+        DeadLetterDO db = deadLetterMapper.selectById(deadLetter.getId());
+        assertThat(db.getMessageId()).hasSize(64).startsWith("ut-dl-long-");
+        assertThat(db.getTopic()).hasSize(128);
+        assertThat(db.getErrorMsg()).hasSize(1000);
+        assertThat(db.getPayload()).isEqualTo("中".repeat(65_535 / 3));
+    }
+
     /**
      * 经 Mapper 写入：同时验证写入的租户取自实体、不被当前上下文（租户 1）覆盖
      */

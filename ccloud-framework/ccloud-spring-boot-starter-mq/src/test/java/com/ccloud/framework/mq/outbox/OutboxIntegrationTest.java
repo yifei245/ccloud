@@ -225,6 +225,28 @@ class OutboxIntegrationTest {
         assertThat(deadLetterMapper.selectList()).extracting(DeadLetterDO::getTenantId).containsExactly(9L);
     }
 
+    @Test
+    @DisplayName("消息编号、主题超出死信表列宽时截断后写入，不因写库失败卡在待重试")
+    void exhaustedRetry_shouldTruncateOverlongFields() {
+        OutboxMessageDO stored = insertMessage("DL-4", 9L, 0, 1);
+        OutboxMessageDO inMemory = new OutboxMessageDO();
+        inMemory.setId(stored.getId());
+        inMemory.setMessageId("DL-4-" + "m".repeat(100));
+        inMemory.setTopic("t".repeat(200));
+        inMemory.setPayload("{}");
+        inMemory.setTenantId(9L);
+        inMemory.setRetryCount(0);
+        inMemory.setMaxRetry(1);
+        sender.setFailing(true);
+
+        outboxPublisher.publish(inMemory);
+
+        assertThat(outboxMapper.selectById(stored.getId()).getStatus()).isEqualTo(OutboxStatusEnum.DEAD.getStatus());
+        DeadLetterDO deadLetter = deadLetterMapper.selectList().get(0);
+        assertThat(deadLetter.getMessageId()).isEqualTo(inMemory.getMessageId().substring(0, DeadLetterDO.MESSAGE_ID_MAX_LENGTH));
+        assertThat(deadLetter.getTopic()).hasSize(DeadLetterDO.TOPIC_MAX_LENGTH);
+    }
+
     // ========== 不变量二：消费幂等 ==========
 
     @Test

@@ -89,6 +89,6 @@ public class OutboxPublisher {
         deadLetter.setErrorMsg(errorMsg);
         deadLetter.setHandled(false);
         deadLetter.setTenantId(tenantId == null ? 0L : tenantId);
-        deadLetterMapper.insert(deadLetter);
+        deadLetterMapper.insert(deadLetter.truncateToColumnWidth());
     }
 }

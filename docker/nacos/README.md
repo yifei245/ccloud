@@ -5,7 +5,7 @@
 | dataId | 导入的服务 | 内容 |
 |---|---|---|
 | `ccloud-common.yaml` | 全部 | 内部签名时效、租户校验缓存、文案刷新、消息重投 |
-| `ccloud-datasource.yaml` | system、member | 连接池的通用行为 |
+| `ccloud-datasource.yaml` | system、infra、member | 连接池的通用行为 |
 | `ccloud-gateway.yaml` | gateway | 限流阈值、令牌缓存、开放平台应用 |
 | `ccloud-system-server.yaml` | system | 登录失败锁定、短信验证码 |
 | `ccloud-infra-server.yaml` | infra | 文件大小上限、访问日志与异常日志保留天数 |

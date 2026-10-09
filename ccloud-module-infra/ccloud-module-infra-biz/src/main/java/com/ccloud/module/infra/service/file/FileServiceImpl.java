@@ -13,6 +13,7 @@ import com.ccloud.module.infra.dal.mysql.file.FileMapper;
 import com.ccloud.module.infra.framework.file.config.FileProperties;
 import com.ccloud.module.infra.framework.file.core.FileClientFactory;
 import com.ccloud.module.infra.framework.file.core.client.FileClient;
+import com.ccloud.module.infra.framework.file.core.client.s3.S3FileClient;
 import com.ccloud.module.infra.framework.file.core.utils.FileTypeUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -91,7 +92,12 @@ public class FileServiceImpl implements FileService {
     @Override
     public byte[] getFileContent(Long configId, String path) {
         try {
-            return fileClientFactory.getFileClient(configId).getContent(path);
+            FileClient client = fileClientFactory.getFileClient(configId);
+            // 匿名读取只服务数据库与本地磁盘存储；S3 文件由存储桶自身公开读，代读会让匿名用户借服务端密钥读出桶内任意对象
+            if (client instanceof S3FileClient) {
+                return null;
+            }
+            return client.getContent(path);
         } catch (ServiceException e) {
             throw e;
         } catch (Exception e) {

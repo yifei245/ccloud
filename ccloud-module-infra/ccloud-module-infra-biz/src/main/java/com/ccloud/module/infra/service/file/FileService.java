@@ -26,7 +26,9 @@ public interface FileService {
     PageResult<FileDO> getFilePage(FilePageReqVO reqVO);
 
     /**
-     * @return 文件内容，不存在返回 null
+     * 供匿名读取接口使用，只服务数据库与本地磁盘存储
+     *
+     * @return 文件内容；不存在或存储器为 S3 时返回 null
      */
     byte[] getFileContent(Long configId, String path);
 }

@@ -1,6 +1,7 @@
 package com.ccloud.module.infra.controller.admin;
 
 import com.ccloud.module.infra.controller.admin.file.FileController;
+import com.ccloud.module.infra.framework.file.core.client.FakeS3Server;
 import com.ccloud.module.infra.test.BaseInfraWebIntegrationTest;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
@@ -150,6 +151,31 @@ class FileControllerTest extends BaseInfraWebIntegrationTest {
             fileController.getFileContent(request, response, Long.parseLong(c[0]));
             assertThat(response.getStatus()).as(c[0] + " " + c[1]).isEqualTo(404);
             assertThat(response.getContentAsByteArray()).as(c[0] + " " + c[1]).isEmpty();
+        }
+    }
+
+    /**
+     * 设计 4.3：匿名读取接口只服务数据库与本地磁盘存储。S3 文件由存储桶自身公开读，地址不经过本接口；
+     * 代读会让匿名用户借服务端密钥读出桶内任意对象（包括桶策略未公开的），整对象读入内存还能打满堆
+     */
+    @Test
+    void S3存储不经匿名接口代读_返回404且不访问存储桶() throws Exception {
+        FakeS3Server s3 = new FakeS3Server();
+        s3.start();
+        try {
+            s3.putObject("/ccloud-test/20261001/secret.png", PNG);
+            jdbcTemplate.update("INSERT INTO infra_file_config (name, storage, master, config) VALUES (?, 20, b'0', ?)",
+                    "Web测试S3", "{\"endpoint\":\"" + s3.endpoint() + "\",\"bucket\":\"ccloud-test\",\"accessKey\":\"ut-ak\","
+                            + "\"accessSecret\":\"ut-sk\",\"region\":\"cn-hangzhou\",\"pathStyle\":true,"
+                            + "\"domain\":\"https://cdn.ccloud.local/\"}");
+            long s3Id = jdbcTemplate.queryForObject("SELECT id FROM infra_file_config WHERE name = 'Web测试S3'", Long.class);
+
+            mockMvc.perform(get(URI.create(FILE_PREFIX + s3Id + "/get/20261001/secret.png")))
+                    .andExpect(status().isNotFound())
+                    .andExpect(content().string(""));
+            assertThat(s3.requests()).isEmpty();
+        } finally {
+            s3.stop();
         }
     }
 

@@ -20,7 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 测试用的进程内 S3 服务端：路径风格（/{bucket}/{key}），对象存在内存里，只实现 PUT、GET、DELETE，并记录收到的每个请求。
  * 不校验签名：签名由 SDK 生成，测试只断言请求里带了签名。
  */
-class FakeS3Server {
+public class FakeS3Server {
 
     private static final String NO_SUCH_KEY = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
             + "<Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>";
@@ -28,7 +28,7 @@ class FakeS3Server {
     /**
      * @param headers 请求头，名称按不区分大小写比较
      */
-    record RecordedRequest(String method, String path, Map<String, String> headers, byte[] body) {
+    public record RecordedRequest(String method, String path, Map<String, String> headers, byte[] body) {
 
         String header(String name) {
             return headers.get(name);
@@ -43,7 +43,7 @@ class FakeS3Server {
     private final List<RecordedRequest> requests = new CopyOnWriteArrayList<>();
     private HttpServer server;
 
-    void start() {
+    public void start() {
         try {
             server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         } catch (IOException e) {
@@ -53,21 +53,30 @@ class FakeS3Server {
         server.start();
     }
 
-    void stop() {
+    public void stop() {
         server.stop(0);
     }
 
-    String endpoint() {
+    public String endpoint() {
         return "http://127.0.0.1:" + server.getAddress().getPort();
     }
 
-    List<RecordedRequest> requests() {
+    public List<RecordedRequest> requests() {
         return Collections.unmodifiableList(requests);
     }
 
-    void clear() {
+    public void clear() {
         requests.clear();
         objects.clear();
+    }
+
+    /**
+     * 直接放入一个对象，不经 SDK、不记请求
+     *
+     * @param path 路径风格的请求路径，即 /{bucket}/{key}
+     */
+    public void putObject(String path, byte[] content) {
+        objects.put(path, content);
     }
 
     private static boolean isAwsChunked(Map<String, String> headers) {

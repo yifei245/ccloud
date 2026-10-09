@@ -28,6 +28,10 @@ xxl:
     enabled: false
 
 ccloud:
+  infra:
+    file:
+      # 测试用 @TempDir 作本地磁盘存储的根目录，它位于 java.io.tmpdir 之下
+      local-root: ${java.io.tmpdir}
   # Web 测试不记访问日志：它们不回滚事务，日志会残留在共享测试库。需要的测试自行打开（ApiLogStreamIntegrationTest）
   access-log:
     enable: false

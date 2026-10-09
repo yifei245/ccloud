@@ -5,6 +5,7 @@ import com.ccloud.framework.operatelog.core.util.DesensitizeUtils;
 import com.ccloud.module.infra.controller.admin.file.vo.FileConfigSaveReqVO;
 import com.ccloud.module.infra.dal.dataobject.file.FileConfigDO;
 import com.ccloud.module.infra.dal.mysql.file.FileConfigMapper;
+import com.ccloud.module.infra.framework.file.config.FileProperties;
 import com.ccloud.module.infra.framework.file.core.FileClientFactory;
 import com.ccloud.module.infra.framework.file.core.FileConfigRefresher;
 import com.ccloud.module.infra.framework.file.core.enums.FileStorageEnum;
@@ -16,6 +17,8 @@ import jakarta.annotation.Resource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -31,8 +34,17 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-@Import({FileConfigServiceImpl.class, FileClientFactory.class, LocalValidatorFactoryBean.class})
+@Import({FileConfigServiceImpl.class, FileClientFactory.class, LocalValidatorFactoryBean.class,
+        FileConfigServiceImplTest.PropertiesConfig.class})
 class FileConfigServiceImplTest extends BaseInfraDbUnitTest {
+
+    /**
+     * 受控根目录取 application-unit-test.yaml 中的 java.io.tmpdir，@TempDir 位于其下
+     */
+    @TestConfiguration
+    @EnableConfigurationProperties(FileProperties.class)
+    static class PropertiesConfig {
+    }
 
     @Resource
     private FileConfigServiceImpl fileConfigService;
@@ -76,6 +88,23 @@ class FileConfigServiceImplTest extends BaseInfraDbUnitTest {
         FileConfigDO db = fileConfigMapper.selectById(id);
         assertThat(db.getMaster()).isFalse();
         assertThat(db.getStorage()).isEqualTo(10);
+    }
+
+    @Test
+    void 本地磁盘根目录须位于受控根目录之内() {
+        Path root = Path.of(System.getProperty("java.io.tmpdir"));
+        for (String basePath : new String[]{"/proc/self", "/", root + "/../etc"}) {
+            Map<String, Object> config = Map.of("basePath", basePath, "domain", "http://127.0.0.1:28080");
+            assertServiceException(() -> fileConfigService.createFileConfig(save(null, 10, config)),
+                    FILE_CONFIG_BASE_PATH_INVALID);
+        }
+        Long id = fileConfigService.createFileConfig(save(null, 10, local()));
+        assertServiceException(() -> fileConfigService.updateFileConfig(save(id, 10,
+                Map.of("basePath", "/proc/self", "domain", "http://127.0.0.1:28080"))), FILE_CONFIG_BASE_PATH_INVALID);
+
+        Long sub = fileConfigService.createFileConfig(save(null, 10,
+                Map.of("basePath", dir.resolve("sub").toString(), "domain", "http://127.0.0.1:28080")));
+        assertThat(fileConfigMapper.selectById(sub)).isNotNull();
     }
 
     @Test

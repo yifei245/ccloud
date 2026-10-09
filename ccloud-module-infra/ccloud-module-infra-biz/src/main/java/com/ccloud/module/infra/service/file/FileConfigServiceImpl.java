@@ -11,9 +11,12 @@ import com.ccloud.module.infra.controller.admin.file.vo.FileConfigPageReqVO;
 import com.ccloud.module.infra.controller.admin.file.vo.FileConfigSaveReqVO;
 import com.ccloud.module.infra.dal.dataobject.file.FileConfigDO;
 import com.ccloud.module.infra.dal.mysql.file.FileConfigMapper;
+import com.ccloud.module.infra.framework.file.config.FileProperties;
 import com.ccloud.module.infra.framework.file.core.FileClientFactory;
 import com.ccloud.module.infra.framework.file.core.FileConfigRefresher;
 import com.ccloud.module.infra.framework.file.core.client.FileClientConfig;
+import com.ccloud.module.infra.framework.file.core.client.local.LocalFileClient;
+import com.ccloud.module.infra.framework.file.core.client.local.LocalFileClientConfig;
 import com.ccloud.module.infra.framework.file.core.enums.FileStorageEnum;
 import com.ccloud.module.infra.framework.tenant.core.SystemTenantValidator;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.HashMap;
@@ -48,6 +52,8 @@ public class FileConfigServiceImpl implements FileConfigService {
     private Validator validator;
     @Resource
     private SystemTenantValidator systemTenantValidator;
+    @Resource
+    private FileProperties fileProperties;
 
     @Override
     public Long createFileConfig(FileConfigSaveReqVO reqVO) {
@@ -140,6 +146,9 @@ public class FileConfigServiceImpl implements FileConfigService {
         Set<ConstraintViolation<FileClientConfig>> violations = validator.validate(parsed);
         if (!violations.isEmpty()) {
             throw exception(FILE_CONFIG_INVALID, violations.iterator().next().getMessage());
+        }
+        if (parsed instanceof LocalFileClientConfig local) {
+            LocalFileClient.validateBasePath(local.getBasePath(), Path.of(fileProperties.getLocalRoot()));
         }
         return parsed;
     }

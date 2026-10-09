@@ -34,6 +34,10 @@ spring:
       password: ${REDIS_PASSWORD:}
 
 ccloud:
+  infra:
+    file:
+      # 本机开发时本地磁盘存储的受控根目录，文件配置的 basePath 须位于其下
+      local-root: ${user.home}/.ccloud/files
   security:
     internal-sign-secret: ${CCLOUD_INTERNAL_SIGN_SECRET:ccloud-local-internal-sign-secret}
   swagger:

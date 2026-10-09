@@ -4,6 +4,7 @@ import com.ccloud.framework.common.util.json.JsonUtils;
 import com.ccloud.module.infra.dal.dataobject.file.FileConfigDO;
 import com.ccloud.module.infra.dal.mysql.file.FileConfigMapper;
 import com.ccloud.module.infra.dal.mysql.file.FileContentMapper;
+import com.ccloud.module.infra.framework.file.config.FileProperties;
 import com.ccloud.module.infra.framework.file.core.client.FileClient;
 import com.ccloud.module.infra.framework.file.core.client.FileClientConfig;
 import com.ccloud.module.infra.framework.file.core.client.db.DBFileClient;
@@ -16,6 +17,7 @@ import com.ccloud.module.infra.framework.file.core.enums.FileStorageEnum;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Path;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -34,6 +36,8 @@ public class FileClientFactory {
     private FileConfigMapper fileConfigMapper;
     @Resource
     private FileContentMapper fileContentMapper;
+    @Resource
+    private FileProperties fileProperties;
 
     /**
      * @throws com.ccloud.framework.common.exception.ServiceException 配置不存在时抛 FILE_CONFIG_NOT_EXISTS
@@ -68,7 +72,8 @@ public class FileClientFactory {
         FileClientConfig clientConfig = JsonUtils.parseObject(config.getConfig(), storage.getConfigClass());
         return switch (storage) {
             case DB -> new DBFileClient(config.getId(), (DBFileClientConfig) clientConfig, fileContentMapper);
-            case LOCAL -> new LocalFileClient(config.getId(), (LocalFileClientConfig) clientConfig);
+            case LOCAL -> new LocalFileClient(config.getId(), (LocalFileClientConfig) clientConfig,
+                    Path.of(fileProperties.getLocalRoot()));
             case S3 -> new S3FileClient(config.getId(), (S3FileClientConfig) clientConfig);
         };
     }

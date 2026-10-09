@@ -10,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static com.ccloud.module.infra.enums.ErrorCodeConstants.FILE_CONFIG_BASE_PATH_INVALID;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LocalFileClientTest {
@@ -19,10 +21,38 @@ class LocalFileClientTest {
     Path base;
 
     private LocalFileClient client() {
+        return client(base.resolve("root").toString());
+    }
+
+    private LocalFileClient client(String basePath) {
         LocalFileClientConfig config = new LocalFileClientConfig();
-        config.setBasePath(base.resolve("root").toString());
+        config.setBasePath(basePath);
         config.setDomain("http://127.0.0.1:28080");
-        return new LocalFileClient(7L, config);
+        return new LocalFileClient(7L, config, base);
+    }
+
+    @Test
+    void 根目录须位于受控根目录之内() {
+        // 否则 basePath=/proc/self 加匿名读取接口即可读到进程环境变量里的密钥
+        for (String basePath : new String[]{"/proc/self", "/", base + "/../etc", base + "/sub/../../etc"}) {
+            assertThatThrownBy(() -> client(basePath)).as(basePath).isInstanceOf(ServiceException.class)
+                    .extracting("code").isEqualTo(FILE_CONFIG_BASE_PATH_INVALID.getCode());
+        }
+        assertThatCode(() -> client(base + "/sub")).doesNotThrowAnyException();
+        assertThatCode(() -> client(base + "/sub/../other")).doesNotThrowAnyException();
+        assertThatCode(() -> client(base.toString())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void 根目录经符号链接指向受控根目录之外也拒绝() throws Exception {
+        Path outside = Files.createTempDirectory("ccloud-outside");
+        try {
+            Path link = Files.createSymbolicLink(base.resolve("link"), outside);
+            assertThatThrownBy(() -> client(link.toString())).isInstanceOf(ServiceException.class);
+            assertThatThrownBy(() -> client(link + "/not-exists")).isInstanceOf(ServiceException.class);
+        } finally {
+            Files.deleteIfExists(outside);
+        }
     }
 
     @Test

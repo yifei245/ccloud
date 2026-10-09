@@ -127,6 +127,8 @@ ccloud:
     file:
       # 单个文件的大小上限。Spring 的 multipart 上限（16MB）须大于它
       max-size: 10MB
+      # 本地磁盘存储的受控根目录，文件配置的 basePath 须等于它或位于其下。容器内为数据卷 /app/files
+      local-root: /app/files
     api-log:
       # 访问日志、异常日志的保留天数，由每日清理任务使用
       access-retain-days: 30

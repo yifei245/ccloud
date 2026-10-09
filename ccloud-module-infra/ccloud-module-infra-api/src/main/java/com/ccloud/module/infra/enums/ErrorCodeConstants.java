@@ -47,6 +47,7 @@ public interface ErrorCodeConstants {
     ErrorCode FILE_CONFIG_NOT_EXISTS = new ErrorCode(1_002_006_000, "文件配置不存在");
     ErrorCode FILE_CONFIG_DELETE_FAIL_MASTER = new ErrorCode(1_002_006_001, "该文件配置不允许删除，原因：它是主配置，删除会导致无法上传文件");
     ErrorCode FILE_CONFIG_INVALID = new ErrorCode(1_002_006_002, "文件配置不正确：{}");
+    ErrorCode FILE_CONFIG_BASE_PATH_INVALID = new ErrorCode(1_002_006_003, "本地磁盘存储的根目录须位于 {} 之内");
 
     // ========== 文件 1-002-007-000 ==========
     ErrorCode FILE_NOT_EXISTS = new ErrorCode(1_002_007_000, "文件不存在");

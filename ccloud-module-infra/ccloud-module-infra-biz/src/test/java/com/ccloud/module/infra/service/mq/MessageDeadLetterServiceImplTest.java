@@ -20,6 +20,7 @@ import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.ex
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.MESSAGE_DEAD_LETTER_HANDLED;
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.ONLY_SYSTEM_TENANT;
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.MESSAGE_DEAD_LETTER_NOT_EXISTS;
+import static com.ccloud.module.infra.enums.ErrorCodeConstants.MESSAGE_DEAD_LETTER_PAYLOAD_EMPTY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.any;
@@ -121,6 +122,17 @@ class MessageDeadLetterServiceImplTest extends BaseInfraDbAndRedisUnitTest {
         DeadLetterDO db = deadLetterMapper.selectById(id);
         assertThat(db.getHandled()).isFalse();
         assertThat(db.getHandledTime()).isNull();
+    }
+
+    @Test
+    void resendDeadLetter_消息体为空时报业务错误_不发送且保持未处理() {
+        Long id = insert("ut-dl-null", "t.topic", 2L);
+        jdbcTemplate.update("UPDATE infra_message_dead_letter SET payload = NULL WHERE id = ?", id);
+
+        assertServiceException(() -> deadLetterService.resendDeadLetter(id), MESSAGE_DEAD_LETTER_PAYLOAD_EMPTY);
+
+        verify(messageSender, never()).send(any(), any(), any());
+        assertThat(deadLetterMapper.selectById(id).getHandled()).isFalse();
     }
 
     @Test

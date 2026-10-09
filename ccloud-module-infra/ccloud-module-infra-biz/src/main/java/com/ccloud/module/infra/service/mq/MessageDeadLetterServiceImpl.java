@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.MESSAGE_DEAD_LETTER_HANDLED;
 import static com.ccloud.module.infra.enums.ErrorCodeConstants.MESSAGE_DEAD_LETTER_NOT_EXISTS;
+import static com.ccloud.module.infra.enums.ErrorCodeConstants.MESSAGE_DEAD_LETTER_PAYLOAD_EMPTY;
 
 /**
  * DeadLetterMapper 整体不参与多租户拦截，这里的查询与更新天然跨租户，因此全部操作只允许系统租户执行
@@ -54,6 +55,10 @@ public class MessageDeadLetterServiceImpl implements MessageDeadLetterService {
     public void resendDeadLetter(Long id) {
         systemTenantValidator.validate();
         DeadLetterDO deadLetter = validateUnhandled(id);
+        // payload 列可为 NULL，Stream 发送端组装字段时遇到 null 会抛 NPE
+        if (deadLetter.getPayload() == null) {
+            throw exception(MESSAGE_DEAD_LETTER_PAYLOAD_EMPTY);
+        }
         messageSender.send(deadLetter.getTopic(), deadLetter.getMessageId(), deadLetter.getPayload());
         markHandled(id);
     }

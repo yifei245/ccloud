@@ -42,6 +42,7 @@ public interface ErrorCodeConstants {
     // ========== 消息死信 1-002-005-000 ==========
     ErrorCode MESSAGE_DEAD_LETTER_NOT_EXISTS = new ErrorCode(1_002_005_000, "死信不存在");
     ErrorCode MESSAGE_DEAD_LETTER_HANDLED = new ErrorCode(1_002_005_001, "死信已处理");
+    ErrorCode MESSAGE_DEAD_LETTER_PAYLOAD_EMPTY = new ErrorCode(1_002_005_002, "死信的消息体为空，无法重新投递");
 
     // ========== 文件配置 1-002-006-000 ==========
     ErrorCode FILE_CONFIG_NOT_EXISTS = new ErrorCode(1_002_006_000, "文件配置不存在");

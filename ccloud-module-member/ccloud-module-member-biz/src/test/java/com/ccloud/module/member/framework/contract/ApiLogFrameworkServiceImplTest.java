@@ -4,7 +4,9 @@ import com.ccloud.framework.apilog.core.service.ApiAccessLog;
 import com.ccloud.framework.apilog.core.service.ApiErrorLog;
 import com.ccloud.framework.common.util.json.JsonUtils;
 import com.ccloud.framework.mq.outbox.core.MessageSender;
+import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.module.infra.enums.logger.ApiLogTopics;
+import com.ccloud.module.open.enums.logger.OpenApiLogTopics;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -45,5 +47,61 @@ class ApiLogFrameworkServiceImplTest {
         service.createApiAccessLogAsync(new ApiAccessLog());
 
         verify(messageSender, timeout(3000).times(2)).send(eq(ApiLogTopics.ACCESS_LOG), any(), any());
+    }
+
+    @Test
+    void 开放应用的开放接口调用另发一份到开放平台调用日志() {
+        ApiAccessLog accessLog = new ApiAccessLog();
+        accessLog.setUserId(9L);
+        accessLog.setUserType(UserTypeEnum.OPEN_APP.getValue());
+        accessLog.setRequestUrl("/open-api/member/user/get");
+
+        service.createApiAccessLogAsync(accessLog);
+
+        verify(messageSender, timeout(2000)).send(eq(ApiLogTopics.ACCESS_LOG), anyString(), anyString());
+        ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
+        verify(messageSender, timeout(2000)).send(eq(OpenApiLogTopics.API_LOG), anyString(), payload.capture());
+        ApiAccessLog sent = JsonUtils.parseObject(payload.getValue(), ApiAccessLog.class);
+        assertThat(sent.getUserId()).isEqualTo(9L);
+        assertThat(sent.getUserType()).isEqualTo(3);
+    }
+
+    @Test
+    void 管理员访问管理端接口只发访问日志() {
+        ApiAccessLog accessLog = new ApiAccessLog();
+        accessLog.setUserId(1L);
+        accessLog.setUserType(UserTypeEnum.ADMIN.getValue());
+        accessLog.setRequestUrl("/admin-api/member/user/page");
+
+        service.createApiAccessLogAsync(accessLog);
+
+        verify(messageSender, timeout(2000)).send(eq(ApiLogTopics.ACCESS_LOG), anyString(), anyString());
+        verify(messageSender, after(300).never()).send(eq(OpenApiLogTopics.API_LOG), anyString(), anyString());
+    }
+
+    @Test
+    void 开放应用类型但地址不是开放接口只发访问日志() {
+        ApiAccessLog accessLog = new ApiAccessLog();
+        accessLog.setUserId(9L);
+        accessLog.setUserType(UserTypeEnum.OPEN_APP.getValue());
+        accessLog.setRequestUrl("/app-api/member/user/get");
+
+        service.createApiAccessLogAsync(accessLog);
+
+        verify(messageSender, timeout(2000)).send(eq(ApiLogTopics.ACCESS_LOG), anyString(), anyString());
+        verify(messageSender, after(300).never()).send(eq(OpenApiLogTopics.API_LOG), anyString(), anyString());
+    }
+
+    @Test
+    void 非开放应用身份即使地址是开放接口也只发访问日志() {
+        ApiAccessLog accessLog = new ApiAccessLog();
+        accessLog.setUserId(1L);
+        accessLog.setUserType(UserTypeEnum.ADMIN.getValue());
+        accessLog.setRequestUrl("/open-api/member/user/get");
+
+        service.createApiAccessLogAsync(accessLog);
+
+        verify(messageSender, timeout(2000)).send(eq(ApiLogTopics.ACCESS_LOG), anyString(), anyString());
+        verify(messageSender, after(300).never()).send(eq(OpenApiLogTopics.API_LOG), anyString(), anyString());
     }
 }

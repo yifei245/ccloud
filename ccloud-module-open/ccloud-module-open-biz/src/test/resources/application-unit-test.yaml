@@ -35,6 +35,10 @@ ccloud:
     encrypt-key: ccloud1234567890
   security:
     internal-sign-secret: unit-test-secret
+  open:
+    notify:
+      # 测试中的回调接收方监听本机 127.0.0.1
+      allow-private-address: true
 
 logging:
   level:

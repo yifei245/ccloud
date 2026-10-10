@@ -91,7 +91,8 @@ CREATE TABLE `open_api_log` (
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_app_create_time` (`app_id`, `create_time`),
-  KEY `idx_trace_id` (`trace_id`)
+  KEY `idx_trace_id` (`trace_id`),
+  KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='开放接口调用日志表';
 DROP TABLE IF EXISTS `open_notify_log`;
 CREATE TABLE `open_notify_log` (
@@ -116,5 +117,6 @@ CREATE TABLE `open_notify_log` (
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   KEY `idx_status_retry` (`status`, `next_retry_time`),
+  KEY `idx_status_create_time` (`status`, `create_time`),
   UNIQUE KEY `uk_event_id` (`event_id`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='开放应用事件回调日志表，失败按退避策略重试';

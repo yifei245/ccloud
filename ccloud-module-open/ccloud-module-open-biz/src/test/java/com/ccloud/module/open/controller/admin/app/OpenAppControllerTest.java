@@ -1,10 +1,13 @@
 package com.ccloud.module.open.controller.admin.app;
 
+import com.ccloud.module.open.enums.notify.OpenNotifyStatusEnum;
+import com.ccloud.module.open.support.NotifyReceiver;
 import com.ccloud.module.open.test.BaseOpenWebIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,6 +22,7 @@ class OpenAppControllerTest extends BaseOpenWebIntegrationTest {
 
     @AfterEach
     void cleanUp() {
+        jdbcTemplate.update("DELETE FROM open_notify_log WHERE app_id IN (SELECT id FROM open_app WHERE name LIKE 'Web测试%')");
         jdbcTemplate.update("DELETE FROM open_app_api WHERE app_id IN (SELECT id FROM (SELECT id FROM open_app WHERE name LIKE 'Web测试%') t)");
         jdbcTemplate.update("DELETE FROM open_app WHERE name LIKE 'Web测试%'");
         jdbcTemplate.update("DELETE FROM open_api WHERE code LIKE 'webtest.%'");
@@ -140,6 +144,43 @@ class OpenAppControllerTest extends BaseOpenWebIntegrationTest {
     }
 
     @Test
+    void 测试回调_异步发送成功_接收方收到open_test事件() throws Exception {
+        try (NotifyReceiver receiver = new NotifyReceiver()) {
+            String id = extract(mockMvc.perform(asAdmin(post("/admin-api/open/app/create"), ADMIN_ID)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"Web测试h\",\"status\":0,\"rateLimit\":100,\"notifyUrl\":\""
+                                    + receiver.url("/notify") + "\"}"))
+                    .andReturn().getResponse().getContentAsString(), "\"id\":(\\d+)");
+
+            String logId = extract(mockMvc.perform(asAdmin(post("/admin-api/open/app/test-notify").param("id", id), ADMIN_ID))
+                    .andExpect(jsonPath("$.code").value(0))
+                    .andReturn().getResponse().getContentAsString(), "\"data\":(\\d+)");
+
+            // Web 测试事务会提交，提交后的异步发送真实执行
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            String status;
+            do {
+                Thread.sleep(100);
+                status = extract(mockMvc.perform(asAdmin(get("/admin-api/open/notify-log/get").param("id", logId), ADMIN_ID))
+                        .andReturn().getResponse().getContentAsString(), "\"status\":(\\d+)");
+            } while (!String.valueOf(OpenNotifyStatusEnum.SUCCESS.getStatus()).equals(status) && System.nanoTime() < deadline);
+            assertThat(status).isEqualTo(String.valueOf(OpenNotifyStatusEnum.SUCCESS.getStatus()));
+            assertThat(receiver.requests).hasSize(1);
+            assertThat(receiver.requests.get(0).body()).contains("\"event\":\"open.test\"");
+            assertThat(receiver.requests.get(0).headers().getFirst("X-Open-Event-Id")).isNotBlank();
+        }
+    }
+
+    @Test
+    void 测试回调_未配置回调地址报错() throws Exception {
+        String id = extract(mockMvc.perform(asAdmin(post("/admin-api/open/app/create"), ADMIN_ID)
+                        .contentType(MediaType.APPLICATION_JSON).content(body(null, "Web测试i")))
+                .andReturn().getResponse().getContentAsString(), "\"id\":(\\d+)");
+        mockMvc.perform(asAdmin(post("/admin-api/open/app/test-notify").param("id", id), ADMIN_ID))
+                .andExpect(jsonPath("$.code").value(1_005_001_003));
+    }
+
+    @Test
     void 无权限管理员返回403() throws Exception {
         mockMvc.perform(asAdmin(put("/admin-api/open/app/assign-api"), NO_PERM_ADMIN_ID).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"appId\":1,\"apiIds\":[]}"))
@@ -150,6 +191,8 @@ class OpenAppControllerTest extends BaseOpenWebIntegrationTest {
         mockMvc.perform(asAdmin(get("/admin-api/open/app/page"), NO_PERM_ADMIN_ID))
                 .andExpect(jsonPath("$.code").value(403));
         mockMvc.perform(asAdmin(put("/admin-api/open/app/reset-secret").param("id", "1"), NO_PERM_ADMIN_ID))
+                .andExpect(jsonPath("$.code").value(403));
+        mockMvc.perform(asAdmin(post("/admin-api/open/app/test-notify").param("id", "1"), NO_PERM_ADMIN_ID))
                 .andExpect(jsonPath("$.code").value(403));
     }
 

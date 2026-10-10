@@ -7,6 +7,7 @@ import com.ccloud.module.open.controller.admin.app.vo.*;
 import com.ccloud.module.open.dal.dataobject.app.OpenAppDO;
 import com.ccloud.module.open.service.app.OpenAppSecretUtils;
 import com.ccloud.module.open.service.app.OpenAppService;
+import com.ccloud.module.open.service.notify.OpenNotifyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +29,8 @@ public class OpenAppController {
 
     @Resource
     private OpenAppService openAppService;
+    @Resource
+    private OpenNotifyService openNotifyService;
 
     @PostMapping("/create")
     @Operation(summary = "创建开放应用", description = "应用密钥只在响应中返回一次")
@@ -92,6 +95,14 @@ public class OpenAppController {
     @PreAuthorize("@ss.hasPermission('open:app:query')")
     public CommonResult<Set<Long>> getAppApiIds(@RequestParam("id") Long id) {
         return success(openAppService.getAppApiIds(id));
+    }
+
+    @PostMapping("/test-notify")
+    @Operation(summary = "发送测试回调", description = "事件 open.test，返回回调日志编号；可在回调日志中查看结果")
+    @Parameter(name = "id", description = "应用编号", required = true)
+    @PreAuthorize("@ss.hasPermission('open:app:test-notify')")
+    public CommonResult<Long> testNotify(@RequestParam("id") Long id) {
+        return success(openNotifyService.sendTestNotify(id));
     }
 
     private static OpenAppRespVO toResp(OpenAppDO app) {

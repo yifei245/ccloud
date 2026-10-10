@@ -3,6 +3,7 @@ package com.ccloud.module.open.job.logger;
 import com.ccloud.framework.test.core.ut.BaseMockitoUnitTest;
 import com.ccloud.module.open.framework.config.OpenProperties;
 import com.ccloud.module.open.service.logger.OpenApiLogService;
+import com.ccloud.module.open.service.notify.OpenNotifyService;
 import com.xxl.job.core.context.XxlJobHelper;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -21,6 +22,8 @@ class OpenLogCleanJobTest extends BaseMockitoUnitTest {
 
     @Mock
     private OpenApiLogService openApiLogService;
+    @Mock
+    private OpenNotifyService openNotifyService;
     @Spy
     private OpenProperties openProperties = new OpenProperties();
 
@@ -28,12 +31,14 @@ class OpenLogCleanJobTest extends BaseMockitoUnitTest {
     void clean_usesApiLogRetainDays_andReportsCount() {
         openProperties.getApiLog().setRetainDays(7);
         when(openApiLogService.cleanApiLog(7, 10_000)).thenReturn(5);
+        when(openNotifyService.cleanNotifyLog(7, 10_000)).thenReturn(3);
 
         try (MockedStatic<XxlJobHelper> helper = mockStatic(XxlJobHelper.class)) {
             job.clean();
 
             verify(openApiLogService).cleanApiLog(7, 10_000);
-            helper.verify(() -> XxlJobHelper.handleSuccess("删除 7 天前的调用日志 5 条"));
+            verify(openNotifyService).cleanNotifyLog(7, 10_000);
+            helper.verify(() -> XxlJobHelper.handleSuccess("删除 7 天前的调用日志 5 条、已结束的回调日志 3 条"));
         }
     }
 }

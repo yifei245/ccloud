@@ -2,8 +2,11 @@ package com.ccloud.framework.common.util.net;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class IpWhitelistUtilsTest {
 
@@ -54,5 +57,21 @@ class IpWhitelistUtilsTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("10.0.0.0/33");
         assertThatThrownBy(() -> IpWhitelistUtils.validate("10.0.0.1,,10.0.0.2"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 非字面量地址一律拒绝_不走DNS也不接受遗留缩写() {
+        for (String bad : new String[]{"abc", "dead.beef", "a.b", "be", "face", "1", "10.1", "1.2.3", "1.2.3.4.5"}) {
+            assertThatThrownBy(() -> IpWhitelistUtils.validate(bad))
+                    .as(bad).isInstanceOf(IllegalArgumentException.class).hasMessage(bad);
+            assertThat(IpWhitelistUtils.matches(bad, "0.0.0.1")).as(bad).isFalse();
+            assertThat(IpWhitelistUtils.matches("10.0.0.1", bad)).as(bad).isFalse();
+        }
+    }
+
+    @Test
+    void 校验不做DNS解析_快速失败() {
+        assertTimeoutPreemptively(Duration.ofMillis(500), () ->
+                assertThatThrownBy(() -> IpWhitelistUtils.validate("abc")).isInstanceOf(IllegalArgumentException.class));
     }
 }

@@ -1,17 +1,12 @@
 package com.ccloud.framework.common.util.net;
 
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.regex.Pattern;
+import com.google.common.net.InetAddresses;
 
 /**
  * IP 白名单：逗号分隔的 IPv4 / IPv6 地址或 CIDR。只接受字面量地址，绝不做 DNS 解析
  * （域名白名单会让匹配结果随 DNS 变化，解析本身也会阻塞网关的事件循环线程）
  */
 public final class IpWhitelistUtils {
-
-    private static final Pattern LITERAL = Pattern.compile("[0-9a-fA-F:.]+");
 
     private IpWhitelistUtils() {
     }
@@ -93,30 +88,14 @@ public final class IpWhitelistUtils {
     }
 
     /**
-     * 字面量地址转字节；IPv4 映射的 IPv6 地址（::ffff:a.b.c.d）按 IPv4 处理
+     * 字面量地址转字节。用 Guava 的严格解析：只接受标准的 IPv4 / IPv6 文本，不做 DNS，
+     * 也不接受 JDK 遗留的缩写写法（1、10.1、1.2.3）。IPv4 映射的 IPv6 地址（::ffff:a.b.c.d）
+     * 由 JDK 在构造地址时折叠为 4 字节的 IPv4 地址
      */
     private static byte[] toBytes(String ip) {
-        if (ip == null || !LITERAL.matcher(ip).matches()) {
+        if (ip == null || !InetAddresses.isInetAddress(ip)) {
             return null;
         }
-        try {
-            InetAddress address = InetAddress.getByName(ip);   // 已限定为字面量，不会触发 DNS
-            byte[] bytes = address.getAddress();
-            if (address instanceof Inet6Address && isIpv4Mapped(bytes)) {
-                return new byte[]{bytes[12], bytes[13], bytes[14], bytes[15]};
-            }
-            return bytes;
-        } catch (UnknownHostException e) {
-            return null;
-        }
-    }
-
-    private static boolean isIpv4Mapped(byte[] b) {
-        for (int i = 0; i < 10; i++) {
-            if (b[i] != 0) {
-                return false;
-            }
-        }
-        return b[10] == (byte) 0xFF && b[11] == (byte) 0xFF;
+        return InetAddresses.forString(ip).getAddress();
     }
 }

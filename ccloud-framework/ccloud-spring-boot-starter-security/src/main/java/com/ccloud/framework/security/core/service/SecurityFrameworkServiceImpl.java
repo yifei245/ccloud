@@ -1,6 +1,7 @@
 package com.ccloud.framework.security.core.service;
 
 import cn.hutool.core.collection.CollUtil;
+import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.security.core.LoginUser;
 import com.ccloud.framework.security.core.util.SecurityFrameworkUtils;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -61,7 +62,7 @@ public class SecurityFrameworkServiceImpl implements SecurityFrameworkService {
     public boolean hasAnyPermissions(String... permissions) {
         Long userId = SecurityFrameworkUtils.getLoginUserId();
         // 没有登录身份就没有任何权限。这里绝不能"无身份即放行"
-        if (userId == null) {
+        if (userId == null || !isAdmin()) {
             return false;
         }
         String key = userId + ":p:" + String.join(",", permissions);
@@ -77,12 +78,20 @@ public class SecurityFrameworkServiceImpl implements SecurityFrameworkService {
     @Override
     public boolean hasAnyRoles(String... roles) {
         Long userId = SecurityFrameworkUtils.getLoginUserId();
-        if (userId == null) {
+        if (userId == null || !isAdmin()) {
             return false;
         }
         String key = userId + ":r:" + String.join(",", roles);
         return Boolean.TRUE.equals(cache.get(key,
                 k -> permissionFrameworkService.hasAnyRoles(userId, roles)));
+    }
+
+    /**
+     * 角色与权限是管理员体系的概念，按用户编号查询。会员、开放应用的编号与管理员编号会重复，
+     * 若不限定用户类型，编号恰好相同的非管理员身份会继承该管理员的权限（例如 1 号即超级管理员）
+     */
+    private static boolean isAdmin() {
+        return UserTypeEnum.isAdmin(SecurityFrameworkUtils.getLoginUserType());
     }
 
     @Override

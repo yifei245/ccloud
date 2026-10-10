@@ -10,13 +10,15 @@ import java.util.Objects;
 /**
  * 用户类型。ccloud 把 C 端会员与管理端用户放在两套独立体系里，
  * 同一手机号在两边是互不相干的两条记录，令牌也按该字段隔离。
+ * 开放应用是第三方系统的身份，只在开放接口（/open-api）下有效。
  */
 @Getter
 @AllArgsConstructor
 public enum UserTypeEnum implements IntArrayValuable {
 
     MEMBER(1, "会员"),
-    ADMIN(2, "管理员");
+    ADMIN(2, "管理员"),
+    OPEN_APP(3, "开放应用");
 
     public static final String DICT_TYPE = "user_type";
 

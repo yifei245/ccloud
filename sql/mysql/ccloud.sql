@@ -4785,6 +4785,7 @@ INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `st
   (2, 2, '关闭', '1', 'common_status', 0, 'info', '', NULL, '1'),
   (3, 1, '会员', '1', 'user_type', 0, 'primary', '', NULL, '1'),
   (4, 2, '管理员', '2', 'user_type', 0, 'success', '', NULL, '1'),
+  (191, 3, '开放应用', '3', 'user_type', 0, 'warning', '', NULL, '1'),
   (5, 1, '微信小程序', '10', 'terminal', 0, '', '', NULL, '1'),
   (6, 2, '微信公众号', '11', 'terminal', 0, '', '', NULL, '1'),
   (7, 3, 'H5 网页', '20', 'terminal', 0, '', '', NULL, '1'),

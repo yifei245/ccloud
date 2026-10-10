@@ -72,11 +72,15 @@ public class WebFrameworkUtils {
         }
         String adminPrefix = properties != null ? properties.getAdminApi().getPrefix() : RpcConstants.ADMIN_API_PREFIX;
         String appPrefix = properties != null ? properties.getAppApi().getPrefix() : RpcConstants.APP_API_PREFIX;
+        String openPrefix = properties != null ? properties.getOpenApi().getPrefix() : RpcConstants.OPEN_API_PREFIX;
         if (uri.startsWith(adminPrefix)) {
             return UserTypeEnum.ADMIN.getValue();
         }
         if (uri.startsWith(appPrefix)) {
             return UserTypeEnum.MEMBER.getValue();
+        }
+        if (uri.startsWith(openPrefix)) {
+            return UserTypeEnum.OPEN_APP.getValue();
         }
         return null;
     }

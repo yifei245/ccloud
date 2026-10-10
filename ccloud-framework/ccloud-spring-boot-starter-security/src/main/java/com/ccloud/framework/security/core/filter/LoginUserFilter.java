@@ -1,5 +1,6 @@
 package com.ccloud.framework.security.core.filter;
 
+import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.util.json.JsonUtils;
 import com.ccloud.framework.security.config.SecurityProperties;
 import com.ccloud.framework.security.core.LoginUser;
@@ -102,9 +103,11 @@ public class LoginUserFilter extends OncePerRequestFilter {
                 return null;
             }
             // 管理员与会员是两套编号会重复的用户体系：管理员令牌访问 /app-api 若被接受，
-            // 就会以同编号会员的身份读写数据，反之亦然
+            // 就会以同编号会员的身份读写数据，反之亦然。开放应用身份只在 /open-api 下有效
             Integer expectedUserType = WebFrameworkUtils.getUserTypeByUrl(request.getRequestURI());
-            if (expectedUserType != null && !expectedUserType.equals(loginUser.getUserType())) {
+            boolean openApp = UserTypeEnum.OPEN_APP.getValue().equals(loginUser.getUserType());
+            if ((expectedUserType != null && !expectedUserType.equals(loginUser.getUserType()))
+                    || (expectedUserType == null && openApp)) {
                 log.warn("[parseLoginUser] 身份的用户类型({})与接口({})不符，已忽略。userId={}",
                         loginUser.getUserType(), request.getRequestURI(), loginUser.getId());
                 return null;

@@ -109,17 +109,17 @@ public class OpenNotifyServiceImpl implements OpenNotifyService, DisposableBean 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void retryNotify(Long id) {
-        OpenNotifyLogDO notifyLog = getNotifyLog(id);
-        if (notifyLog == null) {
+        if (getNotifyLog(id) == null) {
             throw exception(OPEN_NOTIFY_LOG_NOT_EXISTS);
         }
-        if (!OpenNotifyStatusEnum.FAILURE.getStatus().equals(notifyLog.getStatus())
-                && !OpenNotifyStatusEnum.ABANDONED.getStatus().equals(notifyLog.getStatus())) {
+        // 条件更新而非先查后改：查询之后定时任务可能已把记录写成成功，无条件更新会把它重置并重发
+        int updated = openNotifyLogMapper.updateByIdAndStatus(id,
+                List.of(OpenNotifyStatusEnum.FAILURE.getStatus(), OpenNotifyStatusEnum.ABANDONED.getStatus()),
+                new OpenNotifyLogDO().setStatus(OpenNotifyStatusEnum.WAITING.getStatus()).setRetryCount(0)
+                        .setNextRetryTime(dueNow()));
+        if (updated == 0) {
             throw exception(OPEN_NOTIFY_LOG_CANNOT_RETRY);
         }
-        openNotifyLogMapper.updateById(new OpenNotifyLogDO().setId(id)
-                .setStatus(OpenNotifyStatusEnum.WAITING.getStatus()).setRetryCount(0)
-                .setNextRetryTime(dueNow()));
         executeAfterCommit(id);
     }
 
@@ -144,13 +144,19 @@ public class OpenNotifyServiceImpl implements OpenNotifyService, DisposableBean 
      * 抢占并发送一次，按结果更新状态。返回是否抢占成功
      */
     boolean execute(Long id) {
-        LocalDateTime now = LocalDateTime.now();
-        if (TenantUtils.executeIgnore(() -> openNotifyLogMapper.claim(id, now, now.plus(LEASE))) == 0) {
+        // 先读后抢占：抢占以读到的重试次数为条件，计算退避用的次数与抢占时一致
+        OpenNotifyLogDO notifyLog = TenantUtils.executeIgnore(() -> openNotifyLogMapper.selectById(id));
+        if (notifyLog == null) {
             return false;
         }
-        OpenNotifyLogDO notifyLog = TenantUtils.executeIgnore(() -> openNotifyLogMapper.selectById(id));
+        LocalDateTime now = LocalDateTime.now();
+        // 租约结束时间截到整秒，与库中存储值一致，回写时据此确认仍持有租约
+        LocalDateTime lease = now.plus(LEASE).truncatedTo(ChronoUnit.SECONDS);
+        if (TenantUtils.executeIgnore(() -> openNotifyLogMapper.claim(id, notifyLog.getRetryCount(), now, lease)) == 0) {
+            return false;
+        }
         OpenAppDO app = openAppService.getAppIgnoreTenant(notifyLog.getAppId());
-        OpenNotifyLogDO update = new OpenNotifyLogDO().setId(id);
+        OpenNotifyLogDO update = new OpenNotifyLogDO();
         NotifyResult result;
         if (app == null || StrUtil.isBlank(app.getNotifyUrl())) {
             result = new NotifyResult(false, 0, app == null ? "应用已删除" : "应用未配置回调地址");
@@ -179,7 +185,11 @@ public class OpenNotifyServiceImpl implements OpenNotifyService, DisposableBean 
             }
         }
         update.setHttpStatus(result.httpStatus()).setResponseBody(result.responseBody());
-        TenantUtils.executeIgnore(() -> openNotifyLogMapper.updateById(update));
+        if (TenantUtils.executeIgnore(() -> openNotifyLogMapper.updateIfLeaseHeld(update, id, lease,
+                notifyLog.getRetryCount())) == 0) {
+            // 租约已失效（超时后被他方重新抢占、发送中被手工重新通知等），结果以持有租约的一方为准
+            log.warn("[execute] 回调 {} 的租约已失效，丢弃本次发送结果：{}", id, result);
+        }
         return true;
     }
 

@@ -91,9 +91,13 @@ class OpenNotifyClientTest {
 
     @Test
     void 允许内网时仍拒绝云元数据地址() {
-        NotifyResult result = client(true).post("http://169.254.169.254/latest", Map.of(), "{}");
-        assertThat(result.success()).isFalse();
-        assertThat(result.responseBody()).contains("受限地址");
+        for (String url : List.of("http://169.254.169.254/latest", "http://169.254.170.2/v2", "http://169.254.0.23/",
+                "http://100.100.100.200/latest", "http://[fd00:ec2::254]/latest")) {
+            NotifyResult result = client(true).post(url, Map.of(), "{}");
+            assertThat(result.success()).as(url).isFalse();
+            assertThat(result.httpStatus()).as(url).isZero();
+            assertThat(result.responseBody()).as(url).contains("受限地址");
+        }
     }
 
     @Test

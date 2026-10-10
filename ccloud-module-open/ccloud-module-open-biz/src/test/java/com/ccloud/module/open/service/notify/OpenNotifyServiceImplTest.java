@@ -24,15 +24,19 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.ccloud.module.open.enums.ErrorCodeConstants.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 @Import({OpenNotifyServiceImpl.class, OpenNotifyClient.class, OpenAppServiceImpl.class, OpenApiServiceImpl.class})
 @EnableConfigurationProperties(OpenProperties.class)
@@ -50,6 +54,11 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     private OpenAppCacheInvalidator invalidator;
     @MockitoBean
     private SystemTenantValidator systemTenantValidator;
+    /**
+     * 默认调用真实发送；租约用例借它在"发送进行中"插入并发改动
+     */
+    @MockitoSpyBean
+    private OpenNotifyClient openNotifyClient;
 
     private NotifyReceiver receiver;
     private OpenNotifyServiceImpl impl;
@@ -175,6 +184,81 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
         assertThat(log.getStatus()).isEqualTo(OpenNotifyStatusEnum.WAITING.getStatus());
         assertThat(log.getRetryCount()).isZero();
         assertThat(log.getNextRetryTime()).isBetween(before, LocalDateTime.now().plusSeconds(1));
+    }
+
+    @Test
+    void 租约过期后被他方重新抢占_本次回写被丢弃() {
+        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        LocalDateTime otherLease = LocalDateTime.now().plusMinutes(5).truncatedTo(ChronoUnit.SECONDS);
+        doAnswer(inv -> {
+            // 发送进行中：另一执行方在租约过期后重新抢占，租约结束时间变为它的
+            jdbcTemplate.update("UPDATE open_notify_log SET next_retry_time = ? WHERE id = ?", otherLease, id);
+            return inv.callRealMethod();
+        }).when(openNotifyClient).post(any(), any(), any());
+
+        assertThat(impl.execute(id)).isTrue();
+
+        assertThat(receiver.requests).hasSize(1);
+        OpenNotifyLogDO log = openNotifyService.getNotifyLog(id);
+        assertThat(log.getStatus()).isEqualTo(OpenNotifyStatusEnum.WAITING.getStatus());
+        assertThat(log.getRetryCount()).isZero();
+        assertThat(log.getHttpStatus()).isNull();
+        assertThat(log.getResponseBody()).isNull();
+        assertThat(log.getNextRetryTime()).isEqualTo(otherLease);
+    }
+
+    @Test
+    void 发送中被重新通知且同一秒再次被抢占_本次回写被丢弃() {
+        receiver.status = 500;
+        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        jdbcTemplate.update("UPDATE open_notify_log SET status = 20, retry_count = 3 WHERE id = ?", id);
+        doAnswer(inv -> {
+            LocalDateTime lease = jdbcTemplate.queryForObject("SELECT next_retry_time FROM open_notify_log WHERE id = ?",
+                    LocalDateTime.class, id);
+            openNotifyService.retryNotify(id);
+            // 另一执行方在同一秒抢占：租约结束时间与本次相同，只有重试次数（已清零）不同
+            jdbcTemplate.update("UPDATE open_notify_log SET next_retry_time = ? WHERE id = ?", lease, id);
+            return inv.callRealMethod();
+        }).when(openNotifyClient).post(any(), any(), any());
+
+        assertThat(impl.execute(id)).isTrue();
+
+        assertThat(receiver.requests).hasSize(1);
+        OpenNotifyLogDO log = openNotifyService.getNotifyLog(id);
+        assertThat(log.getStatus()).isEqualTo(OpenNotifyStatusEnum.WAITING.getStatus());
+        assertThat(log.getRetryCount()).isZero();
+        assertThat(log.getHttpStatus()).isNull();
+    }
+
+    @Test
+    void 重新通知_状态已被并发改为成功_报错且记录不变() {
+        receiver.status = 500;
+        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        impl.execute(id);
+        // 管理员看到"失败待重试"后、点击重新通知前，定时任务已发送成功
+        jdbcTemplate.update("UPDATE open_notify_log SET status = 10, http_status = 200 WHERE id = ?", id);
+        OpenNotifyLogDO before = openNotifyService.getNotifyLog(id);
+
+        assertServiceException(() -> openNotifyService.retryNotify(id), OPEN_NOTIFY_LOG_CANNOT_RETRY);
+
+        OpenNotifyLogDO after = openNotifyService.getNotifyLog(id);
+        assertThat(after.getStatus()).isEqualTo(OpenNotifyStatusEnum.SUCCESS.getStatus());
+        assertThat(after.getRetryCount()).isEqualTo(1);
+        assertThat(after.getNextRetryTime()).isEqualTo(before.getNextRetryTime());
+        assertThat(after.getHttpStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void 重新通知_其他租户的记录不存在且不受影响() {
+        Long tenant2AppId = TenantUtils.execute(2L, () -> 新建应用(receiver.url("/n")));
+        Long id = openNotifyService.sendNotify(tenant2AppId, "webtest.event", Map.of());
+        jdbcTemplate.update("UPDATE open_notify_log SET status = 30, retry_count = 6 WHERE id = ?", id);
+
+        assertServiceException(() -> openNotifyService.retryNotify(id), OPEN_NOTIFY_LOG_NOT_EXISTS);
+
+        OpenNotifyLogDO log = TenantUtils.executeIgnore(() -> openNotifyService.getNotifyLog(id));
+        assertThat(log.getStatus()).isEqualTo(OpenNotifyStatusEnum.ABANDONED.getStatus());
+        assertThat(log.getRetryCount()).isEqualTo(6);
     }
 
     @Test

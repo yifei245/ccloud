@@ -156,6 +156,8 @@ class OpenAppServiceImplTest extends BaseOpenDbAndRedisUnitTest {
         assertThat(snapshot.getTenantId()).isEqualTo(2L);
         assertThat(snapshot.getAppSecret()).matches("[A-Za-z0-9]{32}");
         assertThat(snapshot.getApis()).extracting(OpenAppSnapshotRespDTO.Api::getPath).containsExactly("/open-api/webtest/on");
+        // 快照携带密钥原文：toString 不得泄露，防止被日志、异常信息带出
+        assertThat(snapshot.toString()).doesNotContain(snapshot.getAppSecret());
         assertThat(openAppService.getAppSnapshot("not-exists")).isNull();
     }
 

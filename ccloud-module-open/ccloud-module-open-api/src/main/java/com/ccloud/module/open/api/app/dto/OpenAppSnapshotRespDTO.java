@@ -2,6 +2,7 @@ package com.ccloud.module.open.api.app.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.ToString;
 import lombok.experimental.Accessors;
 
 import java.time.LocalDateTime;
@@ -9,6 +10,7 @@ import java.util.List;
 
 @Schema(description = "RPC 服务 - 开放应用快照 Response DTO")
 @Data
+@ToString(exclude = "appSecret")
 @Accessors(chain = true)
 public class OpenAppSnapshotRespDTO {
 

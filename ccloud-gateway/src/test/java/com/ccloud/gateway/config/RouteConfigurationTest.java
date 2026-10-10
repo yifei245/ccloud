@@ -50,6 +50,7 @@ class RouteConfigurationTest extends GatewayIntegrationTestSupport {
 
     @Test
     void open_api_pay路径应路由到pay服务() {
+        registerDemoOpenApp();
         signedPost("/open-api/pay/order/create", "{}").exchange()
                 .expectStatus().isOk()
                 .expectBody().jsonPath("$.server").isEqualTo("pay");

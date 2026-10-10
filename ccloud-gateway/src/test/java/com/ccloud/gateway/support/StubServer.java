@@ -18,11 +18,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 下游服务桩：记录收到的业务请求（路径、请求头、请求体），返回 {"server": 名称}。
- * system 桩另外应答令牌校验 RPC，结果按令牌从 {@link #tokens} 取，未登记的令牌返回 401
+ * system 桩另外应答令牌校验 RPC，结果按令牌从 {@link #tokens} 取，未登记的令牌返回 401；
+ * open 桩另外应答应用快照 RPC，结果按 appKey 从 {@link #openApps} 取，未登记的 appKey 返回 data 为 null
  */
 public final class StubServer {
 
     public static final String TOKEN_CHECK_PATH = "/rpc-api/system/oauth2/token/check";
+    public static final String OPEN_APP_PATH = "/rpc-api/open/app/get-by-key";
 
     public record Received(String method, String pathAndQuery, Headers headers, String body) {
     }
@@ -36,6 +38,11 @@ public final class StubServer {
     public final List<Received> requests = new CopyOnWriteArrayList<>();
     public final Map<String, TokenReply> tokens = new ConcurrentHashMap<>();
     public final Map<String, AtomicInteger> tokenChecks = new ConcurrentHashMap<>();
+    /**
+     * appKey → 应答；未登记的 appKey 返回 data 为 null（应用不存在）
+     */
+    public final Map<String, TokenReply> openApps = new ConcurrentHashMap<>();
+    public final Map<String, AtomicInteger> openAppLookups = new ConcurrentHashMap<>();
 
     private final HttpServer server;
 
@@ -48,6 +55,10 @@ public final class StubServer {
         server.createContext("/", exchange -> {
             if (TOKEN_CHECK_PATH.equals(exchange.getRequestURI().getPath())) {
                 replyTokenCheck(exchange);
+                return;
+            }
+            if (OPEN_APP_PATH.equals(exchange.getRequestURI().getPath())) {
+                replyOpenApp(exchange);
                 return;
             }
             String query = exchange.getRequestURI().getRawQuery();
@@ -70,6 +81,15 @@ public final class StubServer {
         write(exchange, reply.status(), reply.body());
     }
 
+    private void replyOpenApp(HttpExchange exchange) throws IOException {
+        String query = exchange.getRequestURI().getRawQuery();
+        String appKey = query == null ? "" : URLDecoder.decode(query.replaceFirst("^appKey=", ""), StandardCharsets.UTF_8);
+        openAppLookups.computeIfAbsent(appKey, k -> new AtomicInteger()).incrementAndGet();
+        TokenReply reply = openApps.getOrDefault(appKey,
+                new TokenReply(200, "{\"code\":0,\"msg\":\"\",\"data\":null}"));
+        write(exchange, reply.status(), reply.body());
+    }
+
     private static void write(HttpExchange exchange, int status, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -84,10 +104,17 @@ public final class StubServer {
         return count == null ? 0 : count.get();
     }
 
+    public int lookupCount(String appKey) {
+        AtomicInteger count = openAppLookups.get(appKey);
+        return count == null ? 0 : count.get();
+    }
+
     public void reset() {
         requests.clear();
         tokens.clear();
         tokenChecks.clear();
+        openApps.clear();
+        openAppLookups.clear();
     }
 
     public int port() {

@@ -2,9 +2,9 @@ package com.ccloud.gateway.filter.limiter;
 
 import com.ccloud.framework.common.exception.enums.GlobalErrorCodeConstants;
 import com.ccloud.framework.common.pojo.CommonResult;
-import com.ccloud.gateway.filter.openapi.OpenApiProperties;
 import com.ccloud.gateway.filter.openapi.OpenApiSignatureFilter;
 import com.ccloud.gateway.filter.security.LoginUser;
+import com.ccloud.gateway.service.open.OpenApp;
 import com.ccloud.gateway.util.SecurityFrameworkUtils;
 import com.ccloud.gateway.util.WebFrameworkUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +29,7 @@ import java.util.List;
  *
  * <ul>
  *   <li>普通接口：按"路由 + 调用方"计数，已登录按用户、未登录按客户端 IP——单个调用方刷接口不会耗尽他人配额；</li>
- *   <li>开放接口：按应用计数，阈值取自应用配置。排在验签之后，伪造 appId 的无效请求不会消耗对方配额。</li>
+ *   <li>开放接口：按应用计数，阈值取自应用的每秒上限（open_app.rate_limit）。排在验签之后，伪造 appKey 的无效请求不会消耗对方配额。</li>
  * </ul>
  * Redis 不可用时放行：限流是保护措施，不能因为它的故障让整个网关不可用
  */
@@ -64,9 +64,9 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         String id;
         int replenishRate;
         int burstCapacity;
-        OpenApiProperties.App app = exchange.getAttribute(OpenApiSignatureFilter.OPEN_APP_ATTRIBUTE);
+        OpenApp app = exchange.getAttribute(OpenApiSignatureFilter.OPEN_APP_ATTRIBUTE);
         if (app != null) {
-            id = "open-app:" + app.getAppId();
+            id = "open-app:" + app.getAppKey();
             replenishRate = app.getRateLimit();
             burstCapacity = app.getRateLimit();
         } else {

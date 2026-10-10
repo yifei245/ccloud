@@ -1,0 +1,160 @@
+# ccloud-open-server 基础配置。与环境无关的项放这里，环境相关项放 application-{profile}.yaml。
+# Nacos 配置（ccloud-common.yaml / ccloud-datasource.yaml / ccloud-open-server.yaml）在各 application-{profile}.yaml 中导入，优先级高于本文件与 profile 文件。
+server:
+  port: 28084
+
+spring:
+  application:
+    name: ccloud-open-server
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  main:
+    allow-circular-references: false
+  cloud:
+    nacos:
+      server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        metadata:
+          # 供 Spring Boot Admin 发现 actuator 端点
+          management.context-path: /actuator
+      config:
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+  jackson:
+    serialization:
+      write-dates-as-timestamps: true
+      fail-on-empty-beans: false
+    deserialization:
+      fail-on-unknown-properties: false
+  cache:
+    type: redis
+    redis:
+      time-to-live: 1h
+  datasource:
+    dynamic:
+      primary: master
+      strict: false
+  boot:
+    admin:
+      client:
+        # 监控面板（ccloud-monitor）从 Nacos 发现本服务，默认不再主动注册：两种方式同时开启会出现两个相同实例，
+        # 且面板要求登录，未配置账号的主动注册会被拒绝。无注册中心的环境可设 SBA_CLIENT_ENABLED=true 并配置账号
+        enabled: ${SBA_CLIENT_ENABLED:false}
+        url: http://${SBA_HOST:127.0.0.1}:28182
+        username: admin
+        password: ${CCLOUD_MONITOR_PASSWORD:ccloud123}
+        instance:
+          prefer-ip: true
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.ccloud.module.open.dal.dataobject
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+  tracing:
+    sampling:
+      probability: ${TRACING_PROBABILITY:1.0}
+  info:
+    env:
+      enabled: true
+  zipkin:
+    tracing:
+      endpoint: http://${ZIPKIN_HOST:127.0.0.1}:9411/api/v2/spans
+
+xxl:
+  job:
+    enabled: ${XXL_JOB_ENABLED:true}
+    access-token: ${XXL_JOB_ACCESS_TOKEN:default_token}
+    admin:
+      addresses: http://${XXL_JOB_HOST:127.0.0.1}:48180/xxl-job-admin
+    executor:
+      appname: ${spring.application.name}
+      port: 0
+      log-path: ${user.home}/logs/xxl-job/${spring.application.name}
+      log-retention-days: 30
+
+ccloud:
+  security:
+    # 网关与各服务共享的内部签名密钥，必须通过环境变量或 Nacos 注入，缺失时所有内部身份均被拒绝
+    internal-sign-secret: ${CCLOUD_INTERNAL_SIGN_SECRET:}
+  mybatis:
+    # 字段加密（EncryptTypeHandler）密钥，16 位
+    encrypt-key: ${CCLOUD_ENCRYPT_KEY:ccloud1234567890}
+  swagger:
+    title: ccloud 开放平台服务
+    description: 开放应用、接口目录、调用日志、回调通知
+    version: 1.0.0
+  xss:
+    enable: true
+  i18n:
+    default-locale: zh_CN
+  open:
+    notify:
+      # 回调地址可否指向内网。生产必须为 false（防 SSRF）；本地开发与 docker 的 dev profile 中打开
+      allow-private-address: false
+      connect-timeout: 5s
+      read-timeout: 5s
+    api-log:
+      # 调用日志与已结束的回调日志的保留天数，由每日清理任务使用
+      retain-days: 30
+  tenant:
+    enable: true
+    # 租户校验结果本地缓存时长：每个请求都要经 RPC 校验租户，缓存期内租户状态变更不会立即生效
+    valid-cache-duration: 1m
+    # 不含 tenant_id 列的全局表，与 sql/mysql/ddl 保持一致（由 OpenServerApplicationTest 校验；与 system 共用一个库）
+    ignore-tables:
+      - system_menu
+      - system_tenant
+      - system_tenant_package
+      - system_dict_type
+      - system_dict_data
+      - system_oauth2_client
+      - system_sms_channel
+      - system_sms_template
+      - system_mail_account
+      - system_mail_template
+      - system_notify_template
+      - system_i18n_message
+      - infra_config
+      - infra_file_config
+      - infra_file_content
+      - infra_codegen_table
+      - infra_codegen_column
+      - infra_data_source_config
+      - infra_message_consume_log
+      - infra_demo_student
+      - infra_demo_category
+      - open_api
+
+debug: false

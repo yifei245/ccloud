@@ -26,6 +26,7 @@
         <module>ccloud-framework</module>
         <module>ccloud-module-system</module>
         <module>ccloud-module-infra</module>
+        <module>ccloud-module-open</module>
         <module>ccloud-module-member</module>
         <module>ccloud-gateway</module>
         <module>ccloud-monitor</module>

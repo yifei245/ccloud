@@ -72,19 +72,11 @@ INSERT INTO `pay_wallet` (`id`, `user_id`, `user_type`, `balance`, `total_expens
   (1, 1, 1, 0, 0, 0, 0, 1, '1');
 
 INSERT INTO `open_app` (`id`, `name`, `app_key`, `app_secret`, `status`, `remark`, `ip_whitelist`, `rate_limit`, `expire_time`, `contact_name`, `contact_mobile`, `notify_url`, `tenant_id`, `creator`) VALUES
-  (1, '开放平台演示应用', 'ccloud-open-demo', 'ccloud-open-demo-secret', 0, '本地调试用，生产环境请删除或重置密钥', NULL, 50, NULL, '演示联系人', '13800000009', NULL, 1, '1');
+  (1, '开放平台演示应用', 'ccloud-open-demo', '762055db4f2bfcd6b747242eafabcdc81c40e79a07ef2482c4d918b301c507c6', 0, '本地调试用，密钥原文 ccloud-open-demo-secret；生产环境请删除或重置密钥', NULL, 50, NULL, '演示联系人', '13800000009', NULL, 1, '1');
 
-INSERT INTO `open_app_scope` (`id`, `app_id`, `scope`, `tenant_id`, `creator`) VALUES
-  (1, 1, 'member.user.read', 1, '1'),
-  (2, 1, 'trade.order.read', 1, '1');
-
-INSERT INTO `open_api` (`id`, `name`, `code`, `path`, `method`, `module`, `description`, `status`, `creator`) VALUES
-  (1, '查询会员信息', 'member.user.get', '/open-api/member/user/get', 'GET', 'member', '按手机号查询会员基本信息', 0, '1'),
-  (2, '查询订单详情', 'trade.order.get', '/open-api/trade/order/get', 'GET', 'trade', '按订单号查询订单', 0, '1'),
-  (3, '分页查询订单', 'trade.order.page', '/open-api/trade/order/page', 'GET', 'trade', '按时间范围分页查询订单', 0, '1');
+INSERT INTO `open_api` (`id`, `name`, `code`, `path`, `method`, `description`, `status`, `creator`) VALUES
+  (1, '查询会员信息', 'member.user.get', '/open-api/member/user/get', 'GET', '按手机号查询会员基本信息，手机号脱敏', 0, '1');
 
 INSERT INTO `open_app_api` (`id`, `app_id`, `api_id`, `tenant_id`, `creator`) VALUES
-  (1, 1, 1, 1, '1'),
-  (2, 1, 2, 1, '1'),
-  (3, 1, 3, 1, '1');
+  (1, 1, 1, 1, '1');
 

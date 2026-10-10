@@ -1315,7 +1315,7 @@ CREATE TABLE `member_sign_in_record` (
 
 -- >>>>>>>>>> ddl/04-open.sql <<<<<<<<<<
 -- ----------------------------------------------------------------------------
--- open 模块：第三方开放平台：应用、密钥、授权范围、接口目录、调用日志、回调通知
+-- open 模块：第三方开放平台：应用、接口目录、应用接口授权、调用日志、回调通知
 -- 本文件由 DDL 生成器产出，公共约定与 01-system.sql 一致
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
@@ -1326,8 +1326,8 @@ DROP TABLE IF EXISTS `open_app`;
 CREATE TABLE `open_app` (
   `id`               bigint        NOT NULL AUTO_INCREMENT COMMENT '应用编号',
   `name`             varchar(64)   NOT NULL COMMENT '应用名称',
-  `app_key`          varchar(64)   NOT NULL COMMENT '应用标识，公开',
-  `app_secret`       varchar(128)  NOT NULL COMMENT '应用密钥。签名校验需明文参与 HMAC 计算，不可单向哈希',
+  `app_key`          varchar(64)   NOT NULL COMMENT '应用标识，公开，系统生成，不可修改',
+  `app_secret`       varchar(255)  NOT NULL COMMENT '应用密钥，AES 加密存储（ccloud.mybatis.encrypt-key）。签名校验需原文参与 HMAC 计算，不可单向哈希',
   `status`           tinyint       NOT NULL DEFAULT 0 COMMENT '状态：0 开启 1 关闭',
   `remark`           varchar(500)  DEFAULT NULL COMMENT '备注',
   `ip_whitelist`     varchar(1024) DEFAULT NULL COMMENT 'IP 白名单，逗号分隔，为空表示不限制',
@@ -1346,29 +1346,13 @@ CREATE TABLE `open_app` (
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_key` (`app_key`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='开放应用表。第三方凭 app_key + app_secret 调用 /open-api';
-DROP TABLE IF EXISTS `open_app_scope`;
-CREATE TABLE `open_app_scope` (
-  `id`            bigint       NOT NULL AUTO_INCREMENT COMMENT '编号',
-  `app_id`        bigint       NOT NULL COMMENT '应用编号',
-  `scope`         varchar(128) NOT NULL COMMENT '授权范围，如 order.read',
-  `tenant_id`     bigint       NOT NULL DEFAULT 0 COMMENT '租户编号',
-  `creator`       varchar(64)  DEFAULT '' COMMENT '创建者',
-  `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater`       varchar(64)  DEFAULT '' COMMENT '更新者',
-  `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
-  PRIMARY KEY (`id`),
-  KEY `idx_tenant_id` (`tenant_id`),
-  UNIQUE KEY `uk_app_scope` (`app_id`, `scope`, `deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='开放应用授权范围表，client_credentials 换取的令牌据此限定 scope';
 DROP TABLE IF EXISTS `open_api`;
 CREATE TABLE `open_api` (
   `id`            bigint       NOT NULL AUTO_INCREMENT COMMENT '接口编号',
   `name`          varchar(64)  NOT NULL COMMENT '接口名称',
   `code`          varchar(128) NOT NULL COMMENT '接口编码',
-  `path`          varchar(255) NOT NULL COMMENT '接口路径，/open-api/ 开头',
+  `path`          varchar(255) NOT NULL COMMENT '接口路径，/open-api/ 开头，网关按 方法 + 路径 精确匹配授权',
   `method`        varchar(16)  NOT NULL COMMENT '请求方法',
-  `module`        varchar(32)  NOT NULL COMMENT '所属模块，网关据此路由',
   `description`   varchar(512) DEFAULT NULL COMMENT '接口描述',
   `status`        tinyint      NOT NULL DEFAULT 0 COMMENT '状态：0 开启 1 关闭',
   `creator`       varchar(64)  DEFAULT '' COMMENT '创建者',
@@ -1377,8 +1361,9 @@ CREATE TABLE `open_api` (
   `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`       bigint       NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_code` (`code`, `deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='开放接口目录表，全局共享';
+  UNIQUE KEY `uk_code` (`code`, `deleted`),
+  UNIQUE KEY `uk_method_path` (`method`, `path`, `deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='开放接口目录表，全局共享，只有系统租户可维护';
 DROP TABLE IF EXISTS `open_app_api`;
 CREATE TABLE `open_app_api` (
   `id`            bigint      NOT NULL AUTO_INCREMENT COMMENT '编号',
@@ -1406,9 +1391,8 @@ CREATE TABLE `open_api_log` (
   `request_method`   varchar(16)  NOT NULL COMMENT '请求方法',
   `request_url`      varchar(255) NOT NULL COMMENT '请求地址',
   `request_params`   text         DEFAULT NULL COMMENT '请求参数，敏感字段已脱敏',
-  `response_body`    text         DEFAULT NULL COMMENT '响应结果',
   `result_code`      int          NOT NULL DEFAULT 0 COMMENT '业务结果码',
-  `result_msg`       varchar(512) DEFAULT '' COMMENT '结果提示',
+  `result_msg`       varchar(512) DEFAULT '' COMMENT '结果提示，业务失败时为错误提示',
   `user_ip`          varchar(50)  NOT NULL COMMENT '调用方 IP',
   `duration`         int          NOT NULL DEFAULT 0 COMMENT '执行时长，单位毫秒',
   `begin_time`       datetime     NOT NULL COMMENT '开始时间',
@@ -1429,13 +1413,16 @@ DROP TABLE IF EXISTS `open_notify_log`;
 CREATE TABLE `open_notify_log` (
   `id`                bigint        NOT NULL AUTO_INCREMENT COMMENT '编号',
   `app_id`            bigint        NOT NULL COMMENT '应用编号',
+  `event_id`          varchar(64)   NOT NULL COMMENT '事件编号，回调时放入 X-Open-Event-Id，供对方去重',
   `event`             varchar(64)   NOT NULL COMMENT '事件类型，如 order.paid',
-  `payload`           text          NOT NULL COMMENT '回调内容，JSON',
+  `payload`           text          NOT NULL COMMENT '回调请求体，JSON，签名即对它计算',
   `notify_url`        varchar(512)  NOT NULL COMMENT '回调地址',
   `status`            tinyint       NOT NULL DEFAULT 0 COMMENT '状态：0 待通知 10 成功 20 失败待重试 30 放弃',
   `retry_count`       int           NOT NULL DEFAULT 0 COMMENT '已重试次数',
   `next_retry_time`   datetime      DEFAULT NULL COMMENT '下次重试时间',
-  `response_body`     varchar(2048) DEFAULT NULL COMMENT '对方响应内容',
+  `last_notify_time`  datetime      DEFAULT NULL COMMENT '最近一次通知时间',
+  `http_status`       int           DEFAULT NULL COMMENT '最近一次对方返回的 HTTP 状态码',
+  `response_body`     varchar(2048) DEFAULT NULL COMMENT '对方最近一次响应内容，截断到 2048 字符；未发出时为失败原因',
   `tenant_id`         bigint        NOT NULL DEFAULT 0 COMMENT '租户编号',
   `creator`           varchar(64)   DEFAULT '' COMMENT '创建者',
   `create_time`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1444,7 +1431,8 @@ CREATE TABLE `open_notify_log` (
   `deleted`           bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
-  KEY `idx_status_retry` (`status`, `next_retry_time`)
+  KEY `idx_status_retry` (`status`, `next_retry_time`),
+  UNIQUE KEY `uk_event_id` (`event_id`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='开放应用事件回调日志表，失败按退避策略重试';
 
 -- >>>>>>>>>> ddl/05-pay.sql <<<<<<<<<<
@@ -3439,7 +3427,7 @@ CREATE TABLE `ai_knowledge_segment` (
 USE `ccloud`;
 
 INSERT INTO `system_tenant_package` (`id`, `name`, `status`, `remark`, `menu_ids`) VALUES
-  (1, '普通套餐', 0, '新建租户的默认套餐，不含租户管理、开发工具类菜单，以及参数配置、文件配置、消息死信等全局 / 跨租户管理菜单', '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,110,111,112,113,114,115,121,122,123,124,125,144,145,146,147,148,149,150,151,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,335,336,337,338,339,340,341,342,343,344,345,346,347,348,349,350,351,352,353,354,355,356,357,358,359,360,361,362,363,364,365,366,367,368,369,370,371,372,373,374,375,376,377,378,379,380,381,382,383,384,385,386,387,388,389,390,391,392,393,394,395,396,397,398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417,418,419,420,421,422,423,424,425,426,427,428,429,430,431,432,433,434,435,436,437,438,439,440,441,442,443,444,445,446,447,448,449,450,451,452,453,454,455,456,457,458,459,460,461,462,463,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492]');
+  (1, '普通套餐', 0, '新建租户的默认套餐，不含租户管理、开发工具类菜单，以及参数配置、文件配置、消息死信等全局 / 跨租户管理菜单', '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,110,111,112,113,114,115,121,122,123,124,125,144,145,146,147,148,149,150,151,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,335,336,337,338,339,340,341,342,343,344,345,346,347,348,349,350,351,352,353,354,355,356,357,358,359,360,361,362,363,364,365,366,367,368,369,370,371,372,373,374,375,376,377,378,379,380,381,382,383,384,385,386,387,388,389,390,391,392,393,394,395,396,397,398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417,418,419,420,421,422,423,424,425,426,427,428,429,430,431,432,433,434,435,436,437,438,439,440,441,442,443,444,445,446,447,448,449,450,451,452,453,454,455,456,457,458,459,460,461,462,463,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492,493,494]');
 
 INSERT INTO `system_tenant` (`id`, `name`, `contact_user_id`, `contact_name`, `contact_mobile`, `status`, `website`, `package_id`, `expire_time`, `account_count`, `creator`) VALUES
   (1, 'ccloud 总部', 1, '超级管理员', '13800000000', 0, 'localhost', 0, '2099-12-31 23:59:59', 9999, '1');
@@ -3474,7 +3462,7 @@ INSERT INTO `member_user` (`id`, `mobile`, `password`, `status`, `register_ip`, 
 -- >>>>>>>>>> dml/02-menu.sql <<<<<<<<<<
 -- ----------------------------------------------------------------------------
 -- 初始化数据：菜单
--- 共 485 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
+-- 共 487 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -3971,7 +3959,9 @@ INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_i
   (489, '知识库查询', 'ai:knowledge:query', 3, 1, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (490, '知识库新增', 'ai:knowledge:create', 3, 2, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (491, '知识库修改', 'ai:knowledge:update', 3, 3, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (492, '知识库删除', 'ai:knowledge:delete', 3, 4, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1');
+  (492, '知识库删除', 'ai:knowledge:delete', 3, 4, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
+  (493, '开放应用授权接口', 'open:app:assign-api', 3, 6, 207, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
+  (494, '开放应用测试回调', 'open:app:test-notify', 3, 7, 207, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1');
 
 
 -- >>>>>>>>>> dml/03-role.sql <<<<<<<<<<
@@ -4729,7 +4719,9 @@ INSERT INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `tenant_id`, `creato
   (741, 2, 485, 1, '1'),
   (742, 2, 486, 1, '1'),
   (743, 2, 488, 1, '1'),
-  (744, 2, 489, 1, '1');
+  (744, 2, 489, 1, '1'),
+  (745, 1, 493, 1, '1'),
+  (746, 1, 494, 1, '1');
 
 
 -- >>>>>>>>>> dml/04-dict.sql <<<<<<<<<<
@@ -4785,7 +4777,8 @@ INSERT INTO `system_dict_type` (`id`, `name`, `type`, `status`, `remark`, `creat
   (44, '优惠劵领取方式', 'promotion_coupon_take_type', 0, NULL, '1'),
   (45, '营销商品范围', 'promotion_product_scope', 0, NULL, '1'),
   (46, 'AI 平台', 'ai_platform', 0, NULL, '1'),
-  (47, 'AI 模型类型', 'ai_model_type', 0, NULL, '1');
+  (47, 'AI 模型类型', 'ai_model_type', 0, NULL, '1'),
+  (48, '开放平台回调状态', 'open_notify_status', 0, NULL, '1');
 
 INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `status`, `color_type`, `css_class`, `remark`, `creator`) VALUES
   (1, 1, '开启', '0', 'common_status', 0, 'primary', '', NULL, '1'),
@@ -4970,7 +4963,11 @@ INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `st
   (187, 3, '语音', '3', 'ai_model_type', 0, '', '', NULL, '1'),
   (188, 4, '视频', '4', 'ai_model_type', 0, '', '', NULL, '1'),
   (189, 5, '向量', '5', 'ai_model_type', 0, '', '', NULL, '1'),
-  (190, 6, '重排序', '6', 'ai_model_type', 0, '', '', NULL, '1');
+  (190, 6, '重排序', '6', 'ai_model_type', 0, '', '', NULL, '1'),
+  (192, 1, '待通知', '0', 'open_notify_status', 0, 'info', '', NULL, '1'),
+  (193, 2, '成功', '10', 'open_notify_status', 0, 'success', '', NULL, '1'),
+  (194, 3, '失败待重试', '20', 'open_notify_status', 0, 'warning', '', NULL, '1'),
+  (195, 4, '放弃', '30', 'open_notify_status', 0, 'danger', '', NULL, '1');
 
 
 -- >>>>>>>>>> dml/05-oauth2-client.sql <<<<<<<<<<
@@ -4984,9 +4981,7 @@ INSERT INTO `system_oauth2_client` (`id`, `client_id`, `secret`, `name`, `logo`,
   (1, 'ccloud-web', 'ccloud-web-secret', '管理后台', '', 'Web 管理后台，支持 SSO 授权码模式', 0, 1800, 2592000, '["http://localhost:8080/cb","http://127.0.0.1:8080/cb"]', '["password","sms_code","social","authorization_code","refresh_token"]', '["user.read","user.write"]', '["user.read"]', '[]', '[]', '{}', '1'),
   (2, 'ccloud-app', 'ccloud-app-secret', '手机 App', '', 'iOS / Android App', 0, 7200, 2592000, '[]', '["password","sms_code","social","refresh_token"]', '["user.read","user.write"]', '[]', '[]', '[]', '{}', '1'),
   (3, 'ccloud-mp-weixin', 'ccloud-mp-weixin-secret', '微信小程序', '', '微信小程序，支持一键登录', 0, 7200, 2592000, '[]', '["sms_code","social","refresh_token"]', '["user.read","user.write"]', '[]', '[]', '[]', '{}', '1'),
-  (4, 'ccloud-h5', 'ccloud-h5-secret', 'H5 网页', '', '移动端 H5 与微信公众号 H5', 0, 7200, 2592000, '[]', '["password","sms_code","social","refresh_token"]', '["user.read","user.write"]', '[]', '[]', '[]', '{}', '1'),
-  (5, 'ccloud-open-demo', 'ccloud-open-demo-secret', '开放平台演示应用', '', '第三方系统以 client_credentials 换取令牌调用 /open-api', 0, 7200, 0, '[]', '["client_credentials"]', '["member.user.read","trade.order.read"]', '[]', '[]', '[]', '{}', '1');
-
+  (4, 'ccloud-h5', 'ccloud-h5-secret', 'H5 网页', '', '移动端 H5 与微信公众号 H5', 0, 7200, 2592000, '[]', '["password","sms_code","social","refresh_token"]', '["user.read","user.write"]', '[]', '[]', '[]', '{}', '1');
 
 -- >>>>>>>>>> dml/06-i18n.sql <<<<<<<<<<
 -- ----------------------------------------------------------------------------
@@ -5453,21 +5448,13 @@ INSERT INTO `pay_wallet` (`id`, `user_id`, `user_type`, `balance`, `total_expens
   (1, 1, 1, 0, 0, 0, 0, 1, '1');
 
 INSERT INTO `open_app` (`id`, `name`, `app_key`, `app_secret`, `status`, `remark`, `ip_whitelist`, `rate_limit`, `expire_time`, `contact_name`, `contact_mobile`, `notify_url`, `tenant_id`, `creator`) VALUES
-  (1, '开放平台演示应用', 'ccloud-open-demo', 'ccloud-open-demo-secret', 0, '本地调试用，生产环境请删除或重置密钥', NULL, 50, NULL, '演示联系人', '13800000009', NULL, 1, '1');
+  (1, '开放平台演示应用', 'ccloud-open-demo', '762055db4f2bfcd6b747242eafabcdc81c40e79a07ef2482c4d918b301c507c6', 0, '本地调试用，密钥原文 ccloud-open-demo-secret；生产环境请删除或重置密钥', NULL, 50, NULL, '演示联系人', '13800000009', NULL, 1, '1');
 
-INSERT INTO `open_app_scope` (`id`, `app_id`, `scope`, `tenant_id`, `creator`) VALUES
-  (1, 1, 'member.user.read', 1, '1'),
-  (2, 1, 'trade.order.read', 1, '1');
-
-INSERT INTO `open_api` (`id`, `name`, `code`, `path`, `method`, `module`, `description`, `status`, `creator`) VALUES
-  (1, '查询会员信息', 'member.user.get', '/open-api/member/user/get', 'GET', 'member', '按手机号查询会员基本信息', 0, '1'),
-  (2, '查询订单详情', 'trade.order.get', '/open-api/trade/order/get', 'GET', 'trade', '按订单号查询订单', 0, '1'),
-  (3, '分页查询订单', 'trade.order.page', '/open-api/trade/order/page', 'GET', 'trade', '按时间范围分页查询订单', 0, '1');
+INSERT INTO `open_api` (`id`, `name`, `code`, `path`, `method`, `description`, `status`, `creator`) VALUES
+  (1, '查询会员信息', 'member.user.get', '/open-api/member/user/get', 'GET', '按手机号查询会员基本信息，手机号脱敏', 0, '1');
 
 INSERT INTO `open_app_api` (`id`, `app_id`, `api_id`, `tenant_id`, `creator`) VALUES
-  (1, 1, 1, 1, '1'),
-  (2, 1, 2, 1, '1'),
-  (3, 1, 3, 1, '1');
+  (1, 1, 1, 1, '1');
 
 
 SET FOREIGN_KEY_CHECKS = 1;

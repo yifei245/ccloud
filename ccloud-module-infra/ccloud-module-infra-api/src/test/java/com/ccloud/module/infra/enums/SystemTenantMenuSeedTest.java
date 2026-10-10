@@ -32,16 +32,26 @@ class SystemTenantMenuSeedTest {
     @Test
     @DisplayName("普通套餐不得含全局 / 跨租户的 infra 管理菜单")
     void normalPackageShouldNotContainSystemOnlyMenus() {
-        Matcher matcher = Pattern.compile("\\(1, '普通套餐', [^\\n]*'\\[([0-9,]+)]'\\)")
-                .matcher(SqlFixture.read("01-tenant-and-user.sql"));
-        assertThat(matcher.find()).as("01-tenant-and-user.sql 中应有普通套餐").isTrue();
-        Set<Long> menuIds = Arrays.stream(matcher.group(1).split(",")).map(Long::valueOf)
-                .collect(Collectors.toSet());
+        Set<Long> menuIds = normalPackageMenuIds();
 
         assertThat(SYSTEM_ONLY_MENU_IDS).hasSize(14);
         assertThat(menuIds).as("普通套餐菜单").isNotEmpty().doesNotContainAnyElementsOf(SYSTEM_ONLY_MENU_IDS);
         // 文件列表与 API 日志仍按租户隔离，普通租户可用
         assertThat(menuIds).contains(121L, 122L, 123L, 124L, 125L);
+    }
+
+    @Test
+    @DisplayName("普通套餐不含接口目录的增删改，含开放应用授权与测试回调按钮")
+    void 普通套餐不含接口目录的增删改_含开放应用授权与测试回调按钮() {
+        Set<Long> menuIds = normalPackageMenuIds();
+        assertThat(menuIds).doesNotContain(215L, 216L, 217L).contains(214L, 493L, 494L);
+    }
+
+    private static Set<Long> normalPackageMenuIds() {
+        Matcher matcher = Pattern.compile("\\(1, '普通套餐', [^\\n]*'\\[([0-9,]+)]'\\)")
+                .matcher(SqlFixture.read("01-tenant-and-user.sql"));
+        assertThat(matcher.find()).as("01-tenant-and-user.sql 中应有普通套餐").isTrue();
+        return Arrays.stream(matcher.group(1).split(",")).map(Long::valueOf).collect(Collectors.toSet());
     }
 
     @Test

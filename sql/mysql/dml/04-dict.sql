@@ -50,7 +50,8 @@ INSERT INTO `system_dict_type` (`id`, `name`, `type`, `status`, `remark`, `creat
   (44, '优惠劵领取方式', 'promotion_coupon_take_type', 0, NULL, '1'),
   (45, '营销商品范围', 'promotion_product_scope', 0, NULL, '1'),
   (46, 'AI 平台', 'ai_platform', 0, NULL, '1'),
-  (47, 'AI 模型类型', 'ai_model_type', 0, NULL, '1');
+  (47, 'AI 模型类型', 'ai_model_type', 0, NULL, '1'),
+  (48, '开放平台回调状态', 'open_notify_status', 0, NULL, '1');
 
 INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `status`, `color_type`, `css_class`, `remark`, `creator`) VALUES
   (1, 1, '开启', '0', 'common_status', 0, 'primary', '', NULL, '1'),
@@ -235,5 +236,9 @@ INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `st
   (187, 3, '语音', '3', 'ai_model_type', 0, '', '', NULL, '1'),
   (188, 4, '视频', '4', 'ai_model_type', 0, '', '', NULL, '1'),
   (189, 5, '向量', '5', 'ai_model_type', 0, '', '', NULL, '1'),
-  (190, 6, '重排序', '6', 'ai_model_type', 0, '', '', NULL, '1');
+  (190, 6, '重排序', '6', 'ai_model_type', 0, '', '', NULL, '1'),
+  (192, 1, '待通知', '0', 'open_notify_status', 0, 'info', '', NULL, '1'),
+  (193, 2, '成功', '10', 'open_notify_status', 0, 'success', '', NULL, '1'),
+  (194, 3, '失败待重试', '20', 'open_notify_status', 0, 'warning', '', NULL, '1'),
+  (195, 4, '放弃', '30', 'open_notify_status', 0, 'danger', '', NULL, '1');
 

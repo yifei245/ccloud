@@ -81,7 +81,7 @@ class OpenAppServiceImplTest extends GatewayIntegrationTestSupport {
     }
 
     @Test
-    void open返回错误状态_错误码_无法解析的响应都视为不可用且不缓存() {
+    void open返回错误状态_错误码_无法解析_空响应体都视为不可用且不缓存() {
         OPEN.openApps.put("bad", new StubServer.TokenReply(500, "oops"));
         assertThatThrownBy(() -> openAppService.getApp("bad").block()).isInstanceOf(OpenAppUnavailableException.class);
 
@@ -91,8 +91,12 @@ class OpenAppServiceImplTest extends GatewayIntegrationTestSupport {
         OPEN.openApps.put("bad", new StubServer.TokenReply(200, "not json"));
         assertThatThrownBy(() -> openAppService.getApp("bad").block()).isInstanceOf(OpenAppUnavailableException.class);
 
-        // 三次失败都没有被缓存，open 恢复后立即可用
-        assertThat(OPEN.lookupCount("bad")).isEqualTo(3);
+        // 200 空响应体不能当作"应用不存在"
+        OPEN.openApps.put("bad", new StubServer.TokenReply(200, ""));
+        assertThatThrownBy(() -> openAppService.getApp("bad").block()).isInstanceOf(OpenAppUnavailableException.class);
+
+        // 四次失败都没有被缓存，open 恢复后立即可用
+        assertThat(OPEN.lookupCount("bad")).isEqualTo(4);
         registerOpenApp("bad", "s", 3L, 7L, 0, 50, null, null, API);
         assertThat(openAppService.getApp("bad").block()).isNotNull();
     }

@@ -58,6 +58,8 @@ public class OpenAppServiceImpl implements OpenAppService {
                 .bodyToMono(String.class)
                 .timeout(properties.getAppLookupTimeout())
                 .onErrorMap(e -> new OpenAppUnavailableException("开放平台服务不可用", e))
+                // 200 空响应体：bodyToMono 为空，不能让 map 被跳过而落入"应用不存在"（401）
+                .switchIfEmpty(Mono.error(new OpenAppUnavailableException("应用查询响应为空", null)))
                 .map(OpenAppServiceImpl::parse);
     }
 

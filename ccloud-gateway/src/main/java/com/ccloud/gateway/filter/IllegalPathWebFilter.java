@@ -21,6 +21,10 @@ import java.util.Locale;
  * <p>网关按原始路径匹配路由后原样转发，下游 Tomcat 会再做一次解码与规范化：
  * {@code /admin-api/system/..%2F..%2Frpc-api/...} 在网关看来属于 system 业务路由，
  * 到了下游却变成 {@code /rpc-api/...}，绕过网关对内部接口的阻断。两端对路径理解不一致的请求一律拒绝。
+ *
+ * <p>对 unreserved 字符（字母、数字、{@code - . _ ~}）的百分号编码同样拒绝：路由按解码后的路径段匹配，
+ * 而网关的前缀判断（{@code /open-api/} 验签、令牌校验的接口前缀）与下游的 URL 前缀校验按原样字符串进行，
+ * {@code /%6Fpen-api/...} 会被路由到开放接口却不经验签。正常客户端不会编码这些字符
  */
 @Slf4j
 @Component
@@ -43,6 +47,29 @@ public class IllegalPathWebFilter implements WebFilter {
         return chain.filter(exchange);
     }
 
+    /**
+     * 是否含对 unreserved 字符（A-Z a-z 0-9 - . _ ~）的百分号编码，十六进制大小写均识别
+     */
+    private static boolean hasEncodedUnreserved(String rawPath) {
+        for (int i = 0; i + 2 < rawPath.length(); i++) {
+            if (rawPath.charAt(i) != '%') {
+                continue;
+            }
+            int high = Character.digit(rawPath.charAt(i + 1), 16);
+            int low = Character.digit(rawPath.charAt(i + 2), 16);
+            if (high < 0 || low < 0) {
+                continue;
+            }
+            char decoded = (char) (high * 16 + low);
+            if ((decoded >= 'A' && decoded <= 'Z') || (decoded >= 'a' && decoded <= 'z')
+                    || (decoded >= '0' && decoded <= '9') || decoded == '-' || decoded == '.'
+                    || decoded == '_' || decoded == '~') {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static boolean isIllegal(String rawPath) {
         if (rawPath == null) {
             return false;
@@ -56,6 +83,9 @@ public class IllegalPathWebFilter implements WebFilter {
             if (lower.contains(encoded)) {
                 return true;
             }
+        }
+        if (hasEncodedUnreserved(rawPath)) {
+            return true;
         }
         for (String segment : rawPath.split("/", -1)) {
             if (".".equals(segment) || "..".equals(segment)) {

@@ -245,6 +245,11 @@ class OpenApiSignatureFilterTest extends GatewayIntegrationTestSupport {
         signedPost("down-app", "x", PATH, "{}").exchange()
                 .expectStatus().isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
 
+        // open 返回 200 空响应体同样是不可用，不能落入 401
+        OPEN.openApps.put("empty-app", new StubServer.TokenReply(200, ""));
+        signedPost("empty-app", "x", PATH, "{}").exchange()
+                .expectStatus().isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+
         // 失败不缓存：open 恢复后立即可用
         registerOpenApp("down-app", "x", 21L, 7L, 0, 50, null, null, "POST " + PATH);
         signedPost("down-app", "x", PATH, "{}").exchange().expectStatus().isOk();

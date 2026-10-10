@@ -43,6 +43,13 @@ echo "==> 打包应用"
 (cd "$ROOT" && mvn -q -DskipTests clean package \
   -pl ccloud-gateway,ccloud-monitor,ccloud-module-system/ccloud-module-system-biz,ccloud-module-infra/ccloud-module-infra-biz,ccloud-module-member/ccloud-module-member-biz -am)
 
+# 每次重建镜像，旧镜像会失去标签成为悬空镜像，反复构建会累积几十 GB。
+# 只清理本项目（compose 标签 ccloud）的悬空镜像，不影响其他项目；构建失败退出时也要清理
+prune_ccloud_images() {
+  docker image prune -f --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" >/dev/null || true
+}
+trap prune_ccloud_images EXIT
+
 echo "==> 构建镜像并启动（等待全部应用健康，最多 8 分钟）"
 (cd "$ROOT/docker" && docker compose up -d --build --wait --wait-timeout 480)
 

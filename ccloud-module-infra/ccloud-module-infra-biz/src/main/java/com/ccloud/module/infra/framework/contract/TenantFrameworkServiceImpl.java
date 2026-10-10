@@ -52,4 +52,12 @@ public class TenantFrameworkServiceImpl implements TenantFrameworkService {
             throw result.get();
         }
     }
+
+    /**
+     * 不缓存：只在少数管理操作中调用
+     */
+    @Override
+    public boolean isSystemTenant(Long id) {
+        return Boolean.TRUE.equals(tenantApi.isSystemTenant(id).getCheckedData());
+    }
 }

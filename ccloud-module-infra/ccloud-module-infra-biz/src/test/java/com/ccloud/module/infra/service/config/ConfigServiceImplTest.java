@@ -1,11 +1,11 @@
 package com.ccloud.module.infra.service.config;
 
+import com.ccloud.framework.tenant.core.service.SystemTenantValidator;
 import com.ccloud.module.infra.controller.admin.config.vo.ConfigPageReqVO;
 import com.ccloud.module.infra.controller.admin.config.vo.ConfigSaveReqVO;
 import com.ccloud.module.infra.dal.dataobject.config.ConfigDO;
 import com.ccloud.module.infra.dal.mysql.config.ConfigMapper;
 import com.ccloud.module.infra.enums.config.ConfigTypeEnum;
-import com.ccloud.module.infra.framework.tenant.core.SystemTenantValidator;
 import com.ccloud.module.infra.test.BaseInfraDbUnitTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
@@ -82,7 +82,7 @@ class ConfigServiceImplTest extends BaseInfraDbUnitTest {
     @Test
     void 非系统租户不能增删改_读取不受限() {
         Long id = configService.createConfig(save(null, "ut.g", "1"));
-        doThrow(exception(ONLY_SYSTEM_TENANT)).when(systemTenantValidator).validate();
+        doThrow(exception(ONLY_SYSTEM_TENANT)).when(systemTenantValidator).validate(ONLY_SYSTEM_TENANT);
 
         assertServiceException(() -> configService.createConfig(save(null, "ut.h", "1")), ONLY_SYSTEM_TENANT);
         assertServiceException(() -> configService.updateConfig(save(id, "ut.g", "2")), ONLY_SYSTEM_TENANT);

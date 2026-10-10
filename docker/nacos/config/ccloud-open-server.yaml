@@ -1,0 +1,12 @@
+# ccloud-open-server 的可调配置
+
+ccloud:
+  open:
+    notify:
+      # 回调地址可否指向回环、内网地址。生产必须为 false（防 SSRF）；docker 联调时回调接收方在宿主机，需要打开
+      allow-private-address: true
+      connect-timeout: 5s
+      read-timeout: 5s
+    api-log:
+      # 调用日志与已结束的回调日志的保留天数，修改后下次清理生效
+      retain-days: 30

@@ -18,9 +18,10 @@ fail() { echo "FAIL $*"; exit 1; }
 
 echo "==> 校验配置包不含连接地址与密钥"
 [ -d "$CONFIG_DIR" ] || fail "缺少 $CONFIG_DIR"
-# 只看非注释行、以这些词结尾的键名（如 password、app-secret、access-token、server-addr、url）
+# 只看非注释行、以这些词结尾的键名（如 password、app-secret、access-token、server-addr、url）；
+# 值为 true / false 的开关（如 allow-private-address）不是地址或密钥，不计入
 leaks=$(grep -nEi '^[[:space:]]*-?[[:space:]]*[a-z0-9_.-]*(password|secret|token|url|uri|host|addr|address|addresses|username)[[:space:]]*:' \
-  "$CONFIG_DIR"/*.yaml || true)
+  "$CONFIG_DIR"/*.yaml | grep -vEi ':[[:space:]]*(true|false)[[:space:]]*(#.*)?$' || true)
 [ -z "$leaks" ] || fail "配置包含连接地址或密钥，这些应由各环境的 profile 与环境变量提供：
 $leaks"
 

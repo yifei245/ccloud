@@ -5,11 +5,12 @@
 | dataId | 导入的服务 | 内容 |
 |---|---|---|
 | `ccloud-common.yaml` | 全部 | 内部签名时效、租户校验缓存、文案刷新、消息重投 |
-| `ccloud-datasource.yaml` | system、infra、member | 连接池的通用行为 |
-| `ccloud-gateway.yaml` | gateway | 限流阈值、令牌缓存、开放平台应用 |
+| `ccloud-datasource.yaml` | system、infra、member、open | 连接池的通用行为 |
+| `ccloud-gateway.yaml` | gateway | 限流阈值、令牌缓存、开放接口时间戳偏差与应用缓存 |
 | `ccloud-system-server.yaml` | system | 登录失败锁定、短信验证码 |
 | `ccloud-infra-server.yaml` | infra | 文件大小上限、访问日志与异常日志保留天数 |
 | `ccloud-member-server.yaml` | member | 会员登录失败锁定、C 端功能开关 |
+| `ccloud-open-server.yaml` | open | 回调地址内网开关与超时、调用日志保留天数 |
 
 ## 导入
 

@@ -1,4 +1,4 @@
-# ccloud 应用镜像（gateway / system / infra / member / monitor 共用同一份内容，由 scripts/verify-docker.sh 校验一致）。
+# ccloud 应用镜像（gateway / system / infra / member / open / monitor 共用同一份内容，由 scripts/verify-docker.sh 校验一致）。
 # 构建前先执行 mvn package；构建上下文为模块目录。
 # 分层：依赖变动少、业务代码变动多，按层复制后只改代码时只需重建最后一层
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 校验 docker 编排与本机中间件：compose 语法、本机中间件在运行、ccloud 库、Nacos 账号与配置、XXL-Job 任务已登记。
 # 用法：scripts/verify-docker.sh [--full]
-#   --full  另外执行 scripts/docker-up.sh 打包并启动 gateway / system / infra / member / monitor，校验路由、文档与执行器注册
+#   --full  另外执行 scripts/docker-up.sh 打包并启动 gateway / system / infra / member / open / monitor，校验路由、文档与执行器注册
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,8 +13,8 @@ FULL=false
 
 fail() { echo "FAIL $*"; exit 1; }
 
-echo "==> 校验五个应用的 Dockerfile 内容一致"
-for f in ccloud-monitor ccloud-module-system/ccloud-module-system-biz ccloud-module-infra/ccloud-module-infra-biz ccloud-module-member/ccloud-module-member-biz; do
+echo "==> 校验六个应用的 Dockerfile 内容一致"
+for f in ccloud-monitor ccloud-module-system/ccloud-module-system-biz ccloud-module-infra/ccloud-module-infra-biz ccloud-module-member/ccloud-module-member-biz ccloud-module-open/ccloud-module-open-biz; do
   cmp -s "$ROOT/ccloud-gateway/Dockerfile" "$ROOT/$f/Dockerfile" || fail "$f/Dockerfile 与 ccloud-gateway/Dockerfile 不一致"
 done
 
@@ -41,13 +41,15 @@ for file in "$ROOT"/docker/nacos/config/*.yaml; do
 done
 
 echo "==> 校验 XXL-Job 执行器与任务已登记"
-for app in ccloud-system-server ccloud-infra-server; do
+for app in ccloud-system-server ccloud-infra-server ccloud-open-server; do
   group=$(lq "SELECT COUNT(*) FROM xxl_job.xxl_job_group WHERE app_name='$app';")
   [ "$group" -eq 1 ] || fail "缺少执行器 $app"
 done
 for spec in "ccloud-system-server:outboxRetryJob" "ccloud-system-server:redisStreamPendingMessageResendJob" \
             "ccloud-infra-server:redisStreamPendingMessageResendJob" "ccloud-infra-server:apiAccessLogCleanJob" \
-            "ccloud-infra-server:apiErrorLogCleanJob"; do
+            "ccloud-infra-server:apiErrorLogCleanJob" \
+            "ccloud-open-server:openNotifyRetryJob" "ccloud-open-server:openApiLogCleanJob" \
+            "ccloud-open-server:redisStreamPendingMessageResendJob"; do
   app="${spec%%:*}"; handler="${spec#*:}"
   running=$(lq "SELECT COUNT(*) FROM xxl_job.xxl_job_info i JOIN xxl_job.xxl_job_group g ON i.job_group=g.id
     WHERE g.app_name='$app' AND i.executor_handler='$handler' AND i.trigger_status=1;")
@@ -71,13 +73,13 @@ if $FULL; then
     "http://127.0.0.1:${GATEWAY_PORT}/admin-api/system/tenant/get-id-by-name")
   echo "$resp" | grep -q '"data":"\{0,1\}1"\{0,1\}' || fail "经网关访问 system 失败：$resp"
   echo "==> 校验接口文档经网关聚合可用"
-  for module in system infra member; do
+  for module in system infra member open; do
     doc=$(curl -s "http://127.0.0.1:${GATEWAY_PORT}/${module}/v3/api-docs/admin")
     echo "$doc" | grep -q '"openapi"' || fail "$module 的接口文档无法生成：$(echo "$doc" | head -c 200)"
   done
   echo "==> 校验执行器已注册到 XXL-Job"
   deadline=$((SECONDS + 90))
-  for app in ccloud-system-server ccloud-infra-server; do
+  for app in ccloud-system-server ccloud-infra-server ccloud-open-server; do
     until [ -n "$(lq "SELECT address_list FROM xxl_job.xxl_job_group WHERE app_name='$app' AND address_list IS NOT NULL AND address_list<>'';")" ]; do
       [ $SECONDS -lt $deadline ] || fail "$app 执行器未注册到调度中心"
       sleep 5

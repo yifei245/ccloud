@@ -89,13 +89,18 @@ public final class IpWhitelistUtils {
 
     /**
      * 字面量地址转字节。用 Guava 的严格解析：只接受标准的 IPv4 / IPv6 文本，不做 DNS，
-     * 也不接受 JDK 遗留的缩写写法（1、10.1、1.2.3）。IPv4 映射的 IPv6 地址（::ffff:a.b.c.d）
+     * 不接受 JDK 遗留的缩写写法（1、10.1、1.2.3），也不接受 IPv6 zone id（fe80::1%eth0，
+     * Guava 会去查本机网卡，且 zone 对白名单没有意义）。IPv4 映射的 IPv6 地址（::ffff:a.b.c.d）
      * 由 JDK 在构造地址时折叠为 4 字节的 IPv4 地址
      */
     private static byte[] toBytes(String ip) {
-        if (ip == null || !InetAddresses.isInetAddress(ip)) {
+        if (ip == null || ip.indexOf('%') >= 0 || !InetAddresses.isInetAddress(ip)) {
             return null;
         }
-        return InetAddresses.forString(ip).getAddress();
+        try {
+            return InetAddresses.forString(ip).getAddress();
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }

@@ -74,4 +74,14 @@ class IpWhitelistUtilsTest {
         assertTimeoutPreemptively(Duration.ofMillis(500), () ->
                 assertThatThrownBy(() -> IpWhitelistUtils.validate("abc")).isInstanceOf(IllegalArgumentException.class));
     }
+
+    @Test
+    void 带zone的IPv6地址一律拒绝_不抛出非预期异常() {
+        assertThat(IpWhitelistUtils.matches("10.0.0.1", "fe80::1%eth0")).isFalse();
+        assertThat(IpWhitelistUtils.matches("fe80::1", "fe80::1%1")).isFalse();
+        for (String bad : new String[]{"fe80::1%eth0", "fe80::1%1"}) {
+            assertThatThrownBy(() -> IpWhitelistUtils.validate(bad))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessage(bad);
+        }
+    }
 }

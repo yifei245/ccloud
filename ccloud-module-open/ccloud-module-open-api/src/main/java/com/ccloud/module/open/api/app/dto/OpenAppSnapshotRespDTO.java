@@ -2,12 +2,14 @@ package com.ccloud.module.open.api.app.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.experimental.Accessors;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Schema(description = "RPC 服务 - 开放应用快照 Response DTO")
 @Data
+@Accessors(chain = true)
 public class OpenAppSnapshotRespDTO {
 
     @Schema(description = "应用编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
@@ -39,6 +41,7 @@ public class OpenAppSnapshotRespDTO {
 
     @Schema(description = "已授权的接口")
     @Data
+    @Accessors(chain = true)
     public static class Api {
 
         @Schema(description = "请求方法", requiredMode = Schema.RequiredMode.REQUIRED, example = "GET")

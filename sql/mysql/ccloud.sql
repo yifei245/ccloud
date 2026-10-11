@@ -5474,7 +5474,7 @@ INSERT INTO `pay_wallet` (`id`, `user_id`, `user_type`, `balance`, `total_expens
   (1, 1, 1, 0, 0, 0, 0, 1, '1');
 
 INSERT INTO `open_app` (`id`, `name`, `app_key`, `app_secret`, `status`, `remark`, `ip_whitelist`, `rate_limit`, `expire_time`, `contact_name`, `contact_mobile`, `notify_url`, `tenant_id`, `creator`) VALUES
-  (1, '开放平台演示应用', 'ccloud-open-demo', '762055db4f2bfcd6b747242eafabcdc81c40e79a07ef2482c4d918b301c507c6', 0, '本地调试用，密钥原文 ccloud-open-demo-secret；生产环境请删除或重置密钥', NULL, 50, NULL, '演示联系人', '13800000009', NULL, 1, '1');
+  (1, '开放平台演示应用', 'ccloud-open-demo', '762055db4f2bfcd6b747242eafabcdc81c40e79a07ef2482c4d918b301c507c6', 0, '本地调试用，密钥原文 ccloud-open-demo-secret；生产环境必须删除（密文用开发默认加密密钥加密，换密钥后无法解密）', NULL, 50, NULL, '演示联系人', '13800000009', NULL, 1, '1');
 
 INSERT INTO `open_api` (`id`, `name`, `code`, `path`, `method`, `description`, `status`, `creator`) VALUES
   (1, '查询会员信息', 'member.user.get', '/open-api/member/user/get', 'GET', '按手机号查询会员基本信息，手机号脱敏', 0, '1');

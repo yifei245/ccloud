@@ -79,7 +79,7 @@
 
 ### 3.2 初始数据
 
-- 演示应用 `ccloud-open-demo`（租户 1）保留，`app_secret` 存为用开发环境默认加密密钥计算的密文，原文 `ccloud-open-demo-secret`；备注注明生产环境须重置。
+- 演示应用 `ccloud-open-demo`（租户 1）保留，`app_secret` 存为用开发环境默认加密密钥计算的密文，原文 `ccloud-open-demo-secret`；备注注明生产环境须删除（换了加密密钥后无法解密，文档给出删除语句）。
 - 接口目录只保留「查询会员信息」`GET /open-api/member/user/get`（编码 `member.user.get`）；删除两条交易接口及其授权行；演示应用授权该接口。
 - 删除 `open_app_scope` 演示数据、`system_oauth2_client` 中的 `ccloud-open-demo`。
 - 新增字典 `open_notify_status`：0 待通知、10 成功、20 失败待重试、30 放弃。

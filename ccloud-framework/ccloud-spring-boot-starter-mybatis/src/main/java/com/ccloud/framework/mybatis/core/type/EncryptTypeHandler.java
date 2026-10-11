@@ -53,7 +53,17 @@ public class EncryptTypeHandler extends BaseTypeHandler<String> {
     }
 
     public static String decrypt(String cipher) {
-        return cipher == null ? null : getAes().decryptStr(cipher);
+        if (cipher == null) {
+            return null;
+        }
+        AES current = getAes();
+        try {
+            return current.decryptStr(cipher);
+        } catch (RuntimeException e) {
+            // 最常见的原因：库里的密文是用另一个密钥加密的（例如导入了用开发默认密钥加密的初始化数据后更换了密钥）
+            throw new IllegalStateException(
+                    "数据库加密字段解密失败：加密密钥与数据不一致（ccloud.mybatis.encrypt-key / CCLOUD_ENCRYPT_KEY）", e);
+        }
     }
 
     @Override

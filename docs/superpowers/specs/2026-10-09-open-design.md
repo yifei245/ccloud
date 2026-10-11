@@ -220,7 +220,11 @@
 - `allow-private-address` 只在 profile 中设置（local / dev 为 `true`，prod 与默认为 `false`），Nacos 配置包 `ccloud-open-server.yaml` 不包含该项：配置包会导入每个环境且优先级高于 profile，写入会让生产默认关闭 SSRF 防护。docker 联调使用 dev profile，回调到宿主机仍可用。`scripts/verify-nacos.sh` 检查配置包中不得出现 `allow-private-address: true`。
 - XXL-Job 任务：`openNotifyRetryJob`（`0/15 * * * * ?`）、`openApiLogCleanJob`（每天 03:20）、`redisStreamPendingMessageResendJob`（每分钟）。
 
-### 10.4 端到端验收
+### 10.4 信任边界
+
+- 网关 WebClient 调用 `get-by-key` 时**不带内部签名**（设计 5.1 曾写「带内部签名」），与令牌校验的现状一致；业务服务的 `/rpc-api/**` 一律放行，依赖网关阻断与网络隔离。`get-by-key` 返回应用密钥原文，因此业务服务端口（28081–28084 等）只允许网关与服务之间访问，已写入 `docs/接口鉴权说明.md` 与 `docs/快速开始.md`。若要从代码上加固，可另立任务让 `/rpc-api` 校验内部签名头。
+
+### 10.5 端到端验收
 
 - 8.2 第 5 项中「停掉接收服务后再发」，脚本实际让接收方返回 HTTP 500 来模拟对方失败，效果相同且不需要重启接收进程；验证状态为 20（失败待重试），首次重试间隔为 15 秒。
 - 脚本中的请求体先放入变量再传给 `curl`：macOS 自带的 bash 3.2 会把 `"$(...)"` 里 JSON 的 `{a,b}` 当作花括号展开而拆开参数。

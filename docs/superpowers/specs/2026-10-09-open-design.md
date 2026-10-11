@@ -217,7 +217,7 @@
 
 ### 10.3 部署
 
-- Nacos 配置包 `ccloud-open-server.yaml` 把 `allow-private-address` 设为 `true`（docker 联调的回调接收方在宿主机）；设计中「仅 local / dev profile 打开」指包内 profile 配置，生产部署须确认该项为 `false`。
+- `allow-private-address` 只在 profile 中设置（local / dev 为 `true`，prod 与默认为 `false`），Nacos 配置包 `ccloud-open-server.yaml` 不包含该项：配置包会导入每个环境且优先级高于 profile，写入会让生产默认关闭 SSRF 防护。docker 联调使用 dev profile，回调到宿主机仍可用。`scripts/verify-nacos.sh` 检查配置包中不得出现 `allow-private-address: true`。
 - XXL-Job 任务：`openNotifyRetryJob`（`0/15 * * * * ?`）、`openApiLogCleanJob`（每天 03:20）、`redisStreamPendingMessageResendJob`（每分钟）。
 
 ### 10.4 端到端验收

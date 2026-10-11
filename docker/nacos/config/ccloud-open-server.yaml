@@ -3,8 +3,8 @@
 ccloud:
   open:
     notify:
-      # 回调地址可否指向回环、内网地址。生产必须为 false（防 SSRF）；docker 联调时回调接收方在宿主机，需要打开
-      allow-private-address: true
+      # 回调地址可否指向内网的开关（防 SSRF）只在 profile 中设置，配置包不得包含：
+      # local / dev 为 true，prod 与默认为 false；写进配置包会覆盖各环境的 profile，让生产默认关闭防护
       connect-timeout: 5s
       read-timeout: 5s
     api-log:

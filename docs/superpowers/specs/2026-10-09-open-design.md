@@ -1,6 +1,6 @@
 # 开放平台模块设计（P2 第 3 项）
 
-> 状态：已确认（2026-10-09）
+> 状态：已确认（2026-10-09），已实现并通过端到端验收（实现与设计的差异见第 10 节）
 > 上游：[总体设计](2026-09-07-ccloud-design.md) 的 P2「module-open 全量（含签名鉴权与限流）」。P1 已交付 open 的表结构、菜单、字典，网关的 `/open-api/**` 路由、签名校验（应用登记在 Nacos）与按应用限流。
 
 ## 1. 目标与范围
@@ -55,7 +55,7 @@
 
 ### 2.3 网关缓存与失效
 
-- 快照缓存：命中 60 秒、未找到 10 秒、最多 10000 条（`ccloud.open.app-cache.*` 可配）。
+- 快照缓存：命中 60 秒、未找到 10 秒、最多 10000 条（配置项 `ccloud.open.app-cache-ttl`、`app-cache-not-found-ttl`、`app-cache-max-size`，实际名称见第 10 节）。
 - open 在应用新增、修改、删除、重置密钥、接口授权变更后，向 Redis 频道 `ccloud:open:app:invalidate` 发布该应用的 appKey；接口目录新增、修改、删除后发布空消息，表示整体清空。网关各实例订阅并清缓存。
 - 失效消息丢失时最多延迟一个缓存周期（60 秒）。
 
@@ -191,3 +191,36 @@
 
 - `docs/接口鉴权说明.md`：开放接口一节改为从 open 管理应用；补充接口授权、IP 白名单、403 场景、回调验签说明与 Java 示例；删除 P1 限制与 Nacos 登记。
 - `README`、`docs/快速开始.md`、`docs/模块说明.md`：加入 open 服务、端口、依赖关系（open 依赖 system 的框架契约；member 等业务服务经 Redis Stream 向 open 发送调用日志；网关经 RPC 读取 open）。
+
+## 10. 实现与设计的差异（2026-10-11 同步）
+
+实现过程中对设计做了以下补充与调整，以实现为准：
+
+### 10.1 网关
+
+- 配置项名：应用缓存的配置是 `ccloud.open.app-cache-ttl`（60 秒）、`app-cache-not-found-ttl`（10 秒）、`app-cache-max-size`（10000）、`app-lookup-timeout`（调用 open 的超时，3 秒），不是 `ccloud.open.app-cache.*`。Nacos 配置包只放出 `app-cache-ttl`，其余用默认值。
+- 请求体上限：参与签名的请求体不超过 `ccloud.open.max-body-size`（默认 1MB），超出返回 413。
+- 路径过滤：`IllegalPathWebFilter` 对 unreserved 字符（字母、数字、`- . _ ~`）的百分号编码一律返回 400。路由按解码后的路径匹配，而网关的前缀判断（`/open-api/` 验签）按原样字符串进行，`/%6Fpen-api/...` 否则会被路由到开放接口却不经验签。
+- 失效订阅：Redis 订阅出错后自动退避重连，重连成功后做一次全量失效，避免断线期间丢失的广播留下旧缓存。open 返回空响应体按不可用处理（503）。
+- 校验顺序与 2.2 一致：授权（第 6 步）放在 nonce 之后，未授权的调用也消耗 nonce。
+
+### 10.2 open 服务
+
+- 内部接口的 DTO 名为 `OpenAppSnapshotRespDTO`（应用快照，`toString` 排除密钥以免日志泄露）与 `OpenNotifySendReqDTO`；路径 `GET /rpc-api/open/app/get-by-key`、`POST /rpc-api/open/notify/send`。
+- 回调抢占：设计中的「条件更新抢占」实现为带 60 秒租约的抢占（`claim` 写入租约到期时间），回写结果时以仍持有租约为条件（`updateIfLeaseHeld`）；租约内其他执行方不会重复发送，进程在发送中崩溃时租约到期后由重试任务接手。手工重新通知同样是条件更新（只有失败待重试或放弃的记录可以），避免与定时任务并发时把刚成功的记录重置并重发。错误码 `OPEN_NOTIFY_LOG_CANNOT_RETRY`（1_005_003_001）。
+- 回调发送的整体期限：除连接、读取超时各 5 秒外，另有总期限（两者之和），到期取消请求，防止对方逐字节缓慢输出而超过租约后被重复发送。
+- 防 SSRF 的范围比设计更严：校验识别 IPv4 映射等内嵌写法，并拒绝整个 `169.254.0.0/16` 与 `fd00:ec2::254` 等全部元数据地址，且不受 `allow-private-address` 影响。
+- 重试时使用应用当前的回调地址与密钥（管理员修正地址或重置密钥后，后续重试随之生效）。
+- 第 6 次重试仍失败记为放弃，因此一个事件最多发送 7 次。
+- 调用日志的发送在各服务的 `ApiLogFrameworkServiceImpl` 中（member），消息体为框架的 `ApiAccessLog`；开放应用身份由框架 `LoginUserFilter` 按路径约束（`/open-api/**` 只接受 OPEN_APP，OPEN_APP 在其他路径按未登录）；是否系统租户经 `TenantFrameworkService.isSystemTenant`；open 的 `ErrorCodeConstants.ONLY_SYSTEM_TENANT`（1_005_000_000）供 `SystemTenantValidator` 使用。
+- 管理端另有 `GET /admin-api/open/app/get-api-ids`（应用已授权的接口编号）与 `PUT /admin-api/open/notify-log/retry?id=`（手工重新通知）。
+
+### 10.3 部署
+
+- Nacos 配置包 `ccloud-open-server.yaml` 把 `allow-private-address` 设为 `true`（docker 联调的回调接收方在宿主机）；设计中「仅 local / dev profile 打开」指包内 profile 配置，生产部署须确认该项为 `false`。
+- XXL-Job 任务：`openNotifyRetryJob`（`0/15 * * * * ?`）、`openApiLogCleanJob`（每天 03:20）、`redisStreamPendingMessageResendJob`（每分钟）。
+
+### 10.4 端到端验收
+
+- 8.2 第 5 项中「停掉接收服务后再发」，脚本实际让接收方返回 HTTP 500 来模拟对方失败，效果相同且不需要重启接收进程；验证状态为 20（失败待重试），首次重试间隔为 15 秒。
+- 脚本中的请求体先放入变量再传给 `curl`：macOS 自带的 bash 3.2 会把 `"$(...)"` 里 JSON 的 `{a,b}` 当作花括号展开而拆开参数。

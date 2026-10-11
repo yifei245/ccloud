@@ -1,6 +1,7 @@
 package com.ccloud.module.member.controller.open.user;
 
 import cn.hutool.core.util.DesensitizedUtil;
+import com.ccloud.framework.apilog.core.annotation.ApiAccessLog;
 import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.common.validation.Mobile;
 import com.ccloud.module.member.controller.open.user.vo.OpenMemberUserRespVO;
@@ -37,6 +38,8 @@ public class OpenMemberUserController {
      * 身份由网关验签后下发（开放应用），框架只在 /open-api 下接受开放应用身份；租户为应用所属租户
      */
     @GetMapping("/get")
+    // 调用日志（含 open.api-log）不得留下被查询的手机号明文
+    @ApiAccessLog(sanitizeKeys = "mobile")
     @Operation(summary = "按手机号查询会员基本信息", description = "手机号脱敏；只查应用所属租户的会员")
     @Parameter(name = "mobile", description = "手机号", required = true, example = "13800138000")
     public CommonResult<OpenMemberUserRespVO> getUser(@RequestParam("mobile") @Mobile String mobile) {

@@ -30,6 +30,12 @@
             <artifactId>ccloud-module-infra-api</artifactId>
         </dependency>
 
+        <!-- 开放应用的调用日志主题 -->
+        <dependency>
+            <groupId>com.ccloud</groupId>
+            <artifactId>ccloud-module-open-api</artifactId>
+        </dependency>
+
         <dependency><groupId>com.ccloud</groupId><artifactId>ccloud-spring-boot-starter-web</artifactId></dependency>
         <dependency><groupId>com.ccloud</groupId><artifactId>ccloud-spring-boot-starter-security</artifactId></dependency>
         <dependency><groupId>com.ccloud</groupId><artifactId>ccloud-spring-boot-starter-mybatis</artifactId></dependency>

@@ -16,19 +16,8 @@ ccloud:
   security:
     internal-sign-secret: unit-test-secret
   open:
-    apps:
-      - app-id: demo-app
-        app-secret: demo-secret
-        tenant-id: 7
-        enabled: true
-      - app-id: limited-app
-        app-secret: limited-secret
-        tenant-id: 7
-        rate-limit: 1
-      - app-id: disabled-app
-        app-secret: disabled-secret
-        tenant-id: 7
-        enabled: false
+    # 与默认一致，写出来便于阅读
+    app-cache-ttl: 60s
   gateway:
     rate-limit:
       routes:

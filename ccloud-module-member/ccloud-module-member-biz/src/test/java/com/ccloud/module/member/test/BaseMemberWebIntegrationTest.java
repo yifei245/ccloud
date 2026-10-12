@@ -30,6 +30,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
@@ -110,6 +111,23 @@ public abstract class BaseMemberWebIntegrationTest {
         loginUser.setUserType(userType.getValue());
         loginUser.setTenantId(TENANT);
         loginUser.setExpiresTime(LocalDateTime.now().plusHours(1));
+        return signed(builder, loginUser);
+    }
+
+    /**
+     * 网关验签后下发的开放应用身份：编号为应用编号，附加信息带 appKey，没有过期时间
+     */
+    protected MockHttpServletRequestBuilder asOpenApp(MockHttpServletRequestBuilder builder, long appId) {
+        LoginUser loginUser = new LoginUser();
+        loginUser.setId(appId);
+        loginUser.setUserType(UserTypeEnum.OPEN_APP.getValue());
+        loginUser.setTenantId(TENANT);
+        loginUser.setInfo(Map.of("appKey", "webtest-app"));
+        loginUser.setExpiresTime(null);
+        return signed(builder, loginUser);
+    }
+
+    private MockHttpServletRequestBuilder signed(MockHttpServletRequestBuilder builder, LoginUser loginUser) {
         String payload = Base64.getEncoder().encodeToString(
                 JsonUtils.toJsonString(loginUser).getBytes(StandardCharsets.UTF_8));
         long timestamp = System.currentTimeMillis();

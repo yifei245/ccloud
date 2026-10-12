@@ -1,5 +1,6 @@
 package com.ccloud.framework.mybatis.core.type;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,12 @@ class EncryptTypeHandlerTest {
 
     @BeforeEach
     void setUp() {
+        EncryptTypeHandler.setEncryptKey(KEY);
+    }
+
+    @AfterEach
+    void tearDown() {
+        // 密钥是静态状态，恢复原值，避免影响同一 JVM 中的其他测试
         EncryptTypeHandler.setEncryptKey(KEY);
     }
 
@@ -51,5 +58,19 @@ class EncryptTypeHandlerTest {
         assertThatThrownBy(() -> EncryptTypeHandler.encrypt("abc"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ccloud.mybatis.encrypt-key");
+    }
+
+    @Test
+    @DisplayName("用另一个密钥加密的密文无法解密时，应提示加密密钥与数据不一致")
+    void decrypt_shouldFailWithClearMessageWhenKeyMismatch() {
+        EncryptTypeHandler.setEncryptKey("other-key-123456");
+        String cipherOfOtherKey = EncryptTypeHandler.encrypt("ccloud-open-demo-secret");
+        EncryptTypeHandler.setEncryptKey(KEY);
+
+        assertThatThrownBy(() -> EncryptTypeHandler.decrypt(cipherOfOtherKey))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("加密密钥与数据不一致")
+                .hasMessageContaining("CCLOUD_ENCRYPT_KEY")
+                .hasCauseInstanceOf(RuntimeException.class);
     }
 }

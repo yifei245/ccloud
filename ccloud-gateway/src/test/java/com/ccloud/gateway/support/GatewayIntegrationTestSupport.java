@@ -2,6 +2,7 @@ package com.ccloud.gateway.support;
 
 import com.ccloud.framework.test.core.ut.LocalRedis;
 import com.ccloud.framework.common.util.json.JsonUtils;
+import com.ccloud.gateway.service.open.OpenAppService;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,6 +14,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,10 @@ public abstract class GatewayIntegrationTestSupport {
     protected static final StubServer MEMBER = new StubServer("member");
     protected static final StubServer PAY = new StubServer("pay");
     /**
+     * open 桩：应答应用快照 RPC
+     */
+    protected static final StubServer OPEN = new StubServer("open");
+    /**
      * promotion 路由在测试配置中限流阈值很低，专供限流测试使用
      */
     protected static final StubServer PROMOTION = new StubServer("promotion");
@@ -42,6 +48,7 @@ public abstract class GatewayIntegrationTestSupport {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         Map.of("ccloud-system-server", SYSTEM, "ccloud-member-server", MEMBER, "ccloud-pay-server", PAY,
+                        "ccloud-open-server", OPEN,
                         "ccloud-promotion-server", PROMOTION,
                         // 注册中心里的非业务服务、未登记路由的服务：文档聚合不应列出
                         "ccloud-gateway", SYSTEM, "ccloud-unknown-server", SYSTEM)
@@ -57,12 +64,17 @@ public abstract class GatewayIntegrationTestSupport {
     protected WebTestClient webClient;
     @LocalServerPort
     protected int port;
+    @Autowired
+    private OpenAppService openAppService;
 
     @BeforeEach
     void resetStubs() {
         SYSTEM.reset();
         MEMBER.reset();
         PAY.reset();
+        OPEN.reset();
+        // 所有子类共享同一个上下文，网关缓存的应用快照会在用例间串扰
+        openAppService.invalidateAll();
         PROMOTION.reset();
     }
 
@@ -100,19 +112,70 @@ public abstract class GatewayIntegrationTestSupport {
     }
 
     /**
-     * 构造一个签名正确的 POST 开放接口请求
+     * 构造一个签名正确的 POST 开放接口请求（应用为 {@link #OPEN_APP_ID}）
      */
     protected WebTestClient.RequestHeadersSpec<?> signedPost(String rawPath, String body) {
+        return signedPost(OPEN_APP_ID, OPEN_APP_SECRET, rawPath, body);
+    }
+
+    protected WebTestClient.RequestHeadersSpec<?> signedPost(String appKey, String secret, String rawPath,
+                                                             String body) {
         long timestamp = System.currentTimeMillis();
         String nonce = UUID.randomUUID().toString();
         byte[] bytes = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         return webClient.post().uri(rawPath)
+                .header("X-Open-App-Id", appKey)
+                .header("X-Open-Timestamp", String.valueOf(timestamp))
+                .header("X-Open-Nonce", nonce)
+                .header("X-Open-Sign", openApiSign(secret, "POST", rawPath, null, timestamp, nonce, bytes))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .bodyValue(bytes);
+    }
+
+    /**
+     * 构造一个签名正确的 GET 开放接口请求（应用为 {@link #OPEN_APP_ID}，无查询串）
+     */
+    protected WebTestClient.RequestHeadersSpec<?> signedGet(String rawPath) {
+        long timestamp = System.currentTimeMillis();
+        String nonce = UUID.randomUUID().toString();
+        return webClient.get().uri(rawPath)
                 .header("X-Open-App-Id", OPEN_APP_ID)
                 .header("X-Open-Timestamp", String.valueOf(timestamp))
                 .header("X-Open-Nonce", nonce)
-                .header("X-Open-Sign", openApiSign(OPEN_APP_SECRET, "POST", rawPath, null, timestamp, nonce, bytes))
-                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .bodyValue(bytes);
+                .header("X-Open-Sign", openApiSign(OPEN_APP_SECRET, "GET", rawPath, null, timestamp, nonce, new byte[0]));
+    }
+
+    /**
+     * 在 open 桩中登记应用快照。apis 为 "METHOD /path" 形式
+     */
+    protected void registerOpenApp(String appKey, String secret, long appId, long tenantId, int status,
+                                   int rateLimit, String ipWhitelist, LocalDateTime expireTime, String... apis) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", appId);
+        data.put("appKey", appKey);
+        data.put("appSecret", secret);
+        data.put("tenantId", tenantId);
+        data.put("status", status);
+        data.put("rateLimit", rateLimit);
+        data.put("ipWhitelist", ipWhitelist);
+        data.put("expireTime", expireTime);
+        data.put("apis", Arrays.stream(apis).map(a -> {
+            String[] p = a.split(" ", 2);
+            return Map.of("method", p[0], "path", p[1]);
+        }).toList());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("code", 0);
+        body.put("msg", "");
+        body.put("data", data);
+        OPEN.openApps.put(appKey, new StubServer.TokenReply(200, JsonUtils.toJsonString(body)));
+    }
+
+    /**
+     * 常用：开启、不限 IP、长期有效、授权 POST /open-api/pay/order/create
+     */
+    protected void registerDemoOpenApp() {
+        registerOpenApp(OPEN_APP_ID, OPEN_APP_SECRET, 11L, OPEN_APP_TENANT_ID, 0, 50, null, null,
+                "POST /open-api/pay/order/create");
     }
 
     /**

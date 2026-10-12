@@ -25,11 +25,5 @@ ccloud:
   open:
     # 请求时间戳允许的偏差（即时生效）
     timestamp-tolerance: 5m
-    # 开放平台应用（即时生效）。P1 阶段 open 服务尚未实现，应用在此登记；应用密钥属于机密，
-    # 只在各环境的 Nacos 控制台中填写，不要提交到仓库。格式：
-    #   - app-id: demo-app
-    #     app-secret: （在控制台填写）
-    #     tenant-id: 1
-    #     rate-limit: 50
-    #     enabled: true
-    apps: []
+    # 开放应用由 open 服务管理，网关经 RPC 读取并本地缓存；open 变更应用后会广播失效，此为兜底时长（需重启）
+    app-cache-ttl: 60s

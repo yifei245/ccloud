@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -244,6 +245,46 @@ class LoginUserFilterTest {
         request.setRequestURI("/app-api/member/user/get");
 
         assertThat(run(request).loginUser()).isNotNull();
+    }
+
+    private LoginUser filterAndGetLoginUser(String uri, LoginUser user) throws Exception {
+        long ts = System.currentTimeMillis();
+        String payload = encode(user);
+        MockHttpServletRequest request = request(payload, InternalSignUtils.sign(payload, ts, SECRET), ts);
+        request.setRequestURI(uri);
+        return run(request).loginUser();
+    }
+
+    @Test
+    @DisplayName("开放应用身份只在 /open-api 路径生效，其余路径一律忽略")
+    void 开放应用身份只在open_api路径生效() throws Exception {
+        LoginUser app = new LoginUser();
+        app.setId(9L);
+        app.setUserType(UserTypeEnum.OPEN_APP.getValue());
+        app.setTenantId(1L);
+        app.setInfo(Map.of("appKey", "k1"));
+
+        assertThat(filterAndGetLoginUser("/open-api/member/user/get", app)).isNotNull();
+        assertThat(filterAndGetLoginUser("/admin-api/system/user/page", app)).isNull();
+        assertThat(filterAndGetLoginUser("/app-api/member/user/get", app)).isNull();
+        assertThat(filterAndGetLoginUser("/rpc-api/system/tenant/valid", app)).isNull();
+        assertThat(filterAndGetLoginUser("/actuator/health", app)).isNull();
+    }
+
+    @Test
+    @DisplayName("/open-api 路径不接受管理员与会员身份")
+    void open_api路径不接受管理员与会员身份() throws Exception {
+        LoginUser admin = new LoginUser();
+        admin.setId(1L);
+        admin.setUserType(UserTypeEnum.ADMIN.getValue());
+        admin.setTenantId(1L);
+        LoginUser member = new LoginUser();
+        member.setId(1L);
+        member.setUserType(UserTypeEnum.MEMBER.getValue());
+        member.setTenantId(1L);
+
+        assertThat(filterAndGetLoginUser("/open-api/member/user/get", admin)).isNull();
+        assertThat(filterAndGetLoginUser("/open-api/member/user/get", member)).isNull();
     }
 
     @Test

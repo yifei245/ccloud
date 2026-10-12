@@ -2,6 +2,7 @@ package com.ccloud.module.infra.service.file;
 
 import com.ccloud.framework.common.util.json.JsonUtils;
 import com.ccloud.framework.operatelog.core.util.DesensitizeUtils;
+import com.ccloud.framework.tenant.core.service.SystemTenantValidator;
 import com.ccloud.module.infra.controller.admin.file.vo.FileConfigSaveReqVO;
 import com.ccloud.module.infra.dal.dataobject.file.FileConfigDO;
 import com.ccloud.module.infra.dal.mysql.file.FileConfigMapper;
@@ -9,7 +10,6 @@ import com.ccloud.module.infra.framework.file.config.FileProperties;
 import com.ccloud.module.infra.framework.file.core.FileClientFactory;
 import com.ccloud.module.infra.framework.file.core.FileConfigRefresher;
 import com.ccloud.module.infra.framework.file.core.enums.FileStorageEnum;
-import com.ccloud.module.infra.framework.tenant.core.SystemTenantValidator;
 import com.ccloud.module.infra.controller.admin.file.vo.FileConfigPageReqVO;
 import com.ccloud.module.infra.test.BaseInfraDbUnitTest;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -184,7 +184,7 @@ class FileConfigServiceImplTest extends BaseInfraDbUnitTest {
     @Test
     void 非系统租户不能增删改与测试_读取不受限() {
         Long id = fileConfigService.createFileConfig(save(null, 10, local()));
-        doThrow(exception(ONLY_SYSTEM_TENANT)).when(systemTenantValidator).validate();
+        doThrow(exception(ONLY_SYSTEM_TENANT)).when(systemTenantValidator).validate(ONLY_SYSTEM_TENANT);
 
         assertServiceException(() -> fileConfigService.createFileConfig(save(null, 10, local())), ONLY_SYSTEM_TENANT);
         assertServiceException(() -> fileConfigService.updateFileConfig(save(id, 10, local())), ONLY_SYSTEM_TENANT);

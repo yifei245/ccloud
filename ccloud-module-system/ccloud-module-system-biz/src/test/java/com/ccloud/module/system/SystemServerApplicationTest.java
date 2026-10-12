@@ -145,7 +145,7 @@ class SystemServerApplicationTest {
                 }
             }
         }
-        assertThat(allTables).as("DDL 解析结果应覆盖全部表").hasSize(143);
+        assertThat(allTables).as("DDL 解析结果应覆盖全部表").hasSize(142);
         assertThat(new TreeSet<>(tenantProperties.getIgnoreTables())).isEqualTo(withoutTenantId);
     }
 

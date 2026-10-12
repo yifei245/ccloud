@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 限流：Redis 令牌桶，多个网关实例共享配额。测试配置中 promotion 路由每秒补充 1 个令牌、桶容量 2，
- * 开放应用 limited-app 每秒 1 次
+ * 开放应用 limited-app（在 open 桩中登记）每秒 1 次
  */
 class RateLimitFilterTest extends GatewayIntegrationTestSupport {
 
@@ -93,11 +93,14 @@ class RateLimitFilterTest extends GatewayIntegrationTestSupport {
 
     @Test
     void 开放应用超过自身阈值应返回429() {
+        registerLimitedApp();
         assertThat(exhaustLimitedApp()).contains(429);
     }
 
     @Test
     void 不同appKey的配额互相独立() {
+        registerLimitedApp();
+        registerDemoOpenApp();
         assertThat(exhaustLimitedApp()).contains(429);
 
         signedAs(OPEN_APP_ID, OPEN_APP_SECRET).exchange().expectStatus().isOk();
@@ -120,6 +123,7 @@ class RateLimitFilterTest extends GatewayIntegrationTestSupport {
      */
     @Test
     void 签名无效的请求不消耗应用配额() {
+        registerLimitedApp();
         for (int i = 0; i < 5; i++) {
             webClient.post().uri("/open-api/pay/order/create")
                     .header("X-Open-App-Id", "limited-app")
@@ -131,6 +135,10 @@ class RateLimitFilterTest extends GatewayIntegrationTestSupport {
         }
 
         signedAs("limited-app", "limited-secret").exchange().expectStatus().isOk();
+    }
+
+    private void registerLimitedApp() {
+        registerOpenApp("limited-app", "limited-secret", 21L, 7L, 0, 1, null, null, "POST /open-api/pay/order/create");
     }
 
     private String uniqueUserToken() {

@@ -1,28 +1,37 @@
 #!/usr/bin/env bash
 # 校验 Nacos 配置包：导入后逐个读回，与仓库文件逐字一致；配置包中不得出现连接地址与密钥。
-# 用法：scripts/verify-nacos.sh [--full]
+# 用法：scripts/verify-nacos.sh [--full | --check-only]
+#   --check-only  只做配置包的静态检查（不导入 Nacos），可用 NACOS_CONFIG_DIR 指向临时目录做脚本自测
 #   --full  另外校验运行中的 system 服务确实加载了 Nacos 配置，且其优先级高于 application-{profile}.yaml
 #           （需先 scripts/docker-up.sh 启动全部服务）
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CONFIG_DIR="$ROOT/docker/nacos/config"
+CONFIG_DIR="${NACOS_CONFIG_DIR:-$ROOT/docker/nacos/config}"
 # shellcheck source=lib/local-middleware.sh
 source "$ROOT/scripts/lib/local-middleware.sh"
 cd "$ROOT/docker"
 
 FULL=false
+CHECK_ONLY=false
 [ "${1:-}" = "--full" ] && FULL=true
+[ "${1:-}" = "--check-only" ] && CHECK_ONLY=true
 
 fail() { echo "FAIL $*"; exit 1; }
 
 echo "==> 校验配置包不含连接地址与密钥"
 [ -d "$CONFIG_DIR" ] || fail "缺少 $CONFIG_DIR"
+# 回调地址防 SSRF 的开关只能由各环境的 profile 打开：配置包会导入每个环境的 Nacos，且优先于 profile 文件，
+# 包里写 true 会让生产默认关闭防护
+open_ssrf=$(grep -HnEi '^[[:space:]]*allow-private-address[[:space:]]*:[[:space:]]*true([[:space:]]|#|$)' "$CONFIG_DIR"/*.yaml || true)
+[ -z "$open_ssrf" ] || fail "配置包不得出现 allow-private-address: true（该开关只在 profile 中设置）：
+$open_ssrf"
 # 只看非注释行、以这些词结尾的键名（如 password、app-secret、access-token、server-addr、url）
-leaks=$(grep -nEi '^[[:space:]]*-?[[:space:]]*[a-z0-9_.-]*(password|secret|token|url|uri|host|addr|address|addresses|username)[[:space:]]*:' \
+leaks=$(grep -HnEi '^[[:space:]]*-?[[:space:]]*[a-z0-9_.-]*(password|secret|token|url|uri|host|addr|address|addresses|username)[[:space:]]*:' \
   "$CONFIG_DIR"/*.yaml || true)
 [ -z "$leaks" ] || fail "配置包含连接地址或密钥，这些应由各环境的 profile 与环境变量提供：
 $leaks"
+$CHECK_ONLY && { echo "==> 静态检查通过"; exit 0; }
 
 echo "==> 导入配置到本机 Nacos 的命名空间 $NACOS_NAMESPACE（覆盖已有内容）"
 bash "$ROOT/scripts/nacos-import.sh" --overwrite

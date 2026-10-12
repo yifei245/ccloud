@@ -18,4 +18,7 @@ if docker inspect "$XXL_JOB_CONTAINER" --format '{{json .NetworkSettings.Network
 fi
 
 docker compose down --remove-orphans
-echo "已停止 ccloud 应用（本机中间件未受影响）"
+# 清理本项目留下的匿名卷与悬空镜像。volume prune 只删匿名卷，具名卷（如 infra-files）保留
+docker volume prune -f --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" >/dev/null || true
+docker image prune -f --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" >/dev/null || true
+echo "已停止 ccloud 应用（本机中间件未受影响），已清理本项目的匿名卷与悬空镜像"

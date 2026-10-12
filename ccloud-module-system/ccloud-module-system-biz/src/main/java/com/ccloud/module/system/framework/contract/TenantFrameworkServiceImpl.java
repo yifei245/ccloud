@@ -1,6 +1,7 @@
 package com.ccloud.module.system.framework.contract;
 
 import com.ccloud.framework.tenant.core.service.TenantFrameworkService;
+import com.ccloud.module.system.dal.dataobject.tenant.TenantDO;
 import com.ccloud.module.system.service.tenant.TenantService;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Lazy;
@@ -30,5 +31,11 @@ public class TenantFrameworkServiceImpl implements TenantFrameworkService {
     @Override
     public void validTenant(Long id) {
         tenantService.validTenant(id);
+    }
+
+    @Override
+    public boolean isSystemTenant(Long id) {
+        TenantDO tenant = tenantService.getTenant(id);
+        return tenant != null && tenant.isSystem();
     }
 }

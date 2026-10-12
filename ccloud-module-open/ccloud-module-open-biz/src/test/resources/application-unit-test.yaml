@@ -1,0 +1,45 @@
+# open 模块测试配置。与 starter-test 的同名文件互斥（本文件优先），因此需自包含。
+# 与框架默认不同：Redis 不排除，由 Testcontainers 提供真实实例（protection 等 starter 无条件依赖 Redis）。
+spring:
+  datasource:
+    dynamic:
+      primary: master
+      datasource:
+        master:
+          url: jdbc:h2:mem:ccloud_open_ut;MODE=MYSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+          driver-class-name: org.h2.Driver
+          username: sa
+          password: ""
+  boot:
+    admin:
+      client:
+        enabled: false
+
+management:
+  tracing:
+    enabled: false
+  zipkin:
+    tracing:
+      export:
+        enabled: false
+
+xxl:
+  job:
+    enabled: false
+
+ccloud:
+  # Web 测试不记访问日志：它们不回滚事务，日志会残留在共享测试库。需要的测试自行打开
+  access-log:
+    enable: false
+  mybatis:
+    encrypt-key: ccloud1234567890
+  security:
+    internal-sign-secret: unit-test-secret
+  open:
+    notify:
+      # 测试中的回调接收方监听本机 127.0.0.1
+      allow-private-address: true
+
+logging:
+  level:
+    com.ccloud: debug

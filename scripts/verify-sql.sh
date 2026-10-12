@@ -86,9 +86,9 @@ if [ "$HAS_DATA" = "1" ] && [ "$(q "SELECT COUNT(*) FROM $DB.system_menu;")" != 
     local r; r=$(q "$3")
     if [ "$r" = "$2" ]; then echo "  OK   $1 = $r"; else echo "  FAIL $1 = $r，期望 $2"; exit 1; fi
   }
-  expect_eq "表数量（按设计清单）" 143 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB';"
+  expect_eq "表数量（按设计清单）" 142 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB';"
   expect_eq "admin 账号"          1   "SELECT COUNT(*) FROM $DB.system_users WHERE username='admin';"
-  expect_eq "OAuth2 客户端"        5   "SELECT COUNT(*) FROM $DB.system_oauth2_client;"
+  expect_eq "OAuth2 客户端"        4   "SELECT COUNT(*) FROM $DB.system_oauth2_client;"
   MENUS=$(q "SELECT COUNT(*) FROM $DB.system_menu;")
   [ "$MENUS" -gt 200 ] || { echo "  FAIL 菜单数 $MENUS 不足 200"; exit 1; }
   echo "  OK   菜单数 = $MENUS"

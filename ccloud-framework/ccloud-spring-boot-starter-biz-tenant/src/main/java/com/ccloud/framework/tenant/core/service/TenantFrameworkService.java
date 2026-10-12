@@ -18,4 +18,9 @@ public interface TenantFrameworkService {
      * @throws com.ccloud.framework.common.exception.ServiceException 租户不可用时抛出
      */
     void validTenant(Long id);
+
+    /**
+     * @return 是否为系统租户（套餐编号 0，不受套餐限制）。租户不存在返回 false
+     */
+    boolean isSystemTenant(Long id);
 }

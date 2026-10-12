@@ -19,7 +19,7 @@
 |---|---|---|---|
 | 管理端 | `/admin-api/**` | 运营后台（Web） | OAuth2 Bearer Token，`user_type=ADMIN` |
 | 用户端 | `/app-api/**` | App / 小程序 / H5 | OAuth2 Bearer Token，`user_type=MEMBER` |
-| 开放 API | `/open-api/**` | 第三方系统 | AppKey+AppSecret 换 token / 请求签名 |
+| 开放 API | `/open-api/**` | 第三方系统 | 请求签名（AppKey + AppSecret，2026-10-09 起不再提供换 token 模式） |
 | 内部 RPC | `/rpc-api/**` | 服务间 OpenFeign 调用 | 内部 HMAC 签名头，网关拒绝外部访问 |
 
 非目标：不做前端工程（Vue / UniApp 不在本次范围）。
@@ -81,7 +81,7 @@ ccloud
 ├── ccloud-module-system/   (api, biz)           # ★ 认证/OAuth2/SSO/用户/角色/菜单/部门/岗位/字典/租户/社交/短信/邮件/通知/i18n/日志
 ├── ccloud-module-infra/    (api, biz)           # ★ 文件/配置/代码生成/API 日志/数据源/DB 文档/消息死信
 ├── ccloud-module-member/   (api, biz)           # ★ C 端用户/认证/地址/等级/积分/签到/分组/标签
-├── ccloud-module-open/     (api, biz)           # ★ 开放平台：应用/密钥/授权范围/配额/调用日志/回调通知
+├── ccloud-module-open/     (api, biz)           # ★ 开放平台：应用/密钥/接口授权/限流/调用日志/回调通知
 ├── ccloud-module-pay/      (api, biz)           # 支付：应用/渠道/订单/退款/转账/钱包/回调
 ├── ccloud-module-bpm/      (api, biz)           # 工作流：Flowable 模型/表单/流程/任务/抄送
 ├── ccloud-module-mall/                          # 商城
@@ -142,11 +142,13 @@ ccloud
 
 ### 4.6 开放 API 鉴权
 
-- `open_app`：`app_key / app_secret / status / ip_whitelist / rate_limit / expire_time`
-- 两种模式并存：
-  - **Token 模式**：`client_credentials` 换 token，走统一 OAuth2 链路，scope 由 `open_app_scope` 限定
-  - **签名模式**：`X-App-Key / X-Timestamp / X-Nonce / X-Sign`，`sign = HMAC-SHA256(appSecret, 排序参数 + body + timestamp + nonce)`；timestamp 5 分钟有效，nonce 用 Redis 去重防重放
-- 网关按 `app_key` 令牌桶限流；调用明细落 `open_api_log`。
+**只做签名模式（2026-10-09 调整，见[开放平台模块设计](2026-10-09-open-design.md)）**：不做 `client_credentials` 令牌模式，删除 `open_app_scope` 表与 system 中的 OAuth2 演示客户端 `ccloud-open-demo`。
+
+- `open_app`：`app_key / app_secret（加密存储，只在创建与重置时返回一次） / status / ip_whitelist / rate_limit / expire_time / notify_url`
+- 签名模式：`X-Open-App-Id / X-Open-Timestamp / X-Open-Nonce / X-Open-Sign`，`sign = Base64(HmacSHA256(appSecret, 方法 + 原始路径 + 原始查询串 + timestamp + nonce + 请求体 SHA-256))`（以 `\n` 连接）；timestamp 5 分钟有效，nonce 用 Redis 去重防重放
+- 接口授权由 `open_app_api` 承担：网关按「请求方法 + 原始路径」精确匹配应用已授权的接口，不匹配返回 403；IP 白名单按连接对端地址判断
+- 配额只做每秒限流：网关按应用令牌桶，阈值取 `open_app.rate_limit`；不做每日总量
+- 调用明细落 `open_api_log`；回调通知（带签名、退避重试）落 `open_notify_log`
 
 ## 5. 多租户
 

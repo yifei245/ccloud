@@ -1,6 +1,6 @@
 -- ----------------------------------------------------------------------------
 -- 初始化数据：国际化文案
--- 错误码文案，key 为 error.code.{错误码}。全局 13 条、system 模块 105 条、member 模块 29 条、infra 模块 38 条，zh_CN 与 en_US 各一份
+-- 错误码文案，key 为 error.code.{错误码}。全局 13 条、system 模块 105 条、member 模块 29 条、infra 模块 38 条、open 模块 12 条，zh_CN 与 en_US 各一份
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -384,5 +384,28 @@ INSERT INTO `system_i18n_message` (`id`, `locale`, `code`, `content`, `source`, 
   (373, 'zh_CN', 'error.code.1002006003', '本地磁盘存储的根目录须位于 {} 之内', 1, '1'),
   (374, 'en_US', 'error.code.1002006003', 'The base path of local disk storage must be inside {}', 1, '1'),
   (375, 'zh_CN', 'error.code.1002005002', '死信的消息体为空，无法重新投递', 1, '1'),
-  (376, 'en_US', 'error.code.1002005002', 'The dead letter has no payload and cannot be resent', 1, '1');
-
+  (376, 'en_US', 'error.code.1002005002', 'The dead letter has no payload and cannot be resent', 1, '1'),
+  (377, 'zh_CN', 'error.code.1005000000', '该操作仅限平台管理员（系统租户）执行', 1, '1'),
+  (378, 'en_US', 'error.code.1005000000', 'Only the platform administrator (system tenant) can do this', 1, '1'),
+  (379, 'zh_CN', 'error.code.1005001000', '开放应用不存在', 1, '1'),
+  (380, 'en_US', 'error.code.1005001000', 'The open app does not exist', 1, '1'),
+  (381, 'zh_CN', 'error.code.1005001001', 'IP 白名单格式不正确：{}', 1, '1'),
+  (382, 'en_US', 'error.code.1005001001', 'Invalid IP whitelist entry: {}', 1, '1'),
+  (383, 'zh_CN', 'error.code.1005001002', '回调地址须为 http 或 https 开头的完整地址', 1, '1'),
+  (384, 'en_US', 'error.code.1005001002', 'The notify URL must be a full http or https URL', 1, '1'),
+  (385, 'zh_CN', 'error.code.1005001003', '应用未配置回调地址', 1, '1'),
+  (386, 'en_US', 'error.code.1005001003', 'The app has no notify URL', 1, '1'),
+  (387, 'zh_CN', 'error.code.1005001004', '接口({})不存在或已关闭，不能授权', 1, '1'),
+  (388, 'en_US', 'error.code.1005001004', 'API ({}) does not exist or is disabled and cannot be granted', 1, '1'),
+  (389, 'zh_CN', 'error.code.1005002000', '开放接口不存在', 1, '1'),
+  (390, 'en_US', 'error.code.1005002000', 'The open API does not exist', 1, '1'),
+  (391, 'zh_CN', 'error.code.1005002001', '接口编码已存在', 1, '1'),
+  (392, 'en_US', 'error.code.1005002001', 'The API code already exists', 1, '1'),
+  (393, 'zh_CN', 'error.code.1005002002', '相同请求方法与路径的接口已存在', 1, '1'),
+  (394, 'en_US', 'error.code.1005002002', 'An API with the same method and path already exists', 1, '1'),
+  (395, 'zh_CN', 'error.code.1005002003', '接口路径须以 /open-api/ 开头，且不能包含查询串、通配符或 ..', 1, '1'),
+  (396, 'en_US', 'error.code.1005002003', 'The API path must start with /open-api/ and must not contain a query, wildcards or ..', 1, '1'),
+  (397, 'zh_CN', 'error.code.1005003000', '回调日志不存在', 1, '1'),
+  (398, 'en_US', 'error.code.1005003000', 'The notify log does not exist', 1, '1'),
+  (399, 'zh_CN', 'error.code.1005003001', '只有失败待重试或已放弃的回调可以重新通知', 1, '1'),
+  (400, 'en_US', 'error.code.1005003001', 'Only failed or abandoned notifications can be retried', 1, '1');

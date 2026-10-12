@@ -1,6 +1,6 @@
 -- ----------------------------------------------------------------------------
 -- 初始化数据：菜单
--- 共 485 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
+-- 共 487 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -497,5 +497,7 @@ INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_i
   (489, '知识库查询', 'ai:knowledge:query', 3, 1, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (490, '知识库新增', 'ai:knowledge:create', 3, 2, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (491, '知识库修改', 'ai:knowledge:update', 3, 3, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (492, '知识库删除', 'ai:knowledge:delete', 3, 4, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1');
+  (492, '知识库删除', 'ai:knowledge:delete', 3, 4, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
+  (493, '开放应用授权接口', 'open:app:assign-api', 3, 6, 207, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
+  (494, '开放应用测试回调', 'open:app:test-notify', 3, 7, 207, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1');
 

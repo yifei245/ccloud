@@ -5,9 +5,11 @@ import com.ccloud.framework.apilog.core.service.ApiAccessLog;
 import com.ccloud.framework.apilog.core.service.ApiAccessLogFrameworkService;
 import com.ccloud.framework.apilog.core.service.ApiErrorLog;
 import com.ccloud.framework.apilog.core.service.ApiErrorLogFrameworkService;
+import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.util.json.JsonUtils;
 import com.ccloud.framework.mq.outbox.core.MessageSender;
 import com.ccloud.module.infra.enums.logger.ApiLogTopics;
+import com.ccloud.module.open.enums.logger.OpenApiLogTopics;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.context.annotation.Lazy;
@@ -18,7 +20,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * API 访问日志与异常日志经 Redis Stream 发给 infra 写库。
+ * API 访问日志与异常日志经 Redis Stream 发给 infra 写库；开放应用的调用另发到 open 的调用日志主题。
  *
  * <p>单线程有界队列异步发送：日志不能拖慢业务请求；Redis 故障或积压时丢弃并打警告，不影响业务
  */
@@ -42,6 +44,11 @@ public class ApiLogFrameworkServiceImpl implements ApiAccessLogFrameworkService,
     @Override
     public void createApiAccessLogAsync(ApiAccessLog accessLog) {
         send(ApiLogTopics.ACCESS_LOG, accessLog);
+        // 开放应用的调用另记一份到开放平台的调用日志
+        if (UserTypeEnum.OPEN_APP.getValue().equals(accessLog.getUserType())
+                && accessLog.getRequestUrl() != null && accessLog.getRequestUrl().startsWith("/open-api/")) {
+            send(OpenApiLogTopics.API_LOG, accessLog);
+        }
     }
 
     @Override

@@ -109,7 +109,7 @@ ccloud:
   gateway:
     rate-limit:
       enabled: true
-      # Redis 令牌桶，多个网关实例共享。已登录按用户、未登录按客户端 IP 计数；开放接口按应用计数（ccloud.open.apps[].rate-limit）
+      # Redis 令牌桶，多个网关实例共享。已登录按用户、未登录按客户端 IP 计数；开放接口按应用计数，阈值取自开放应用的每秒上限
       defaults:
         replenish-rate: 100
         burst-capacity: 200

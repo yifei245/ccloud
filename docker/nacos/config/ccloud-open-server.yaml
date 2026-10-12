@@ -1,0 +1,12 @@
+# ccloud-open-server 的可调配置
+
+ccloud:
+  open:
+    notify:
+      # 回调地址可否指向内网的开关（防 SSRF）只在 profile 中设置，配置包不得包含：
+      # local / dev 为 true，prod 与默认为 false；写进配置包会覆盖各环境的 profile，让生产默认关闭防护
+      connect-timeout: 5s
+      read-timeout: 5s
+    api-log:
+      # 调用日志与已结束的回调日志的保留天数，修改后下次清理生效
+      retain-days: 30

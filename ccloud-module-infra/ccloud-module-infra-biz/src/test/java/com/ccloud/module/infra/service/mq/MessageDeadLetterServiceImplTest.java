@@ -5,8 +5,8 @@ import com.ccloud.framework.mq.outbox.config.CcloudOutboxAutoConfiguration;
 import com.ccloud.framework.mq.outbox.core.DeadLetterDO;
 import com.ccloud.framework.mq.outbox.core.DeadLetterMapper;
 import com.ccloud.framework.mq.outbox.core.MessageSender;
+import com.ccloud.framework.tenant.core.service.SystemTenantValidator;
 import com.ccloud.module.infra.controller.admin.mq.vo.MessageDeadLetterPageReqVO;
-import com.ccloud.module.infra.framework.tenant.core.SystemTenantValidator;
 import com.ccloud.module.infra.test.BaseInfraDbAndRedisUnitTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
@@ -143,7 +143,7 @@ class MessageDeadLetterServiceImplTest extends BaseInfraDbAndRedisUnitTest {
     @Test
     void 非系统租户不能查看处理或重投死信() {
         Long id = insert("ut-dl-s", "t.topic", 2L);
-        doThrow(exception(ONLY_SYSTEM_TENANT)).when(systemTenantValidator).validate();
+        doThrow(exception(ONLY_SYSTEM_TENANT)).when(systemTenantValidator).validate(ONLY_SYSTEM_TENANT);
 
         assertServiceException(() -> deadLetterService.getDeadLetterPage(new MessageDeadLetterPageReqVO()), ONLY_SYSTEM_TENANT);
         assertServiceException(() -> deadLetterService.updateDeadLetterHandled(id), ONLY_SYSTEM_TENANT);

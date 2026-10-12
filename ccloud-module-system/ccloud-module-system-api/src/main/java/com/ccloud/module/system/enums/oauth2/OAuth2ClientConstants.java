@@ -11,7 +11,6 @@ public interface OAuth2ClientConstants {
     String CLIENT_ID_APP = "ccloud-app";
     String CLIENT_ID_MP_WEIXIN = "ccloud-mp-weixin";
     String CLIENT_ID_H5 = "ccloud-h5";
-    String CLIENT_ID_OPEN_DEMO = "ccloud-open-demo";
 
     /**
      * 请求未显式携带客户端编号时，管理端默认使用 web，用户端默认使用 app
@@ -24,6 +23,5 @@ public interface OAuth2ClientConstants {
      */
     String HEADER_CLIENT_ID = "X-Client-Id";
 
-    List<String> ALL_CLIENT_IDS = List.of(CLIENT_ID_WEB, CLIENT_ID_APP, CLIENT_ID_MP_WEIXIN, CLIENT_ID_H5,
-            CLIENT_ID_OPEN_DEMO);
+    List<String> ALL_CLIENT_IDS = List.of(CLIENT_ID_WEB, CLIENT_ID_APP, CLIENT_ID_MP_WEIXIN, CLIENT_ID_H5);
 }

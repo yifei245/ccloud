@@ -53,4 +53,15 @@ class TenantFrameworkServiceImplTest {
         when(tenantApi.getTenantIdList()).thenReturn(CommonResult.success(List.of(1L, 2L)));
         assertThat(service.getTenantIds()).containsExactly(1L, 2L);
     }
+
+    @Test
+    void isSystemTenant_经RPC判断_不存在的租户为false() {
+        when(tenantApi.isSystemTenant(1L)).thenReturn(CommonResult.success(true));
+        when(tenantApi.isSystemTenant(2L)).thenReturn(CommonResult.success(false));
+        when(tenantApi.isSystemTenant(3L)).thenReturn(CommonResult.success(null));
+
+        assertThat(service.isSystemTenant(1L)).isTrue();
+        assertThat(service.isSystemTenant(2L)).isFalse();
+        assertThat(service.isSystemTenant(3L)).isFalse();
+    }
 }

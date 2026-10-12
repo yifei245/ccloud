@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 端到端验收（P1 基础平台 + P2 会员运营 + P2 基础设施）：除会员内部接口外全部经网关调用。
+# 端到端验收（P1 基础平台 + P2 会员运营 + P2 基础设施 + P2 开放平台）：除会员内部接口外全部经网关调用。
 # 前置：scripts/docker-up.sh 已启动全部服务。端口取自 docker/.env，可用同名环境变量覆盖。
 set -euo pipefail
 
@@ -280,11 +280,149 @@ redis_cli XRANGE ccloud:stream:e2e.topic - + | grep -q "$MID" || die "死信未�
 [ "$(lq "SELECT handled+0 FROM ccloud.infra_message_dead_letter WHERE id=$DLID;")" = "1" ] || die "重新投递后死信未标记为已处理"
 ok "死信重新投递并标记为已处理"
 
+echo "==> 开放平台"
+OTMP=$(mktemp -d)
+OPEN_APP_ID=""
+RECV_PID=""
+# 无论本节在哪一步失败，都停掉回调接收方、删除创建的应用及其日志
+open_cleanup() {
+  set +e
+  if [ -n "$RECV_PID" ]; then kill "$RECV_PID" 2>/dev/null; wait "$RECV_PID" 2>/dev/null; fi
+  if [ -n "$OPEN_APP_ID" ]; then
+    curl -s -X DELETE "$GW/admin-api/open/app/delete?id=$OPEN_APP_ID" -H "$AUTH" >/dev/null
+    lq "DELETE FROM ccloud.open_api_log WHERE app_id=$OPEN_APP_ID; DELETE FROM ccloud.open_notify_log WHERE app_id=$OPEN_APP_ID;" >/dev/null
+  fi
+  rm -rf "$OTMP"
+}
+trap 'open_cleanup; infra_cleanup' EXIT
+
+# 回调接收方：记录请求头与请求体，按 $OTMP/status 文件应答
+cat > "$OTMP/recv.py" <<'PY'
+import http.server, json, os, sys
+d = sys.argv[1]
+class H(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        with open(os.path.join(d, "last.json"), "w") as f:
+            json.dump({"headers": dict(self.headers), "body": body.decode()}, f)
+        code = int(open(os.path.join(d, "status")).read().strip() or 200) if os.path.exists(os.path.join(d, "status")) else 200
+        self.send_response(code); self.end_headers(); self.wfile.write(b"success")
+    def log_message(self, *a): pass
+s = http.server.HTTPServer(("0.0.0.0", 0), H)
+open(os.path.join(d, "port"), "w").write(str(s.server_port))
+s.serve_forever()
+PY
+python3 "$OTMP/recv.py" "$OTMP" & RECV_PID=$!
+for _ in $(seq 50); do [ -s "$OTMP/port" ] && break; sleep 0.2; done
+[ -s "$OTMP/port" ] || die "回调接收方未能启动"
+RECV_URL="http://host.docker.internal:$(cat "$OTMP/port")/notify"
+
+# 新建应用，取一次性密钥，授权"查询会员信息"
+R=$(curl -s -X POST "$GW/admin-api/open/app/create" -H "$AUTH" -H "$JSON" \
+  -d "{\"name\":\"E2E开放应用\",\"status\":0,\"rateLimit\":50,\"notifyUrl\":\"$RECV_URL\"}")
+OPEN_APP_ID=$(echo "$R" | jq -r '.data.id // empty'); APP_KEY=$(echo "$R" | jq -r '.data.appKey'); APP_SECRET=$(echo "$R" | jq -r '.data.appSecret')
+[ -n "$OPEN_APP_ID" ] || die "新建开放应用失败：$R"
+curl -s "$GW/admin-api/open/app/get?id=$OPEN_APP_ID" -H "$AUTH" | grep -q "$APP_SECRET" && die "应用详情返回了完整密钥"
+API_ID=$(curl -s "$GW/admin-api/open/api/list-all-simple" -H "$AUTH" | jq -r '.data[] | select(.code=="member.user.get") | .id')
+[ -n "$API_ID" ] || die "接口目录中没有 member.user.get"
+# 请求体先放进变量：macOS 自带的 bash 3.2 会把"$(...)"里的 {a,b} 当作花括号展开而拆开参数
+ASSIGN_BODY="{\"appId\":$OPEN_APP_ID,\"apiIds\":[$API_ID]}"
+[ "$(curl -s -X PUT "$GW/admin-api/open/app/assign-api" -H "$AUTH" -H "$JSON" -d "$ASSIGN_BODY" | jq -r '.code')" = "0" ] \
+  || die "授权接口失败"
+ok "新建开放应用，密钥只返回一次，授权接口"
+
+# 签名调用：$1=方法 $2=路径 $3=查询串 $4=appKey $5=密钥 $6=nonce（可选）。输出第一行为状态码，其后为响应体
+open_call() {
+  python3 - "$@" <<'PY'
+import base64, hashlib, hmac, sys, time, uuid, urllib.request, urllib.error, os
+m, path, q, key, secret = sys.argv[1:6]
+nonce = sys.argv[6] if len(sys.argv) > 6 else uuid.uuid4().hex
+ts = str(int(time.time() * 1000))
+s = "\n".join([m, path, q, ts, nonce, hashlib.sha256(b"").hexdigest()])
+sign = base64.b64encode(hmac.new(secret.encode(), s.encode(), hashlib.sha256).digest()).decode()
+req = urllib.request.Request(os.environ["GW"] + path + ("?" + q if q else ""), method=m, headers={
+    "X-Open-App-Id": key, "X-Open-Timestamp": ts, "X-Open-Nonce": nonce, "X-Open-Sign": sign})
+try:
+    r = urllib.request.urlopen(req); print(r.status); print(r.read().decode())
+except urllib.error.HTTPError as e:
+    print(e.code); print(e.read().decode())
+PY
+}
+export GW
+R=$(open_call GET /open-api/member/user/get "mobile=13800138000" "$APP_KEY" "$APP_SECRET")
+[ "$(echo "$R" | head -1)" = "200" ] && [ "$(echo "$R" | tail -1 | jq -r '.data.mobile')" = "138****8000" ] \
+  || die "签名调用开放接口失败：$R"
+ok "签名调用开放接口，手机号已脱敏"
+
+[ "$(open_call GET /open-api/member/user/get "mobile=13800138000" "$APP_KEY" wrong-secret | head -1)" = "401" ] || die "错误签名未被拒绝"
+N="e2e-$(date +%s)"
+open_call GET /open-api/member/user/get "mobile=13800138000" "$APP_KEY" "$APP_SECRET" "$N" >/dev/null
+[ "$(open_call GET /open-api/member/user/get "mobile=13800138000" "$APP_KEY" "$APP_SECRET" "$N" | head -1)" = "401" ] || die "重放请求未被拒绝"
+[ "$(open_call GET /open-api/member/user/page "" "$APP_KEY" "$APP_SECRET" | head -1)" = "403" ] || die "未授权的接口未返回 403"
+ok "错误签名、重放 401，未授权接口 403"
+
+# 应用变更经 Redis 广播使网关缓存失效，最多等 5 秒
+open_status_is() {  # $1=期望的状态码 $2=密钥
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    [ "$(open_call GET /open-api/member/user/get "mobile=13800138000" "$APP_KEY" "$2" | head -1)" = "$1" ] && return 0
+    sleep 0.5
+  done
+  return 1
+}
+update_open_app() {  # $1=状态
+  local body="{\"id\":$OPEN_APP_ID,\"name\":\"E2E开放应用\",\"status\":$1,\"rateLimit\":50,\"notifyUrl\":\"$RECV_URL\"}"
+  curl -s -X PUT "$GW/admin-api/open/app/update" -H "$AUTH" -H "$JSON" -d "$body" | jq -r '.code'
+}
+[ "$(update_open_app 1)" = "0" ] || die "停用开放应用失败"
+open_status_is 401 "$APP_SECRET" || die "停用应用后仍可调用（网关缓存未失效）"
+[ "$(update_open_app 0)" = "0" ] || die "重新开启开放应用失败"
+open_status_is 200 "$APP_SECRET" || die "重新开启应用后仍无法调用"
+NEW_SECRET=$(curl -s -X PUT "$GW/admin-api/open/app/reset-secret?id=$OPEN_APP_ID" -H "$AUTH" | jq -r '.data // empty')
+[ -n "$NEW_SECRET" ] && [ "$NEW_SECRET" != "$APP_SECRET" ] || die "重置密钥失败"
+open_status_is 401 "$APP_SECRET" || die "重置后旧密钥仍可用"
+open_status_is 200 "$NEW_SECRET" || die "重置后新密钥不可用"
+ok "停用与重置密钥立即生效"
+
+deadline=$((SECONDS + 60))
+until [ "$(curl -s "$GW/admin-api/open/api-log/page?pageNo=1&pageSize=10&appId=$OPEN_APP_ID" -H "$AUTH" \
+    | jq -r '[.data.list[] | select(.apiCode=="member.user.get")] | length')" -gt 0 ]; do
+  [ $SECONDS -lt $deadline ] || die "60 秒内未查到开放接口的调用日志"
+  sleep 3
+done
+ok "开放接口调用日志经消息流写入 open"
+
+# 测试回调：成功且可验签；对方失败时记为待重试
+NID=$(curl -s -X POST "$GW/admin-api/open/app/test-notify?id=$OPEN_APP_ID" -H "$AUTH" | jq -r '.data // empty')
+[ -n "$NID" ] || die "发送测试回调失败"
+deadline=$((SECONDS + 30))
+until [ "$(curl -s "$GW/admin-api/open/notify-log/get?id=$NID" -H "$AUTH" | jq -r '.data.status')" = "10" ]; do
+  [ $SECONDS -lt $deadline ] || die "30 秒内测试回调未成功：$(curl -s "$GW/admin-api/open/notify-log/get?id=$NID" -H "$AUTH")"
+  sleep 2
+done
+python3 - "$OTMP/last.json" "$NEW_SECRET" <<'PY' || die "回调验签失败"
+import base64, hashlib, hmac, json, sys
+d = json.load(open(sys.argv[1])); h = {k.lower(): v for k, v in d["headers"].items()}
+s = h["x-open-timestamp"] + "\n" + h["x-open-event-id"] + "\n" + hashlib.sha256(d["body"].encode()).hexdigest()
+assert base64.b64encode(hmac.new(sys.argv[2].encode(), s.encode(), hashlib.sha256).digest()).decode() == h["x-open-sign"]
+assert json.loads(d["body"])["event"] == "open.test"
+PY
+echo 500 > "$OTMP/status"
+NID=$(curl -s -X POST "$GW/admin-api/open/app/test-notify?id=$OPEN_APP_ID" -H "$AUTH" | jq -r '.data // empty')
+[ -n "$NID" ] || die "发送第二次测试回调失败"
+deadline=$((SECONDS + 30))
+until [ "$(curl -s "$GW/admin-api/open/notify-log/get?id=$NID" -H "$AUTH" | jq -r '.data.status')" = "20" ]; do
+  [ $SECONDS -lt $deadline ] || die "30 秒内失败的回调未记为待重试"
+  sleep 2
+done
+ok "测试回调成功且可验签，对方失败时记为待重试"
+
 echo "==> 文档、链路追踪、监控、定时任务"
 curl -sf -o /dev/null "$GW/doc.html" || die "接口文档聚合页不可访问"
 curl -s "$GW/system/v3/api-docs/admin" | jq -e '.paths | length > 0' >/dev/null || die "system 管理端文档为空"
 curl -s "$GW/member/v3/api-docs/app" | jq -e '.paths | length > 0' >/dev/null || die "member 用户端文档为空"
 curl -s "$GW/infra/v3/api-docs/admin" | jq -e '.paths | length > 0' >/dev/null || die "infra 管理端文档为空"
+curl -s "$GW/open/v3/api-docs/admin" | jq -e '.paths | length > 0' >/dev/null || die "open 管理端文档为空"
 ok "接口文档聚合"
 curl -s -D- -o /dev/null "$GW/admin-api/system/auth/get-permission-info" -H "Authorization: Bearer $NEW" \
   | grep -qi '^trace-id:' || die "响应缺少 trace-id 头"; ok "响应携带 trace-id"
@@ -299,14 +437,14 @@ deadline=$((SECONDS + 60))
 while true; do
   APPS=$(curl -s -u "admin:${CCLOUD_MONITOR_PASSWORD}" -H 'Accept: application/json' "http://127.0.0.1:${MONITOR_PORT}/applications")
   down=""
-  for app in ccloud-gateway ccloud-system-server ccloud-infra-server ccloud-member-server; do
+  for app in ccloud-gateway ccloud-system-server ccloud-infra-server ccloud-member-server ccloud-open-server; do
     echo "$APPS" | jq -e --arg n "$app" 'map(select(.name == $n and .status == "UP")) | length == 1' >/dev/null || down="$down $app"
   done
   [ -z "$down" ] && break
   [ $SECONDS -lt $deadline ] || die "监控面板中$down 不是 UP"
   sleep 5
 done
-ok "监控面板显示 gateway、system、infra、member 均为 UP"
+ok "监控面板显示 gateway、system、infra、member、open 均为 UP"
 JOBS=$(lq "SELECT COUNT(DISTINCT executor_handler) FROM xxl_job.xxl_job_log l JOIN xxl_job.xxl_job_group g ON l.job_group = g.id
   WHERE g.app_name = 'ccloud-system-server' AND l.handle_code = 200")
 [ "${JOBS:-0}" -ge 2 ] || die "XXL-Job 两个重投任务尚未成功执行（成功的任务数 ${JOBS:-0}），任务每分钟调度一次，可稍后重试"

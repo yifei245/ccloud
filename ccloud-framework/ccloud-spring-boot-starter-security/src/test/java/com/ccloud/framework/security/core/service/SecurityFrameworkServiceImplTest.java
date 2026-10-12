@@ -34,9 +34,13 @@ class SecurityFrameworkServiceImplTest {
     }
 
     private void login(Long userId, List<String> scopes) {
+        login(userId, UserTypeEnum.ADMIN, scopes);
+    }
+
+    private void login(Long userId, UserTypeEnum userType, List<String> scopes) {
         LoginUser user = new LoginUser();
         user.setId(userId);
-        user.setUserType(UserTypeEnum.ADMIN.getValue());
+        user.setUserType(userType.getValue());
         user.setTenantId(1L);
         user.setScopes(scopes);
         user.setExpiresTime(LocalDateTime.now().plusHours(1));
@@ -64,6 +68,19 @@ class SecurityFrameworkServiceImplTest {
     void hasPermission_shouldReturnFalseWhenNotLoggedIn() {
         assertThat(service.hasPermission("system:user:create")).isFalse();
         verify(permissionFrameworkService, never()).hasAnyPermissions(any(), any(String[].class));
+    }
+
+    @Test
+    @DisplayName("非管理员身份没有角色与权限：开放应用、会员的编号与管理员编号会重复，不能继承同编号管理员的权限")
+    void nonAdminIdentity_shouldNeverHavePermissionsOrRoles() {
+        for (UserTypeEnum type : List.of(UserTypeEnum.OPEN_APP, UserTypeEnum.MEMBER)) {
+            login(1L, type, List.of("member.read"));
+            assertThat(service.hasPermission("system:user:create")).isFalse();
+            assertThat(service.hasRole("super_admin")).isFalse();
+            assertThat(service.hasScope("member.read")).isTrue();
+        }
+        verify(permissionFrameworkService, never()).hasAnyPermissions(any(), any(String[].class));
+        verify(permissionFrameworkService, never()).hasAnyRoles(any(), any(String[].class));
     }
 
     @Test

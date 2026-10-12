@@ -1,8 +1,8 @@
 #!/bin/bash
 # 登记 ccloud 的 XXL-Job 执行器与任务（可重复执行，已登记的跳过）：
-#   - 删除上游示例执行器与任务，登记 system、infra 两个执行器及其任务，并把默认管理员密码 123456 替换为 .env 中的密码
+#   - 删除上游示例执行器与任务，登记 system、infra、open 三个执行器及其任务，并把默认管理员密码 123456 替换为 .env 中的密码
 # MySQL 容器首次初始化时执行（位于 01 ccloud 库、02 Nacos 库、03 XXL-Job 库之后），scripts/docker-up.sh 每次也会执行
-# 任务处理器名须与代码中的 @XxlJob 一致（system 的 MqJobHandler，infra 的 MqJobHandler 与 ApiLogCleanJob）
+# 任务处理器名须与代码中的 @XxlJob 一致（system 的 MqJobHandler，infra 的 MqJobHandler 与 ApiLogCleanJob，open 的 MqJobHandler、回调重试与日志清理任务）
 set -euo pipefail
 
 : "${XXL_JOB_ADMIN_PASSWORD:?必须设置 XXL_JOB_ADMIN_PASSWORD}"
@@ -20,8 +20,12 @@ SELECT 'ccloud-system-server', 'system 服务', 0, NULL, NOW() FROM DUAL
 INSERT INTO xxl_job_group (app_name, title, address_type, address_list, update_time)
 SELECT 'ccloud-infra-server', 'infra 服务', 0, NULL, NOW() FROM DUAL
  WHERE NOT EXISTS (SELECT 1 FROM xxl_job_group WHERE app_name = 'ccloud-infra-server');
+INSERT INTO xxl_job_group (app_name, title, address_type, address_list, update_time)
+SELECT 'ccloud-open-server', 'open 服务', 0, NULL, NOW() FROM DUAL
+ WHERE NOT EXISTS (SELECT 1 FROM xxl_job_group WHERE app_name = 'ccloud-open-server');
 SET @system_group = (SELECT id FROM xxl_job_group WHERE app_name = 'ccloud-system-server');
 SET @infra_group = (SELECT id FROM xxl_job_group WHERE app_name = 'ccloud-infra-server');
+SET @open_group = (SELECT id FROM xxl_job_group WHERE app_name = 'ccloud-open-server');
 
 -- FIRST 路由 + 串行：多实例部署时同一时刻只有一个实例执行
 INSERT INTO xxl_job_info (job_group, job_desc, add_time, update_time, author, alarm_email,
@@ -35,7 +39,10 @@ FROM (SELECT @system_group AS job_group, '消息发件箱重投（全部租户�
       UNION ALL SELECT @system_group, 'Redis Stream 未确认消息重投', '30 * * * * ?', 'redisStreamPendingMessageResendJob', 60
       UNION ALL SELECT @infra_group, 'Redis Stream 未确认消息重投（日志）', '30 * * * * ?', 'redisStreamPendingMessageResendJob', 60
       UNION ALL SELECT @infra_group, '清理过期的 API 访问日志', '0 0 3 * * ?', 'apiAccessLogCleanJob', 3600
-      UNION ALL SELECT @infra_group, '清理过期的 API 异常日志', '0 10 3 * * ?', 'apiErrorLogCleanJob', 3600) t
+      UNION ALL SELECT @infra_group, '清理过期的 API 异常日志', '0 10 3 * * ?', 'apiErrorLogCleanJob', 3600
+      UNION ALL SELECT @open_group, '回调通知发送与重试', '0/15 * * * * ?', 'openNotifyRetryJob', 60
+      UNION ALL SELECT @open_group, '清理过期的调用日志与回调日志', '0 20 3 * * ?', 'openApiLogCleanJob', 3600
+      UNION ALL SELECT @open_group, 'Redis Stream 未确认消息重投（调用日志）', '30 * * * * ?', 'redisStreamPendingMessageResendJob', 60) t
 WHERE NOT EXISTS (SELECT 1 FROM xxl_job_info i WHERE i.job_group = t.job_group AND i.executor_handler = t.handler);
 
 UPDATE xxl_job_user SET password = '${password_hash}' WHERE username = 'admin';

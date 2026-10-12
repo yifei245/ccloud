@@ -1,1 +1,2 @@
 com.ccloud.framework.tenant.config.CcloudTenantAutoConfiguration
+com.ccloud.framework.tenant.config.CcloudSystemTenantValidatorAutoConfiguration

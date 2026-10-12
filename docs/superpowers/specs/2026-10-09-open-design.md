@@ -217,7 +217,7 @@
 
 ### 10.3 部署
 
-- `allow-private-address` 只在 profile 中设置（local / dev 为 `true`，prod 与默认为 `false`），Nacos 配置包 `ccloud-open-server.yaml` 不包含该项：配置包会导入每个环境且优先级高于 profile，写入会让生产默认关闭 SSRF 防护。docker 联调使用 dev profile，回调到宿主机仍可用。`scripts/verify-nacos.sh` 检查配置包中不得出现 `allow-private-address: true`。
+- `allow-private-address` 只在 profile 中设置（local / dev 为 `true`，prod 与默认为 `false`），Nacos 配置包 `ccloud-open-server.yaml` 不包含该项：配置包会导入每个环境且优先级高于 profile，写入会让生产默认关闭 SSRF 防护。docker 联调使用 dev profile，回调到宿主机仍可用。`scripts/verify-nacos.sh` 检查配置包中不得出现 `allow-private-address: true`。已导入过旧配置包（含 `allow-private-address: true`）的环境须在 Nacos 控制台手工删除该行，导入脚本对已存在的 dataId 跳过，见 `docker/nacos/README.md` 约定 5。
 - XXL-Job 任务：`openNotifyRetryJob`（`0/15 * * * * ?`）、`openApiLogCleanJob`（每天 03:20）、`redisStreamPendingMessageResendJob`（每分钟）。
 
 ### 10.4 信任边界

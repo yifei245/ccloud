@@ -10,7 +10,7 @@
 | `ccloud-system-server.yaml` | system | 登录失败锁定、短信验证码 |
 | `ccloud-infra-server.yaml` | infra | 文件大小上限、访问日志与异常日志保留天数 |
 | `ccloud-member-server.yaml` | member | 会员登录失败锁定、C 端功能开关 |
-| `ccloud-open-server.yaml` | open | 回调地址内网开关与超时、调用日志保留天数 |
+| `ccloud-open-server.yaml` | open | 回调的连接与读取超时、调用日志保留天数（回调内网开关 `allow-private-address` 不在配置包中，见约定 5） |
 
 ## 导入
 
@@ -30,3 +30,8 @@ Nacos 3 已移除 v1、v2 的配置发布接口，脚本使用 `/nacos/v3/admin/
    开放平台应用的密钥只在各环境的 Nacos 控制台中填写。
 3. **生效方式**：文件中标注"即时生效"的项绑定在 `@ConfigurationProperties` 上，控制台发布后即生效；其余需重启服务。
 4. 网关匿名白名单 `ccloud.security.ignore-urls` 不在此配置，须留在网关包内的 `application.yaml`，由 system、member 的一致性测试校验。
+5. **回调内网开关只在 profile 中设置**：open 的 `ccloud.open.notify.allow-private-address` 由 profile 决定（local / dev 为 `true`，prod 与默认为 `false`），
+   配置包不得包含该项，`verify-nacos.sh` 发现 `allow-private-address: true` 即失败。
+   **已导入过旧配置包的环境**（2026-10 之前的 `ccloud-open-server.yaml` 含 `allow-private-address: true`）：导入脚本对已存在的 dataId 跳过，
+   不会自动更新，须在该环境 Nacos 控制台的 `ccloud-open-server.yaml` 中手工删除这一行并发布，否则生产会关闭回调的 SSRF 防护；
+   也可用 `scripts/nacos-import.sh --overwrite` 以仓库文件为准覆盖（会同时覆盖控制台改过的其他值）。

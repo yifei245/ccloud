@@ -1,5 +1,6 @@
 package com.ccloud.module.pay.framework.config;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -27,7 +28,9 @@ public class PayProperties {
     @NotBlank
     private String notifyBaseUrl = "http://127.0.0.1:28080";
 
+    @Valid
     private Wallet wallet = new Wallet();
+    @Valid
     private Job job = new Job();
 
     @Data

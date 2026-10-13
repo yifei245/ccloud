@@ -50,6 +50,30 @@ class OpenNotifyApiImplTest extends BaseOpenWebIntegrationTest {
                 .andExpect(jsonPath("$.code").value(400));
     }
 
+    @Test
+    void 事件编号含非法字符返回参数错误() throws Exception {
+        mockMvc.perform(post("/rpc-api/open/notify/send").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"appId\":1,\"eventId\":\"a b\",\"event\":\"pay.order.paid\",\"data\":{}}"))
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void 合法事件编号透传_重复发送返回同一条记录() throws Exception {
+        String appId = extract(mockMvc.perform(asAdmin(post("/admin-api/open/app/create"), ADMIN_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Web测试eventid\",\"status\":0,\"rateLimit\":100}"))
+                .andReturn().getResponse().getContentAsString(), "\"id\":(\\d+)");
+        String body = "{\"appId\":" + appId + ",\"eventId\":\"pay-msg-0002\",\"event\":\"pay.order.paid\",\"data\":{\"k\":\"v\"}}";
+
+        String first = mockMvc.perform(post("/rpc-api/open/notify/send").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(jsonPath("$.code").value(0)).andReturn().getResponse().getContentAsString();
+        String second = mockMvc.perform(post("/rpc-api/open/notify/send").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(jsonPath("$.code").value(0)).andReturn().getResponse().getContentAsString();
+
+        assertThat(extract(second, "\"data\":(\\d+)")).isEqualTo(extract(first, "\"data\":(\\d+)"));
+        assertThat(jdbcTemplate.queryForList("SELECT id FROM open_notify_log WHERE event_id = 'pay-msg-0002'", Long.class)).hasSize(1);
+    }
+
     private static String extract(String json, String regex) {
         Matcher matcher = Pattern.compile(regex).matcher(json);
         assertThat(matcher.find()).as(json).isTrue();

@@ -28,6 +28,16 @@ public interface OpenNotifyLogMapper extends BaseMapperX<OpenNotifyLogDO> {
                 .orderByDesc(OpenNotifyLogDO::getId));
     }
 
+    default OpenNotifyLogDO selectByEventId(String eventId) {
+        return selectOne(OpenNotifyLogDO::getEventId, eventId);
+    }
+
+    /**
+     * 按事件编号查回调日志编号，加共享锁的当前读：绕过事务快照，读到其他事务已提交的记录
+     */
+    @Select("SELECT id FROM open_notify_log WHERE event_id = #{eventId} AND deleted = 0 LIMIT 1 FOR SHARE")
+    Long selectIdByEventIdForShare(@Param("eventId") String eventId);
+
     /**
      * 抢占一条到期的回调：把下次重试时间推到租约结束。多个实例、定时任务与即时发送并发时只有一方更新成功。
      * retryCount 为抢占前读到的值，保证抢占方据以计算退避的次数就是被抢占时的次数

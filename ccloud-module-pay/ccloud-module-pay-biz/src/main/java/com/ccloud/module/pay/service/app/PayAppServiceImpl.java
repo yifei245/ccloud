@@ -49,6 +49,7 @@ public class PayAppServiceImpl implements PayAppService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateApp(PayAppSaveReqVO reqVO) {
         PayAppDO app = validateAppExists(reqVO.getId());
         // 应用标识被内部服务与钱包充值引用，创建后不可修改

@@ -5,7 +5,9 @@ import com.ccloud.module.open.api.app.OpenAppApi;
 import com.ccloud.module.open.api.app.dto.OpenAppSnapshotRespDTO;
 import com.ccloud.module.pay.controller.admin.app.vo.PayAppSaveReqVO;
 import com.ccloud.module.pay.dal.dataobject.app.PayAppDO;
+import com.ccloud.module.pay.dal.dataobject.channel.PayChannelDO;
 import com.ccloud.module.pay.dal.mysql.app.PayAppMapper;
+import com.ccloud.module.pay.dal.mysql.channel.PayChannelMapper;
 import com.ccloud.module.pay.test.BasePayDbUnitTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,8 @@ class PayAppServiceImplTest extends BasePayDbUnitTest {
     private PayAppServiceImpl payAppService;
     @Resource
     private PayAppMapper payAppMapper;
+    @Resource
+    private PayChannelMapper payChannelMapper;
     @MockitoBean
     private OpenAppApi openAppApi;
 
@@ -110,8 +114,11 @@ class PayAppServiceImplTest extends BasePayDbUnitTest {
     @Test
     void 删除应用同时删除它的渠道() {
         Long id = payAppService.createApp(req("a1", null));
+        payChannelMapper.insert(new PayChannelDO().setAppId(id).setCode("mock").setStatus(0).setFeeRate(0D).setConfig("{}"));
+        assertThat(payChannelMapper.selectListByAppId(id)).hasSize(1);
         payAppService.deleteApp(id);
         assertThat(payAppMapper.selectById(id)).isNull();
+        assertThat(payChannelMapper.selectListByAppId(id)).isEmpty();
         assertServiceException(() -> payAppService.deleteApp(id), PAY_APP_NOT_FOUND);
     }
 }

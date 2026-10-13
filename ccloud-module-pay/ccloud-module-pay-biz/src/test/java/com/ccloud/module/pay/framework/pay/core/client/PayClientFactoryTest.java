@@ -1,10 +1,14 @@
 package com.ccloud.module.pay.framework.pay.core.client;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import cn.hutool.core.util.StrUtil;
 import com.ccloud.framework.common.exception.ServiceException;
 import com.ccloud.module.pay.support.FakePayClient;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Set;
@@ -94,5 +98,41 @@ class PayClientFactoryTest {
 
         String replaced = factory.mergeMaskedConfig("mock", "{\"key\":\"b\",\"secret\":\"new\"}", "{\"key\":\"a\",\"secret\":\"s3cr3t\"}");
         assertThat(replaced).contains("\"secret\":\"new\"");
+    }
+
+    @Test
+    void 配置不是合法JSON时拒绝且配置内容不进日志() {
+        // 末尾的 x 使解析在含密钥的位置之后失败，解析器的错误信息会带上原文片段
+        String malformed = "{\"key\":\"a\",\"secret\":\"s3cr3t-value\"x}";
+        List<ILoggingEvent> events = captureLogs(() -> {
+            assertThatThrownBy(() -> factory.parseConfig("mock", malformed))
+                    .isInstanceOf(ServiceException.class).extracting("code").isEqualTo(CHANNEL_CONFIG_INVALID.getCode());
+            assertThatThrownBy(() -> factory.maskConfig("mock", malformed))
+                    .isInstanceOf(ServiceException.class).extracting("code").isEqualTo(CHANNEL_CONFIG_INVALID.getCode());
+        });
+        assertThat(events).extracting(PayClientFactoryTest::render).noneMatch(text -> text.contains("s3cr3t-value"));
+    }
+
+    /** 收集执行期间所有日志事件（根 logger，含 JsonUtils 等 */
+    private static List<ILoggingEvent> captureLogs(Runnable action) {
+        Logger root = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        root.addAppender(appender);
+        try {
+            action.run();
+        } finally {
+            root.detachAppender(appender);
+        }
+        return appender.list;
+    }
+
+    /** 日志消息与整条异常链的消息拼成一段文本，便于检查敏感内容 */
+    private static String render(ILoggingEvent event) {
+        StringBuilder text = new StringBuilder(event.getFormattedMessage());
+        for (var t = event.getThrowableProxy(); t != null; t = t.getCause()) {
+            text.append(' ').append(t.getMessage());
+        }
+        return text.toString();
     }
 }

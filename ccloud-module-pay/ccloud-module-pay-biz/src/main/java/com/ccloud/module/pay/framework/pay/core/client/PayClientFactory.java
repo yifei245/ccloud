@@ -1,7 +1,9 @@
 package com.ccloud.module.pay.framework.pay.core.client;
 
 import cn.hutool.core.util.StrUtil;
+import com.ccloud.framework.common.exception.ServiceException;
 import com.ccloud.framework.common.util.json.JsonUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Component;
@@ -45,12 +47,7 @@ public class PayClientFactory {
 
     public PayClientConfig parseConfig(String code, String configJson) {
         PayClientProvider provider = getProvider(code);
-        PayClientConfig config;
-        try {
-            config = JsonUtils.parseObject(StrUtil.blankToDefault(configJson, "{}"), provider.getConfigClass());
-        } catch (RuntimeException e) {
-            throw exception(CHANNEL_CONFIG_INVALID, "不是合法的 JSON");
-        }
+        PayClientConfig config = readJson(StrUtil.blankToDefault(configJson, "{}"), provider.getConfigClass());
         if (config == null) {
             throw exception(CHANNEL_CONFIG_INVALID, "不能为空");
         }
@@ -104,12 +101,29 @@ public class PayClientFactory {
         if (StrUtil.isBlank(json)) {
             return new LinkedHashMap<>();
         }
+        Map<String, Object> map;
         try {
-            Map<String, Object> map = JsonUtils.parseObject(json, new TypeReference<LinkedHashMap<String, Object>>() {});
-            return map == null ? new LinkedHashMap<>() : map;
-        } catch (RuntimeException e) {
-            throw exception(CHANNEL_CONFIG_INVALID, "不是合法的 JSON");
+            map = JsonUtils.getObjectMapper().readValue(json, new TypeReference<LinkedHashMap<String, Object>>() {});
+        } catch (JsonProcessingException e) {
+            throw invalidJson();
         }
+        return map == null ? new LinkedHashMap<>() : map;
+    }
+
+    /**
+     * 解析渠道配置。不用 {@link JsonUtils#parseObject(String, Class)}：它解析失败时会把整段配置写入 ERROR 日志，
+     * 而配置里含商户密钥。这里解析失败只抛异常，不记录配置内容
+     */
+    private static <T> T readJson(String json, Class<T> clazz) {
+        try {
+            return JsonUtils.getObjectMapper().readValue(json, clazz);
+        } catch (JsonProcessingException e) {
+            throw invalidJson();
+        }
+    }
+
+    private static ServiceException invalidJson() {
+        return exception(CHANNEL_CONFIG_INVALID, "不是合法的 JSON");
     }
 
     private PayClientProvider getProvider(String code) {

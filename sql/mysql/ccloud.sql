@@ -1439,7 +1439,7 @@ CREATE TABLE `open_notify_log` (
 
 -- >>>>>>>>>> ddl/05-pay.sql <<<<<<<<<<
 -- ----------------------------------------------------------------------------
--- pay 模块：支付应用、渠道、订单、退款、转账、钱包、回调通知
+-- pay 模块：支付应用、渠道、订单、退款、转账、钱包
 -- 本文件由 DDL 生成器产出，公共约定与 01-system.sql 一致
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
@@ -1456,9 +1456,7 @@ CREATE TABLE `pay_app` (
   `name`                  varchar(64)   NOT NULL COMMENT '应用名',
   `status`                tinyint       NOT NULL DEFAULT 0 COMMENT '状态：0 开启 1 关闭',
   `remark`                varchar(500)  DEFAULT NULL COMMENT '备注',
-  `order_notify_url`      varchar(1024) NOT NULL COMMENT '支付结果回调地址',
-  `refund_notify_url`     varchar(1024) NOT NULL COMMENT '退款结果回调地址',
-  `transfer_notify_url`   varchar(1024) DEFAULT NULL COMMENT '转账结果回调地址',
+  `open_app_id`           bigint        DEFAULT NULL COMMENT '绑定的开放应用编号。外部系统经开放平台调用支付开放接口、接收支付回调；为空表示不对外开放',
   `tenant_id`             bigint        NOT NULL DEFAULT 0 COMMENT '租户编号',
   `creator`               varchar(64)   DEFAULT '' COMMENT '创建者',
   `create_time`           datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1467,8 +1465,9 @@ CREATE TABLE `pay_app` (
   `deleted`               bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
-  UNIQUE KEY `uk_app_key` (`app_key`, `tenant_id`, `deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='支付应用表，每个接入支付的业务方一条';
+  UNIQUE KEY `uk_app_key` (`app_key`, `tenant_id`, `deleted`),
+  UNIQUE KEY `uk_open_app` (`open_app_id`, `deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='支付应用表，每个接入支付的业务方一条。内部服务经消息接收结果，外部系统经绑定的开放应用接收回调';
 DROP TABLE IF EXISTS `pay_channel`;
 CREATE TABLE `pay_channel` (
   `id`            bigint        NOT NULL AUTO_INCREMENT COMMENT '渠道编号',
@@ -1497,14 +1496,16 @@ CREATE TABLE `pay_order` (
   `app_id`              bigint        NOT NULL COMMENT '应用编号',
   `channel_id`          bigint        DEFAULT NULL COMMENT '渠道编号，用户选择渠道后写入',
   `channel_code`        varchar(32)   DEFAULT NULL COMMENT '渠道编码',
+  `pay_method`          varchar(32)   DEFAULT NULL COMMENT '支付方式。聚合渠道下的具体方式，如 wx_lite、alipay_qr；直连渠道为空',
   `merchant_order_id`   varchar(64)   NOT NULL COMMENT '商户订单编号，即业务侧订单号',
   `subject`             varchar(32)   NOT NULL COMMENT '商品标题',
   `body`                varchar(128)  NOT NULL DEFAULT '' COMMENT '商品描述',
-  `notify_url`          varchar(1024) NOT NULL COMMENT '异步通知地址',
   `price`               int           NOT NULL DEFAULT 0 COMMENT '支付金额，单位：分',
   `channel_fee_rate`    double        DEFAULT 0 COMMENT '渠道手续费率，单位百分比',
   `channel_fee_price`   int           NOT NULL DEFAULT 0 COMMENT '渠道手续费，单位：分',
   `status`              tinyint       NOT NULL COMMENT '支付状态：0 待支付 10 支付成功 20 已退款 30 已关闭',
+  `user_id`             bigint        DEFAULT NULL COMMENT '付款用户编号。会员端据此校验订单归属，钱包支付据此扣款；外部系统创建的订单为空',
+  `user_type`           tinyint       DEFAULT NULL COMMENT '付款用户类型，见 UserTypeEnum',
   `user_ip`             varchar(50)   NOT NULL COMMENT '用户 IP',
   `expire_time`         datetime      NOT NULL COMMENT '订单失效时间，超时未支付由定时任务关闭',
   `success_time`        datetime      DEFAULT NULL COMMENT '支付成功时间',
@@ -1531,8 +1532,9 @@ CREATE TABLE `pay_order_extension` (
   `order_id`              bigint        NOT NULL COMMENT '支付订单编号',
   `channel_id`            bigint        NOT NULL COMMENT '渠道编号',
   `channel_code`          varchar(32)   NOT NULL COMMENT '渠道编码',
+  `pay_method`            varchar(32)   DEFAULT NULL COMMENT '支付方式，聚合渠道下的具体方式',
   `user_ip`               varchar(50)   NOT NULL COMMENT '用户 IP',
-  `status`                tinyint       NOT NULL COMMENT '支付状态',
+  `status`                tinyint       NOT NULL COMMENT '支付状态：0 等待 10 成功 30 关闭（渠道明确失败也记为关闭）',
   `channel_extras`        varchar(1024) DEFAULT NULL COMMENT '渠道额外参数，JSON',
   `channel_error_code`    varchar(64)   DEFAULT NULL COMMENT '渠道错误码',
   `channel_error_msg`     varchar(256)  DEFAULT NULL COMMENT '渠道错误信息',
@@ -1546,7 +1548,8 @@ CREATE TABLE `pay_order_extension` (
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_no` (`no`),
-  KEY `idx_order_id` (`order_id`)
+  KEY `idx_order_id` (`order_id`),
+  KEY `idx_status_create` (`status`, `create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='支付订单拓展表。每发起一次支付尝试生成一条，一个订单可对应多次尝试';
 
 -- ========================= 退款 =========================
@@ -1562,7 +1565,6 @@ CREATE TABLE `pay_refund` (
   `order_no`              varchar(64)   NOT NULL COMMENT '支付订单外部订单号',
   `merchant_order_id`     varchar(64)   NOT NULL COMMENT '商户订单编号',
   `merchant_refund_id`    varchar(64)   NOT NULL COMMENT '商户退款单编号',
-  `notify_url`            varchar(1024) NOT NULL COMMENT '异步通知地址',
   `status`                tinyint       NOT NULL COMMENT '退款状态：0 未退款 10 退款成功 20 退款失败',
   `pay_price`             int           NOT NULL DEFAULT 0 COMMENT '原支付金额，单位：分',
   `refund_price`          int           NOT NULL DEFAULT 0 COMMENT '退款金额，单位：分',
@@ -1584,7 +1586,8 @@ CREATE TABLE `pay_refund` (
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_merchant_refund` (`app_id`, `merchant_refund_id`, `deleted`),
   UNIQUE KEY `uk_no` (`no`),
-  KEY `idx_order_id` (`order_id`)
+  KEY `idx_order_id` (`order_id`),
+  KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='退款订单表';
 
 -- ========================= 转账 =========================
@@ -1603,7 +1606,6 @@ CREATE TABLE `pay_transfer` (
   `user_name`              varchar(64)   DEFAULT NULL COMMENT '收款人姓名',
   `status`                 tinyint       NOT NULL COMMENT '转账状态：0 等待 10 成功 20 失败 5 进行中',
   `success_time`           datetime      DEFAULT NULL COMMENT '转账成功时间',
-  `notify_url`             varchar(1024) NOT NULL COMMENT '异步通知地址',
   `user_ip`                varchar(50)   NOT NULL COMMENT '用户 IP',
   `channel_extras`         varchar(512)  DEFAULT NULL COMMENT '渠道额外参数，JSON',
   `channel_transfer_no`    varchar(64)   DEFAULT NULL COMMENT '渠道转账单号',
@@ -1619,54 +1621,9 @@ CREATE TABLE `pay_transfer` (
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_app_merchant_transfer` (`app_id`, `merchant_transfer_id`, `deleted`),
-  UNIQUE KEY `uk_no` (`no`)
+  UNIQUE KEY `uk_no` (`no`),
+  KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='转账单表，用于佣金提现、钱包提现等出款';
-
--- ========================= 回调通知 =========================
-
-DROP TABLE IF EXISTS `pay_notify_task`;
-CREATE TABLE `pay_notify_task` (
-  `id`                     bigint        NOT NULL AUTO_INCREMENT COMMENT '任务编号',
-  `app_id`                 bigint        NOT NULL COMMENT '应用编号',
-  `type`                   tinyint       NOT NULL COMMENT '通知类型：1 支付单 2 退款单 3 转账单',
-  `data_id`                bigint        NOT NULL COMMENT '数据编号，对应支付单/退款单/转账单',
-  `merchant_order_id`      varchar(64)   NOT NULL COMMENT '商户订单编号',
-  `merchant_refund_id`     varchar(64)   DEFAULT NULL COMMENT '商户退款编号',
-  `merchant_transfer_id`   varchar(64)   DEFAULT NULL COMMENT '商户转账编号',
-  `status`                 tinyint       NOT NULL COMMENT '通知状态：0 等待 10 成功 20 失败 21 请求成功但结果失败 22 请求失败',
-  `next_notify_time`       datetime      NOT NULL COMMENT '下次通知时间',
-  `last_execute_time`      datetime      DEFAULT NULL COMMENT '最后执行时间',
-  `notify_times`           tinyint       NOT NULL COMMENT '已通知次数',
-  `max_notify_times`       tinyint       NOT NULL COMMENT '最大可通知次数',
-  `notify_url`             varchar(1024) NOT NULL COMMENT '通知地址',
-  `tenant_id`              bigint        NOT NULL DEFAULT 0 COMMENT '租户编号',
-  `creator`                varchar(64)   DEFAULT '' COMMENT '创建者',
-  `create_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater`                varchar(64)   DEFAULT '' COMMENT '更新者',
-  `update_time`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`                bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
-  PRIMARY KEY (`id`),
-  KEY `idx_tenant_id` (`tenant_id`),
-  KEY `idx_status_next` (`status`, `next_notify_time`),
-  UNIQUE KEY `uk_type_data` (`type`, `data_id`, `deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商户回调任务表。支付/退款/转账结果按退避策略通知业务方直到成功';
-DROP TABLE IF EXISTS `pay_notify_log`;
-CREATE TABLE `pay_notify_log` (
-  `id`             bigint        NOT NULL AUTO_INCREMENT COMMENT '日志编号',
-  `task_id`        bigint        NOT NULL COMMENT '通知任务编号',
-  `notify_times`   tinyint       NOT NULL COMMENT '第几次被通知',
-  `response`       varchar(2048) NOT NULL COMMENT '业务方响应内容',
-  `status`         tinyint       NOT NULL COMMENT '通知状态',
-  `tenant_id`      bigint        NOT NULL DEFAULT 0 COMMENT '租户编号',
-  `creator`        varchar(64)   DEFAULT '' COMMENT '创建者',
-  `create_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater`        varchar(64)   DEFAULT '' COMMENT '更新者',
-  `update_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted`        bigint        NOT NULL DEFAULT 0 COMMENT '是否删除：0 未删除，删除后为记录编号，使唯一索引不与已删除的记录冲突',
-  PRIMARY KEY (`id`),
-  KEY `idx_tenant_id` (`tenant_id`),
-  KEY `idx_task_id` (`task_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='商户回调日志表，每次通知尝试一条';
 
 -- ========================= 钱包 =========================
 
@@ -1708,7 +1665,8 @@ CREATE TABLE `pay_wallet_transaction` (
   PRIMARY KEY (`id`),
   KEY `idx_tenant_id` (`tenant_id`),
   UNIQUE KEY `uk_wallet_biz` (`wallet_id`, `biz_type`, `biz_id`, `deleted`),
-  UNIQUE KEY `uk_no` (`no`)
+  UNIQUE KEY `uk_no` (`no`),
+  KEY `idx_biz` (`biz_type`, `biz_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='钱包流水表。同一业务单据对同一钱包只能入账一次';
 DROP TABLE IF EXISTS `pay_wallet_recharge_package`;
 CREATE TABLE `pay_wallet_recharge_package` (
@@ -1743,7 +1701,7 @@ CREATE TABLE `pay_wallet_recharge` (
   `refund_pay_price`     int         NOT NULL DEFAULT 0 COMMENT '退款实际金额，单位：分',
   `refund_bonus_price`   int         NOT NULL DEFAULT 0 COMMENT '退回的赠送金额，单位：分',
   `refund_time`          datetime    DEFAULT NULL COMMENT '退款时间',
-  `refund_status`        tinyint     NOT NULL DEFAULT 0 COMMENT '退款状态：0 未退款 10 退款成功 20 退款失败',
+  `refund_status`        tinyint     NOT NULL DEFAULT 0 COMMENT '退款状态：0 未退款或退款中（pay_refund_id 非空即退款中） 10 退款成功 20 退款失败',
   `tenant_id`            bigint      NOT NULL DEFAULT 0 COMMENT '租户编号',
   `creator`              varchar(64) DEFAULT '' COMMENT '创建者',
   `create_time`          datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -3429,7 +3387,7 @@ CREATE TABLE `ai_knowledge_segment` (
 USE `ccloud`;
 
 INSERT INTO `system_tenant_package` (`id`, `name`, `status`, `remark`, `menu_ids`) VALUES
-  (1, '普通套餐', 0, '新建租户的默认套餐，不含租户管理、开发工具类菜单，以及参数配置、文件配置、消息死信等全局 / 跨租户管理菜单', '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,110,111,112,113,114,115,121,122,123,124,125,144,145,146,147,148,149,150,151,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,335,336,337,338,339,340,341,342,343,344,345,346,347,348,349,350,351,352,353,354,355,356,357,358,359,360,361,362,363,364,365,366,367,368,369,370,371,372,373,374,375,376,377,378,379,380,381,382,383,384,385,386,387,388,389,390,391,392,393,394,395,396,397,398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417,418,419,420,421,422,423,424,425,426,427,428,429,430,431,432,433,434,435,436,437,438,439,440,441,442,443,444,445,446,447,448,449,450,451,452,453,454,455,456,457,458,459,460,461,462,463,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492,493,494]');
+  (1, '普通套餐', 0, '新建租户的默认套餐，不含租户管理、开发工具类菜单，以及参数配置、文件配置、消息死信等全局 / 跨租户管理菜单', '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,110,111,112,113,114,115,121,122,123,124,125,144,145,146,147,148,149,150,151,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,237,238,240,241,242,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,335,336,337,338,339,340,341,342,343,344,345,346,347,348,349,350,351,352,353,354,355,356,357,358,359,360,361,362,363,364,365,366,367,368,369,370,371,372,373,374,375,376,377,378,379,380,381,382,383,384,385,386,387,388,389,390,391,392,393,394,395,396,397,398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417,418,419,420,421,422,423,424,425,426,427,428,429,430,431,432,433,434,435,436,437,438,439,440,441,442,443,444,445,446,447,448,449,450,451,452,453,454,455,456,457,458,459,460,461,462,463,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495]');
 
 INSERT INTO `system_tenant` (`id`, `name`, `contact_user_id`, `contact_name`, `contact_mobile`, `status`, `website`, `package_id`, `expire_time`, `account_count`, `creator`) VALUES
   (1, 'ccloud 总部', 1, '超级管理员', '13800000000', 0, 'localhost', 0, '2099-12-31 23:59:59', 9999, '1');
@@ -3464,7 +3422,7 @@ INSERT INTO `member_user` (`id`, `mobile`, `password`, `status`, `register_ip`, 
 -- >>>>>>>>>> dml/02-menu.sql <<<<<<<<<<
 -- ----------------------------------------------------------------------------
 -- 初始化数据：菜单
--- 共 487 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
+-- 共 483 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -3701,16 +3659,11 @@ INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_i
   (233, '支付渠道删除', 'pay:channel:delete', 3, 8, 225, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (234, '支付订单', '', 2, 2, 224, 'order', 'fa:cc-paypal', 'pay/order/index', 'Order', 0, b'1', b'1', b'1', '1'),
   (235, '支付订单查询', 'pay:order:query', 3, 1, 234, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (236, '支付订单导出', 'pay:order:export', 3, 2, 234, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (237, '退款订单', '', 2, 3, 224, 'refund', 'fa:registered', 'pay/refund/index', 'Refund', 0, b'1', b'1', b'1', '1'),
   (238, '退款订单查询', 'pay:refund:query', 3, 1, 237, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (239, '退款订单导出', 'pay:refund:export', 3, 2, 237, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (240, '转账订单', '', 2, 4, 224, 'transfer', 'ep:credit-card', 'pay/transfer/index', 'Transfer', 0, b'1', b'1', b'1', '1'),
   (241, '转账订单查询', 'pay:transfer:query', 3, 1, 240, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (242, '转账订单新增', 'pay:transfer:create', 3, 2, 240, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (243, '转账订单导出', 'pay:transfer:export', 3, 3, 240, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (244, '回调通知', '', 2, 5, 224, 'notify', 'ep:mute-notification', 'pay/notify/index', 'Notify', 0, b'1', b'1', b'1', '1'),
-  (245, '回调通知查询', 'pay:notify:query', 3, 1, 244, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (246, '钱包管理', '', 1, 6, 224, 'wallet', 'ep:wallet', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (247, '会员钱包', '', 2, 1, 246, 'wallet-balance', '#', 'pay/wallet/balance/index', 'Wallet-Balance', 0, b'1', b'1', b'1', '1'),
   (248, '会员钱包查询', 'pay:wallet:query', 3, 1, 247, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
@@ -3963,7 +3916,8 @@ INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_i
   (491, '知识库修改', 'ai:knowledge:update', 3, 3, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (492, '知识库删除', 'ai:knowledge:delete', 3, 4, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (493, '开放应用授权接口', 'open:app:assign-api', 3, 6, 207, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (494, '开放应用测试回调', 'open:app:test-notify', 3, 7, 207, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1');
+  (494, '开放应用测试回调', 'open:app:test-notify', 3, 7, 207, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
+  (495, '充值退款', 'pay:wallet-recharge:refund', 3, 2, 250, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1');
 
 
 -- >>>>>>>>>> dml/03-role.sql <<<<<<<<<<
@@ -4212,16 +4166,11 @@ INSERT INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `tenant_id`, `creato
   (233, 1, 233, 1, '1'),
   (234, 1, 234, 1, '1'),
   (235, 1, 235, 1, '1'),
-  (236, 1, 236, 1, '1'),
   (237, 1, 237, 1, '1'),
   (238, 1, 238, 1, '1'),
-  (239, 1, 239, 1, '1'),
   (240, 1, 240, 1, '1'),
   (241, 1, 241, 1, '1'),
   (242, 1, 242, 1, '1'),
-  (243, 1, 243, 1, '1'),
-  (244, 1, 244, 1, '1'),
-  (245, 1, 245, 1, '1'),
   (246, 1, 246, 1, '1'),
   (247, 1, 247, 1, '1'),
   (248, 1, 248, 1, '1'),
@@ -4593,15 +4542,10 @@ INSERT INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `tenant_id`, `creato
   (613, 2, 230, 1, '1'),
   (614, 2, 234, 1, '1'),
   (615, 2, 235, 1, '1'),
-  (616, 2, 236, 1, '1'),
   (617, 2, 237, 1, '1'),
   (618, 2, 238, 1, '1'),
-  (619, 2, 239, 1, '1'),
   (620, 2, 240, 1, '1'),
   (621, 2, 241, 1, '1'),
-  (622, 2, 243, 1, '1'),
-  (623, 2, 244, 1, '1'),
-  (624, 2, 245, 1, '1'),
   (625, 2, 246, 1, '1'),
   (626, 2, 247, 1, '1'),
   (627, 2, 248, 1, '1'),
@@ -4723,7 +4667,8 @@ INSERT INTO `system_role_menu` (`id`, `role_id`, `menu_id`, `tenant_id`, `creato
   (743, 2, 488, 1, '1'),
   (744, 2, 489, 1, '1'),
   (745, 1, 493, 1, '1'),
-  (746, 1, 494, 1, '1');
+  (746, 1, 494, 1, '1'),
+  (747, 1, 495, 1, '1');
 
 
 -- >>>>>>>>>> dml/04-dict.sql <<<<<<<<<<
@@ -4764,7 +4709,6 @@ INSERT INTO `system_dict_type` (`id`, `name`, `type`, `status`, `remark`, `creat
   (29, '支付渠道编码', 'pay_channel_code', 0, NULL, '1'),
   (30, '支付订单状态', 'pay_order_status', 0, NULL, '1'),
   (31, '退款订单状态', 'pay_refund_status', 0, NULL, '1'),
-  (32, '回调通知状态', 'pay_notify_status', 0, NULL, '1'),
   (33, '钱包流水类型', 'pay_wallet_biz_type', 0, NULL, '1'),
   (34, '流程模型类型', 'bpm_model_type', 0, NULL, '1'),
   (35, '流程表单类型', 'bpm_model_form_type', 0, NULL, '1'),
@@ -4780,7 +4724,8 @@ INSERT INTO `system_dict_type` (`id`, `name`, `type`, `status`, `remark`, `creat
   (45, '营销商品范围', 'promotion_product_scope', 0, NULL, '1'),
   (46, 'AI 平台', 'ai_platform', 0, NULL, '1'),
   (47, 'AI 模型类型', 'ai_model_type', 0, NULL, '1'),
-  (48, '开放平台回调状态', 'open_notify_status', 0, NULL, '1');
+  (48, '开放平台回调状态', 'open_notify_status', 0, NULL, '1'),
+  (49, '转账状态', 'pay_transfer_status', 0, NULL, '1');
 
 INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `status`, `color_type`, `css_class`, `remark`, `creator`) VALUES
   (1, 1, '开启', '0', 'common_status', 0, 'primary', '', NULL, '1'),
@@ -4902,11 +4847,6 @@ INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `st
   (123, 1, '未退款', '0', 'pay_refund_status', 0, 'info', '', NULL, '1'),
   (124, 2, '退款成功', '10', 'pay_refund_status', 0, 'success', '', NULL, '1'),
   (125, 3, '退款失败', '20', 'pay_refund_status', 0, 'danger', '', NULL, '1'),
-  (126, 1, '等待通知', '0', 'pay_notify_status', 0, 'info', '', NULL, '1'),
-  (127, 2, '通知成功', '10', 'pay_notify_status', 0, 'success', '', NULL, '1'),
-  (128, 3, '通知失败', '20', 'pay_notify_status', 0, 'danger', '', NULL, '1'),
-  (129, 4, '请求成功但结果失败', '21', 'pay_notify_status', 0, 'warning', '', NULL, '1'),
-  (130, 5, '请求失败', '22', 'pay_notify_status', 0, 'danger', '', NULL, '1'),
   (131, 1, '充值', '1', 'pay_wallet_biz_type', 0, '', '', NULL, '1'),
   (132, 2, '充值退款', '2', 'pay_wallet_biz_type', 0, '', '', NULL, '1'),
   (133, 3, '支付', '3', 'pay_wallet_biz_type', 0, '', '', NULL, '1'),
@@ -4970,7 +4910,13 @@ INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `st
   (192, 1, '待通知', '0', 'open_notify_status', 0, 'info', '', NULL, '1'),
   (193, 2, '成功', '10', 'open_notify_status', 0, 'success', '', NULL, '1'),
   (194, 3, '失败待重试', '20', 'open_notify_status', 0, 'warning', '', NULL, '1'),
-  (195, 4, '放弃', '30', 'open_notify_status', 0, 'danger', '', NULL, '1');
+  (195, 4, '放弃', '30', 'open_notify_status', 0, 'danger', '', NULL, '1'),
+  (196, 1, '等待转账', '0', 'pay_transfer_status', 0, 'info', '', NULL, '1'),
+  (197, 2, '转账进行中', '5', 'pay_transfer_status', 0, 'primary', '', NULL, '1'),
+  (198, 3, '转账成功', '10', 'pay_transfer_status', 0, 'success', '', NULL, '1'),
+  (199, 4, '转账失败', '20', 'pay_transfer_status', 0, 'danger', '', NULL, '1'),
+  (200, 6, '后台调整', '6', 'pay_wallet_biz_type', 0, '', '', NULL, '1'),
+  (201, 7, '转账入账', '7', 'pay_wallet_biz_type', 0, '', '', NULL, '1');
 
 
 -- >>>>>>>>>> dml/05-oauth2-client.sql <<<<<<<<<<
@@ -5457,14 +5403,14 @@ INSERT INTO `trade_delivery_express` (`id`, `code`, `name`, `logo`, `sort`, `sta
   (3, 'ZTO', '中通快递', '', 3, 0, 1, '1'),
   (4, 'JD', '京东快递', '', 4, 0, 1, '1');
 
-INSERT INTO `pay_app` (`id`, `app_key`, `name`, `status`, `remark`, `order_notify_url`, `refund_notify_url`, `transfer_notify_url`, `tenant_id`, `creator`) VALUES
-  (1, 'mall', '商城', 0, '商城下单支付使用', 'http://127.0.0.1:28080/rpc-api/trade/order/update-paid', 'http://127.0.0.1:28080/rpc-api/trade/after-sale/update-refunded', 'http://127.0.0.1:28080/rpc-api/trade/brokerage/update-transferred', 1, '1'),
-  (2, 'wallet', '钱包充值', 0, '钱包充值使用', 'http://127.0.0.1:28080/rpc-api/pay/wallet/recharge/update-paid', 'http://127.0.0.1:28080/rpc-api/pay/wallet/recharge/update-refunded', NULL, 1, '1');
+INSERT INTO `pay_app` (`id`, `app_key`, `name`, `status`, `remark`, `open_app_id`, `tenant_id`, `creator`) VALUES
+  (1, 'mall', '商城', 0, '商城下单支付使用', 1, 1, '1'),
+  (2, 'wallet', '钱包充值', 0, '钱包充值使用', NULL, 1, '1');
 
 INSERT INTO `pay_channel` (`id`, `code`, `status`, `remark`, `fee_rate`, `app_id`, `config`, `tenant_id`, `creator`) VALUES
-  (1, 'mock', 0, '模拟支付：本地调试时直接支付成功', 0, 1, '{}', 1, '1'),
-  (2, 'wallet', 0, '钱包余额支付', 0, 1, '{}', 1, '1'),
-  (3, 'mock', 0, '模拟支付', 0, 2, '{}', 1, '1');
+  (1, 'mock', 0, '模拟支付：本地调试用，生产环境不可用', 0, 1, 'd0a6627d2f92ec6989e256b20e6e9a26a6cd6905644a1d75fd3c121d153388cc282f016c3932891ff4f31fd2c976acb18a8dc38afe02b0fd786e01c542bc921a5ed6af55cfc0720d09d46dd704729e796da82a51125021f21936db353814ba61', 1, '1'),
+  (2, 'wallet', 0, '钱包余额支付', 0, 1, '649dcb7aad6bc5c4b1dfb98035c7acca', 1, '1'),
+  (3, 'mock', 0, '模拟支付：本地调试用，生产环境不可用', 0, 2, 'd0a6627d2f92ec6989e256b20e6e9a26a6cd6905644a1d75fd3c121d153388cc282f016c3932891ff4f31fd2c976acb18a8dc38afe02b0fd786e01c542bc921a5ed6af55cfc0720d09d46dd704729e796da82a51125021f21936db353814ba61', 1, '1');
 
 INSERT INTO `pay_wallet_recharge_package` (`id`, `name`, `pay_price`, `bonus_price`, `status`, `tenant_id`, `creator`) VALUES
   (1, '充 100 送 10', 10000, 1000, 0, 1, '1'),
@@ -5477,10 +5423,20 @@ INSERT INTO `open_app` (`id`, `name`, `app_key`, `app_secret`, `status`, `remark
   (1, '开放平台演示应用', 'ccloud-open-demo', '762055db4f2bfcd6b747242eafabcdc81c40e79a07ef2482c4d918b301c507c6', 0, '本地调试用，密钥原文 ccloud-open-demo-secret；生产环境必须删除（密文用开发默认加密密钥加密，换密钥后无法解密）', NULL, 50, NULL, '演示联系人', '13800000009', NULL, 1, '1');
 
 INSERT INTO `open_api` (`id`, `name`, `code`, `path`, `method`, `description`, `status`, `creator`) VALUES
-  (1, '查询会员信息', 'member.user.get', '/open-api/member/user/get', 'GET', '按手机号查询会员基本信息，手机号脱敏', 0, '1');
+  (1, '查询会员信息', 'member.user.get', '/open-api/member/user/get', 'GET', '按手机号查询会员基本信息，手机号脱敏', 0, '1'),
+  (2, '创建支付单', 'pay.order.create', '/open-api/pay/order/create', 'POST', '按商户订单号创建支付单，重复创建返回原单', 0, '1'),
+  (3, '查询支付单', 'pay.order.get', '/open-api/pay/order/get', 'GET', '按商户订单号查询支付单', 0, '1'),
+  (4, '提交支付', 'pay.order.submit', '/open-api/pay/order/submit', 'POST', '选择渠道发起支付，返回二维码、跳转链接等展示信息；不可选钱包', 0, '1'),
+  (5, '发起退款', 'pay.refund.create', '/open-api/pay/refund/create', 'POST', '按商户退款单号发起退款，重复发起返回原退款单', 0, '1'),
+  (6, '查询退款', 'pay.refund.get', '/open-api/pay/refund/get', 'GET', '按商户退款单号查询退款单', 0, '1');
 
 INSERT INTO `open_app_api` (`id`, `app_id`, `api_id`, `tenant_id`, `creator`) VALUES
-  (1, 1, 1, 1, '1');
+  (1, 1, 1, 1, '1'),
+  (2, 1, 2, 1, '1'),
+  (3, 1, 3, 1, '1'),
+  (4, 1, 4, 1, '1'),
+  (5, 1, 5, 1, '1'),
+  (6, 1, 6, 1, '1');
 
 
 SET FOREIGN_KEY_CHECKS = 1;

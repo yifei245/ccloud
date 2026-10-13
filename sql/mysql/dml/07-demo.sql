@@ -55,14 +55,14 @@ INSERT INTO `trade_delivery_express` (`id`, `code`, `name`, `logo`, `sort`, `sta
   (3, 'ZTO', '中通快递', '', 3, 0, 1, '1'),
   (4, 'JD', '京东快递', '', 4, 0, 1, '1');
 
-INSERT INTO `pay_app` (`id`, `app_key`, `name`, `status`, `remark`, `order_notify_url`, `refund_notify_url`, `transfer_notify_url`, `tenant_id`, `creator`) VALUES
-  (1, 'mall', '商城', 0, '商城下单支付使用', 'http://127.0.0.1:28080/rpc-api/trade/order/update-paid', 'http://127.0.0.1:28080/rpc-api/trade/after-sale/update-refunded', 'http://127.0.0.1:28080/rpc-api/trade/brokerage/update-transferred', 1, '1'),
-  (2, 'wallet', '钱包充值', 0, '钱包充值使用', 'http://127.0.0.1:28080/rpc-api/pay/wallet/recharge/update-paid', 'http://127.0.0.1:28080/rpc-api/pay/wallet/recharge/update-refunded', NULL, 1, '1');
+INSERT INTO `pay_app` (`id`, `app_key`, `name`, `status`, `remark`, `open_app_id`, `tenant_id`, `creator`) VALUES
+  (1, 'mall', '商城', 0, '商城下单支付使用', 1, 1, '1'),
+  (2, 'wallet', '钱包充值', 0, '钱包充值使用', NULL, 1, '1');
 
 INSERT INTO `pay_channel` (`id`, `code`, `status`, `remark`, `fee_rate`, `app_id`, `config`, `tenant_id`, `creator`) VALUES
-  (1, 'mock', 0, '模拟支付：本地调试时直接支付成功', 0, 1, '{}', 1, '1'),
-  (2, 'wallet', 0, '钱包余额支付', 0, 1, '{}', 1, '1'),
-  (3, 'mock', 0, '模拟支付', 0, 2, '{}', 1, '1');
+  (1, 'mock', 0, '模拟支付：本地调试用，生产环境不可用', 0, 1, 'd0a6627d2f92ec6989e256b20e6e9a26a6cd6905644a1d75fd3c121d153388cc282f016c3932891ff4f31fd2c976acb18a8dc38afe02b0fd786e01c542bc921a5ed6af55cfc0720d09d46dd704729e796da82a51125021f21936db353814ba61', 1, '1'),
+  (2, 'wallet', 0, '钱包余额支付', 0, 1, '649dcb7aad6bc5c4b1dfb98035c7acca', 1, '1'),
+  (3, 'mock', 0, '模拟支付：本地调试用，生产环境不可用', 0, 2, 'd0a6627d2f92ec6989e256b20e6e9a26a6cd6905644a1d75fd3c121d153388cc282f016c3932891ff4f31fd2c976acb18a8dc38afe02b0fd786e01c542bc921a5ed6af55cfc0720d09d46dd704729e796da82a51125021f21936db353814ba61', 1, '1');
 
 INSERT INTO `pay_wallet_recharge_package` (`id`, `name`, `pay_price`, `bonus_price`, `status`, `tenant_id`, `creator`) VALUES
   (1, '充 100 送 10', 10000, 1000, 0, 1, '1'),
@@ -75,8 +75,18 @@ INSERT INTO `open_app` (`id`, `name`, `app_key`, `app_secret`, `status`, `remark
   (1, '开放平台演示应用', 'ccloud-open-demo', '762055db4f2bfcd6b747242eafabcdc81c40e79a07ef2482c4d918b301c507c6', 0, '本地调试用，密钥原文 ccloud-open-demo-secret；生产环境必须删除（密文用开发默认加密密钥加密，换密钥后无法解密）', NULL, 50, NULL, '演示联系人', '13800000009', NULL, 1, '1');
 
 INSERT INTO `open_api` (`id`, `name`, `code`, `path`, `method`, `description`, `status`, `creator`) VALUES
-  (1, '查询会员信息', 'member.user.get', '/open-api/member/user/get', 'GET', '按手机号查询会员基本信息，手机号脱敏', 0, '1');
+  (1, '查询会员信息', 'member.user.get', '/open-api/member/user/get', 'GET', '按手机号查询会员基本信息，手机号脱敏', 0, '1'),
+  (2, '创建支付单', 'pay.order.create', '/open-api/pay/order/create', 'POST', '按商户订单号创建支付单，重复创建返回原单', 0, '1'),
+  (3, '查询支付单', 'pay.order.get', '/open-api/pay/order/get', 'GET', '按商户订单号查询支付单', 0, '1'),
+  (4, '提交支付', 'pay.order.submit', '/open-api/pay/order/submit', 'POST', '选择渠道发起支付，返回二维码、跳转链接等展示信息；不可选钱包', 0, '1'),
+  (5, '发起退款', 'pay.refund.create', '/open-api/pay/refund/create', 'POST', '按商户退款单号发起退款，重复发起返回原退款单', 0, '1'),
+  (6, '查询退款', 'pay.refund.get', '/open-api/pay/refund/get', 'GET', '按商户退款单号查询退款单', 0, '1');
 
 INSERT INTO `open_app_api` (`id`, `app_id`, `api_id`, `tenant_id`, `creator`) VALUES
-  (1, 1, 1, 1, '1');
+  (1, 1, 1, 1, '1'),
+  (2, 1, 2, 1, '1'),
+  (3, 1, 3, 1, '1'),
+  (4, 1, 4, 1, '1'),
+  (5, 1, 5, 1, '1'),
+  (6, 1, 6, 1, '1');
 

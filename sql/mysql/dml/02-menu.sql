@@ -1,6 +1,6 @@
 -- ----------------------------------------------------------------------------
 -- 初始化数据：菜单
--- 共 487 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
+-- 共 483 条：目录、页面菜单与按钮。按钮的 permission 与 Controller 上的 @PreAuthorize 一一对应
 -- ----------------------------------------------------------------------------
 USE `ccloud`;
 
@@ -237,16 +237,11 @@ INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_i
   (233, '支付渠道删除', 'pay:channel:delete', 3, 8, 225, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (234, '支付订单', '', 2, 2, 224, 'order', 'fa:cc-paypal', 'pay/order/index', 'Order', 0, b'1', b'1', b'1', '1'),
   (235, '支付订单查询', 'pay:order:query', 3, 1, 234, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (236, '支付订单导出', 'pay:order:export', 3, 2, 234, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (237, '退款订单', '', 2, 3, 224, 'refund', 'fa:registered', 'pay/refund/index', 'Refund', 0, b'1', b'1', b'1', '1'),
   (238, '退款订单查询', 'pay:refund:query', 3, 1, 237, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (239, '退款订单导出', 'pay:refund:export', 3, 2, 237, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (240, '转账订单', '', 2, 4, 224, 'transfer', 'ep:credit-card', 'pay/transfer/index', 'Transfer', 0, b'1', b'1', b'1', '1'),
   (241, '转账订单查询', 'pay:transfer:query', 3, 1, 240, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (242, '转账订单新增', 'pay:transfer:create', 3, 2, 240, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (243, '转账订单导出', 'pay:transfer:export', 3, 3, 240, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (244, '回调通知', '', 2, 5, 224, 'notify', 'ep:mute-notification', 'pay/notify/index', 'Notify', 0, b'1', b'1', b'1', '1'),
-  (245, '回调通知查询', 'pay:notify:query', 3, 1, 244, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (246, '钱包管理', '', 1, 6, 224, 'wallet', 'ep:wallet', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (247, '会员钱包', '', 2, 1, 246, 'wallet-balance', '#', 'pay/wallet/balance/index', 'Wallet-Balance', 0, b'1', b'1', b'1', '1'),
   (248, '会员钱包查询', 'pay:wallet:query', 3, 1, 247, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
@@ -499,5 +494,6 @@ INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_i
   (491, '知识库修改', 'ai:knowledge:update', 3, 3, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (492, '知识库删除', 'ai:knowledge:delete', 3, 4, 488, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
   (493, '开放应用授权接口', 'open:app:assign-api', 3, 6, 207, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
-  (494, '开放应用测试回调', 'open:app:test-notify', 3, 7, 207, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1');
+  (494, '开放应用测试回调', 'open:app:test-notify', 3, 7, 207, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1'),
+  (495, '充值退款', 'pay:wallet-recharge:refund', 3, 2, 250, '', '#', NULL, NULL, 0, b'1', b'1', b'1', '1');
 

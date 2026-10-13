@@ -47,6 +47,12 @@ class SystemTenantMenuSeedTest {
         assertThat(menuIds).doesNotContain(215L, 216L, 217L).contains(214L, 493L, 494L);
     }
 
+    @Test
+    void 普通套餐不含已删除的支付回调与导出菜单_含充值退款按钮() {
+        Set<Long> menuIds = normalPackageMenuIds();
+        assertThat(menuIds).doesNotContain(236L, 239L, 243L, 244L, 245L).contains(495L);
+    }
+
     private static Set<Long> normalPackageMenuIds() {
         Matcher matcher = Pattern.compile("\\(1, '普通套餐', [^\\n]*'\\[([0-9,]+)]'\\)")
                 .matcher(SqlFixture.read("01-tenant-and-user.sql"));

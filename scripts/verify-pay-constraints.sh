@@ -16,14 +16,24 @@ try() {  # $1=说明 $2=期望(ok|dup) $3=SQL
   if lmysql $DB -e "$3" >/dev/null 2>"$ERR"; then got=ok; else got=dup; fi
   if [ "$got" = "$2" ]; then echo "  OK   $1"; else echo "  FAIL $1（期望 $2，实际 $got）"; cat "$ERR"; fail=1; fi
 }
-ORDER="INSERT INTO pay_order (app_id,merchant_order_id,subject,notify_url,price,status,user_ip,expire_time) VALUES"
-try "首次创建商户单"                  ok  "$ORDER (1,'ORD-1','t','u',100,0,'1.1.1.1',NOW())"
-try "同一应用重复商户单被拒绝"        dup "$ORDER (1,'ORD-1','t','u',100,0,'1.1.1.1',NOW())"
-try "不同应用可用相同商户单号"        ok  "$ORDER (2,'ORD-1','t','u',100,0,'1.1.1.1',NOW())"
+ORDER="INSERT INTO pay_order (app_id,merchant_order_id,subject,price,status,user_ip,expire_time) VALUES"
+try "首次创建商户单"                  ok  "$ORDER (1,'ORD-1','t',100,0,'1.1.1.1',NOW())"
+try "同一应用重复商户单被拒绝"        dup "$ORDER (1,'ORD-1','t',100,0,'1.1.1.1',NOW())"
+try "不同应用可用相同商户单号"        ok  "$ORDER (2,'ORD-1','t',100,0,'1.1.1.1',NOW())"
 
-REFUND="INSERT INTO pay_refund (no,app_id,channel_id,channel_code,order_id,order_no,merchant_order_id,merchant_refund_id,notify_url,status,pay_price,refund_price,reason,channel_order_no) VALUES"
-try "首次退款"                        ok  "$REFUND ('R1',1,1,'mock',1,'N1','ORD-1','RF-1','u',0,100,100,'r','C1')"
-try "同一商户退款单重复退款被拒绝"    dup "$REFUND ('R2',1,1,'mock',1,'N1','ORD-1','RF-1','u',0,100,100,'r','C1')"
+REFUND="INSERT INTO pay_refund (no,app_id,channel_id,channel_code,order_id,order_no,merchant_order_id,merchant_refund_id,status,pay_price,refund_price,reason,channel_order_no) VALUES"
+try "首次退款"                        ok  "$REFUND ('R1',1,1,'mock',1,'N1','ORD-1','RF-1',0,100,100,'r','C1')"
+try "同一商户退款单重复退款被拒绝"    dup "$REFUND ('R2',1,1,'mock',1,'N1','ORD-1','RF-1',0,100,100,'r','C1')"
+
+TRANSFER="INSERT INTO pay_transfer (no,app_id,channel_id,channel_code,merchant_transfer_id,subject,price,user_account,status,user_ip) VALUES"
+try "首次转账"                        ok  "$TRANSFER ('T1',1,1,'wallet','TF-1','t',100,'7',0,'1.1.1.1')"
+try "同一商户转账单重复转账被拒绝"    dup "$TRANSFER ('T2',1,1,'wallet','TF-1','t',100,'7',0,'1.1.1.1')"
+
+APP="INSERT INTO pay_app (app_key,name,status,open_app_id) VALUES"
+try "支付应用绑定开放应用"            ok  "$APP ('a1','a',0,9)"
+try "同一开放应用不能绑定两个支付应用" dup "$APP ('a2','a',0,9)"
+try "多个支付应用可以都不绑定"        ok  "$APP ('a3','a',0,NULL)"
+try "多个支付应用可以都不绑定（再一个）" ok  "$APP ('a4','a',0,NULL)"
 
 TX="INSERT INTO pay_wallet_transaction (no,wallet_id,biz_type,biz_id,title,price,balance) VALUES"
 try "支付单首次扣款入账"              ok  "$TX ('T1',9,3,'P1','支付',-100,900)"

@@ -23,7 +23,7 @@ class BaseDbUnitTestTest extends BaseDbUnitTest {
                 .isEqualTo(LocalMySql.database()).isNotEqualTo("ccloud");
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()", Integer.class);
-        assertThat(count).isEqualTo(142);
+        assertThat(count).isEqualTo(140);
     }
 
     @Test

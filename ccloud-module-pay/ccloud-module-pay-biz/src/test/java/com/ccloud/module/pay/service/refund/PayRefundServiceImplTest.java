@@ -17,6 +17,7 @@ import com.ccloud.module.pay.framework.pay.core.client.dto.PayRefundUnifiedReq;
 import com.ccloud.module.pay.mq.message.PayRefundMessage;
 import com.ccloud.module.pay.service.app.PayAppServiceImpl;
 import com.ccloud.module.pay.service.channel.PayChannelServiceImpl;
+import com.ccloud.module.pay.service.common.PayAfterCommitExecutor;
 import com.ccloud.module.pay.service.order.PayOrderServiceImpl;
 import com.ccloud.module.pay.support.FakePayClientProvider;
 import jakarta.annotation.Resource;
@@ -47,7 +48,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @Import({PayRefundServiceImpl.class, PayOrderServiceImpl.class, PayAppServiceImpl.class, PayChannelServiceImpl.class,
-        PayClientFactory.class, FakePayClientProvider.class, PayNoRedisDAO.class, PayProperties.class})
+        PayClientFactory.class, FakePayClientProvider.class, PayNoRedisDAO.class, PayProperties.class,
+        PayAfterCommitExecutor.class})
 class PayRefundServiceImplTest extends PayRefundTestBase {
 
     @Resource
@@ -136,7 +138,7 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
         assertThat(refundMapper.selectById(id).getStatus()).isEqualTo(PayRefundStatusEnum.SUCCESS.getStatus());
     }
 
-    // 本用例的外层事务由测试管理、结束时回滚，对 runAfterCommit 的回归并不敏感；真正守住"提交后才调渠道"的是下面两个让外层事务真正提交的用例
+    // 本用例的外层事务由测试管理、结束时回滚，对 PayAfterCommitExecutor 的回归并不敏感；真正守住"提交后才调渠道"的是下面两个让外层事务真正提交的用例
     // （外层事务提交后才调用渠道_同步返回的结果在提交后落库、外层事务提交后调用渠道时不处于任何事务中_…）
     @Test
     @Transactional

@@ -8,6 +8,7 @@ import com.ccloud.module.pay.framework.config.PayProperties;
 import com.ccloud.module.pay.framework.pay.core.client.PayClientFactory;
 import com.ccloud.module.pay.service.app.PayAppServiceImpl;
 import com.ccloud.module.pay.service.channel.PayChannelServiceImpl;
+import com.ccloud.module.pay.service.common.PayAfterCommitExecutor;
 import com.ccloud.module.pay.service.order.PayOrderServiceImpl;
 import com.ccloud.module.pay.support.FakePayClientProvider;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,8 @@ import java.util.concurrent.Future;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Import({PayRefundServiceImpl.class, PayOrderServiceImpl.class, PayAppServiceImpl.class, PayChannelServiceImpl.class,
-        PayClientFactory.class, FakePayClientProvider.class, PayNoRedisDAO.class, PayProperties.class})
+        PayClientFactory.class, FakePayClientProvider.class, PayNoRedisDAO.class, PayProperties.class,
+        PayAfterCommitExecutor.class})
 class PayRefundConcurrencyTest extends PayRefundTestBase {
 
     @Test

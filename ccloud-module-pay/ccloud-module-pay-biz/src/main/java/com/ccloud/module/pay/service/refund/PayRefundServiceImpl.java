@@ -4,7 +4,6 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ccloud.framework.common.pojo.PageResult;
 import com.ccloud.framework.mq.outbox.core.OutboxMessageService;
-import com.ccloud.framework.tenant.core.context.TenantContextHolder;
 import com.ccloud.framework.tenant.core.util.TenantUtils;
 import com.ccloud.module.pay.api.refund.dto.PayRefundCreateReqDTO;
 import com.ccloud.module.pay.controller.admin.refund.vo.PayRefundPageReqVO;
@@ -24,14 +23,12 @@ import com.ccloud.module.pay.framework.pay.core.client.dto.PayRefundUnifiedReq;
 import com.ccloud.module.pay.mq.message.PayRefundMessage;
 import com.ccloud.module.pay.service.app.PayAppService;
 import com.ccloud.module.pay.service.channel.PayChannelService;
-import jakarta.annotation.PostConstruct;
+import com.ccloud.module.pay.service.common.PayAfterCommitExecutor;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import com.ccloud.framework.common.exception.ServiceException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.validation.annotation.Validated;
@@ -64,18 +61,8 @@ public class PayRefundServiceImpl implements PayRefundService {
     private PayProperties payProperties;
     @Resource
     private TransactionTemplate transactionTemplate;
-
-    /**
-     * 外层事务提交后触发渠道调用时，那个已完成的事务仍绑在线程上：渠道（如钱包）自带的本地事务会误加入它而不再提交。
-     * 因此提交后的任务挂起它，在没有任何事务的环境中执行
-     */
-    private TransactionTemplate noTransactionTemplate;
-
-    @PostConstruct
-    void initNoTransactionTemplate() {
-        noTransactionTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
-        noTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
-    }
+    @Resource
+    private PayAfterCommitExecutor afterCommitExecutor;
 
     private record CreateResult(Long refundId, boolean created) {
     }
@@ -103,16 +90,8 @@ public class PayRefundServiceImpl implements PayRefundService {
         }
         CreateResult created = result;
         if (created.created()) {
-            // 提交后的任务：保留发起时的租户；任何异常都不外抛（退款已落库，结果由补查任务确定）
-            Long tenantId = TenantContextHolder.getTenantId();
-            runAfterCommit(() -> {
-                try {
-                    TenantUtils.execute(tenantId, () -> noTransactionTemplate.executeWithoutResult(
-                            status -> invokeRefund(created.refundId())));
-                } catch (Throwable t) {
-                    log.error("[createRefund] 退款 {} 提交后发起渠道退款失败，等待补查", created.refundId(), t);
-                }
-            });
+            // 渠道调用推迟到外层事务提交之后，保留发起时的租户，任何异常都不外抛（退款已落库，结果由补查任务确定）
+            afterCommitExecutor.execute("退款 " + created.refundId(), () -> invokeRefund(created.refundId()));
         }
         return result.refundId();
     }
@@ -171,22 +150,6 @@ public class PayRefundServiceImpl implements PayRefundService {
                 .setUserIp(reqDTO.getUserIp()).setChannelOrderNo(StrUtil.nullToEmpty(order.getChannelOrderNo()));
         refundMapper.insert(refund);
         return new CreateResult(refund.getId(), true);
-    }
-
-    /**
-     * 有外层事务时推迟到其提交之后（否则渠道可能退了款而本地记录随外层回滚消失）；没有则立即执行
-     */
-    private static void runAfterCommit(Runnable task) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            task.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                task.run();
-            }
-        });
     }
 
     /**

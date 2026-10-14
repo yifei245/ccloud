@@ -11,6 +11,9 @@ import com.ccloud.module.pay.api.refund.dto.PayRefundCreateReqDTO;
 import com.ccloud.module.pay.enums.refund.PayRefundStatusEnum;
 import com.ccloud.module.pay.service.order.PayOrderService;
 import com.ccloud.module.pay.service.refund.PayRefundService;
+import com.ccloud.module.pay.service.transfer.PayTransferService;
+import com.ccloud.module.pay.api.transfer.dto.PayTransferCreateReqDTO;
+import com.ccloud.module.pay.enums.transfer.PayTransferStatusEnum;
 import com.ccloud.module.pay.test.BasePayWebIntegrationTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
@@ -45,6 +48,8 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
     private PayOrderService orderService;
     @Resource
     private PayRefundService refundService;
+    @Resource
+    private PayTransferService transferService;
 
     private PayChannelDO channel;
     private String no;
@@ -67,6 +72,7 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
 
     @AfterEach
     void cleanup() {
+        jdbcTemplate.update("DELETE t FROM pay_transfer t JOIN pay_app a ON t.app_id = a.id WHERE a.app_key LIKE 'webtest-%'");
         jdbcTemplate.update("DELETE r FROM pay_refund r JOIN pay_app a ON r.app_id = a.id WHERE a.app_key LIKE 'webtest-%'");
         jdbcTemplate.update("DELETE e FROM pay_order_extension e JOIN pay_order o ON e.order_id = o.id "
                 + "JOIN pay_app a ON o.app_id = a.id WHERE a.app_key LIKE 'webtest-%'");
@@ -219,5 +225,80 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         assertThat(refundStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
+    }
+
+    /**
+     * 经服务发起 WT-TF1 的转账（渠道 DROP_NOTIFY：受理后不会自行回调，为进行中），返回转账单号
+     */
+    private String processingTransfer() {
+        Long id = TenantUtils.execute(TENANT, () -> transferService.createTransfer(new PayTransferCreateReqDTO()
+                .setAppKey("webtest-notify").setChannelCode("mock").setMerchantTransferId("WT-TF1").setSubject("回调")
+                .setPrice(200).setUserAccount("acc-1").setUserIp("127.0.0.1")));
+        return jdbcTemplate.queryForObject("SELECT no FROM pay_transfer WHERE id = ?", String.class, id);
+    }
+
+    private String transferBody(String transferNo, String status, int price) {
+        return "{\"type\":\"transfer\",\"no\":\"" + transferNo + "\",\"status\":\"" + status + "\",\"channelNo\":\"MOCK-" + transferNo
+                + "\",\"price\":" + price + ",\"successTime\":" + System.currentTimeMillis() + "}";
+    }
+
+    private Integer transferStatus() {
+        return jdbcTemplate.queryForObject("SELECT status FROM pay_transfer WHERE merchant_transfer_id = 'WT-TF1'", Integer.class);
+    }
+
+    private Integer transferMessages() {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM infra_message_outbox WHERE payload LIKE '%WT-TF1%'", Integer.class);
+    }
+
+    @Test
+    void 转账回调验签通过后转账成功并写消息() throws Exception {
+        String transferNo = processingTransfer();
+        assertThat(transferStatus()).isEqualTo(PayTransferStatusEnum.PROCESSING.getStatus());
+
+        mockMvc.perform(signedNotify("transfer", channel.getId(), transferBody(transferNo, "SUCCESS", 200), NOTIFY_SECRET))
+                .andExpect(status().isOk()).andExpect(content().string("success"));
+
+        assertThat(transferStatus()).isEqualTo(PayTransferStatusEnum.SUCCESS.getStatus());
+        assertThat(transferMessages()).isEqualTo(1);
+    }
+
+    @Test
+    void 转账失败回调后转账失败() throws Exception {
+        String transferNo = processingTransfer();
+
+        mockMvc.perform(signedNotify("transfer", channel.getId(), transferBody(transferNo, "FAILURE", 200), NOTIFY_SECRET))
+                .andExpect(status().isOk());
+
+        assertThat(transferStatus()).isEqualTo(PayTransferStatusEnum.FAILURE.getStatus());
+    }
+
+    @Test
+    void 转账回调验签失败返回400且转账不变() throws Exception {
+        String transferNo = processingTransfer();
+
+        mockMvc.perform(signedNotify("transfer", channel.getId(), transferBody(transferNo, "SUCCESS", 200), "wrong-secret-000000"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(transferStatus()).isEqualTo(PayTransferStatusEnum.PROCESSING.getStatus());
+        assertThat(transferMessages()).isZero();
+    }
+
+    @Test
+    void 转账回调来自其他渠道时返回400_转账不变且不写消息() throws Exception {
+        String transferNo = processingTransfer();
+        PayChannelDO other = TenantUtils.execute(TENANT, () -> {
+            PayAppDO otherApp = new PayAppDO().setAppKey("webtest-notify-other").setName("另一应用").setStatus(0);
+            appMapper.insert(otherApp);
+            PayChannelDO c = new PayChannelDO().setAppId(otherApp.getId()).setCode("mock").setStatus(0).setFeeRate(0D)
+                    .setConfig("{\"notifySecret\":\"" + NOTIFY_SECRET + "\",\"behavior\":\"DROP_NOTIFY\"}");
+            channelMapper.insert(c);
+            return c;
+        });
+        // 另一个渠道用自己的密钥验签通过，但转账不属于它
+        mockMvc.perform(signedNotify("transfer", other.getId(), transferBody(transferNo, "SUCCESS", 200), NOTIFY_SECRET))
+                .andExpect(status().isBadRequest());
+
+        assertThat(transferStatus()).isEqualTo(PayTransferStatusEnum.PROCESSING.getStatus());
+        assertThat(transferMessages()).isZero();
     }
 }

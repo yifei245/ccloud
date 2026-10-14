@@ -20,7 +20,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -167,6 +173,52 @@ class MockPayClientTest extends BasePayDbAndRedisUnitTest {
         client.unifiedRefund(new PayRefundUnifiedReq().setOutTradeNo("P1").setOutRefundNo(refundNo).setRefundPrice(1).setNotifyUrl(notifyUrl));
         Map<String, String> got = received.poll(5, TimeUnit.SECONDS);
         assertThatThrownBy(() -> client.parseOrderNotify(asRequest(got))).isInstanceOf(PayNotifyVerifyException.class);
+    }
+
+    @Test
+    void 并发确认同一支付只回调一次() throws Exception {
+        String no = uniqueNo("P");
+        MockPayClient client = client(MockPayBehavior.SUCCESS);
+        client.unifiedOrder(order(no));
+        runConcurrently(8, () -> client.confirm(no));
+        assertThat(received.poll(5, TimeUnit.SECONDS)).isNotNull();
+        assertThat(received.poll(1500, TimeUnit.MILLISECONDS)).as("并发确认只应回调一次").isNull();
+    }
+
+    @Test
+    void 并发发起同一退款与转账各只回调一次() throws Exception {
+        MockPayClient client = client(MockPayBehavior.SUCCESS);
+        PayRefundUnifiedReq refundReq = new PayRefundUnifiedReq().setOutTradeNo("P1").setOutRefundNo(uniqueNo("R"))
+                .setRefundPrice(30).setPayPrice(100).setNotifyUrl(notifyUrl);
+        runConcurrently(8, () -> client.unifiedRefund(refundReq));
+        assertThat(received.poll(5, TimeUnit.SECONDS).get("body")).contains("\"type\":\"refund\"");
+        assertThat(received.poll(1500, TimeUnit.MILLISECONDS)).as("并发退款只应回调一次").isNull();
+
+        PayTransferUnifiedReq transferReq = new PayTransferUnifiedReq().setOutTransferNo(uniqueNo("T"))
+                .setPrice(20).setUserAccount("a").setNotifyUrl(notifyUrl);
+        runConcurrently(8, () -> client.unifiedTransfer(transferReq));
+        assertThat(received.poll(5, TimeUnit.SECONDS).get("body")).contains("\"type\":\"transfer\"");
+        assertThat(received.poll(1500, TimeUnit.MILLISECONDS)).as("并发转账只应回调一次").isNull();
+    }
+
+    private static void runConcurrently(int threads, Runnable task) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        try {
+            CyclicBarrier barrier = new CyclicBarrier(threads);
+            List<Future<?>> futures = new ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> {
+                    barrier.await();
+                    task.run();
+                    return null;
+                }));
+            }
+            for (Future<?> future : futures) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     @Test

@@ -61,7 +61,7 @@ public class MockPayClient implements PayClient {
     }
 
     /**
-     * 用户在确认页点击支付
+     * 用户在确认页点击支付。WAITING 到终态的转换由一次性的 Redis 键保证只有一个调用方执行，并发或重复确认不会重复回调
      *
      * @return 单据不存在（如已过期）返回 false
      */
@@ -70,8 +70,14 @@ public class MockPayClient implements PayClient {
         if (state == null) {
             return false;
         }
-        if (WAITING.equals(state.getStatus())) {
-            finish(state);
+        if (WAITING.equals(state.getStatus()) && acquireConfirm(outTradeNo)) {
+            try {
+                finish(state);
+            } catch (RuntimeException e) {
+                // 落定失败时释放，允许用户再次确认
+                redisTemplate.delete(String.format(KEY_FORMAT, "confirm", outTradeNo));
+                throw e;
+            }
         }
         return true;
     }
@@ -102,7 +108,10 @@ public class MockPayClient implements PayClient {
         }
         MockPayState state = new MockPayState().setType("refund").setNo(req.getOutRefundNo()).setOutTradeNo(req.getOutTradeNo())
                 .setPrice(req.getRefundPrice()).setNotifyUrl(req.getNotifyUrl()).setStatus(WAITING);
-        save(state);
+        if (!saveIfAbsent(state)) {
+            // 并发的另一个调用方已创建并负责落定，这里不再回调
+            return PayRefundResult.waiting(req.getOutRefundNo());
+        }
         finish(state);
         return PayRefundResult.waiting(req.getOutRefundNo());
     }
@@ -133,7 +142,9 @@ public class MockPayClient implements PayClient {
         }
         MockPayState state = new MockPayState().setType("transfer").setNo(req.getOutTransferNo())
                 .setPrice(req.getPrice()).setNotifyUrl(req.getNotifyUrl()).setStatus(WAITING);
-        save(state);
+        if (!saveIfAbsent(state)) {
+            return PayTransferResult.waiting(req.getOutTransferNo());
+        }
         finish(state);
         return PayTransferResult.waiting(req.getOutTransferNo());
     }
@@ -221,6 +232,19 @@ public class MockPayClient implements PayClient {
 
     private void save(MockPayState state) {
         redisTemplate.opsForValue().set(String.format(KEY_FORMAT, state.getType(), state.getNo()), JsonUtils.toJsonString(state), TTL);
+    }
+
+    /**
+     * @return 创建成功返回 true；已存在（含并发的另一个调用方刚创建）返回 false
+     */
+    private boolean saveIfAbsent(MockPayState state) {
+        return Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(
+                String.format(KEY_FORMAT, state.getType(), state.getNo()), JsonUtils.toJsonString(state), TTL));
+    }
+
+    private boolean acquireConfirm(String outTradeNo) {
+        return Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(
+                String.format(KEY_FORMAT, "confirm", outTradeNo), "1", TTL));
     }
 
     private MockPayState load(String type, String no) {

@@ -7,7 +7,10 @@ import com.ccloud.module.pay.dal.dataobject.app.PayAppDO;
 import com.ccloud.module.pay.dal.dataobject.channel.PayChannelDO;
 import com.ccloud.module.pay.dal.mysql.app.PayAppMapper;
 import com.ccloud.module.pay.dal.mysql.channel.PayChannelMapper;
+import com.ccloud.module.pay.api.refund.dto.PayRefundCreateReqDTO;
+import com.ccloud.module.pay.enums.refund.PayRefundStatusEnum;
 import com.ccloud.module.pay.service.order.PayOrderService;
+import com.ccloud.module.pay.service.refund.PayRefundService;
 import com.ccloud.module.pay.test.BasePayWebIntegrationTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
@@ -40,6 +43,8 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
     private PayChannelMapper channelMapper;
     @MockitoSpyBean
     private PayOrderService orderService;
+    @Resource
+    private PayRefundService refundService;
 
     private PayChannelDO channel;
     private String no;
@@ -62,6 +67,7 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
 
     @AfterEach
     void cleanup() {
+        jdbcTemplate.update("DELETE r FROM pay_refund r JOIN pay_app a ON r.app_id = a.id WHERE a.app_key LIKE 'webtest-%'");
         jdbcTemplate.update("DELETE e FROM pay_order_extension e JOIN pay_order o ON e.order_id = o.id "
                 + "JOIN pay_app a ON o.app_id = a.id WHERE a.app_key LIKE 'webtest-%'");
         jdbcTemplate.update("DELETE o FROM pay_order o JOIN pay_app a ON o.app_id = a.id WHERE a.app_key LIKE 'webtest-%'");
@@ -71,8 +77,12 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
     }
 
     private MockHttpServletRequestBuilder signedNotify(String body, String secret) {
+        return signedNotify("order", channel.getId(), body, secret);
+    }
+
+    private MockHttpServletRequestBuilder signedNotify(String type, Long channelId, String body, String secret) {
         long ts = System.currentTimeMillis();
-        return post("/app-api/pay/notify/order/" + channel.getId()).contentType(MediaType.APPLICATION_JSON).content(body)
+        return post("/app-api/pay/notify/" + type + "/" + channelId).contentType(MediaType.APPLICATION_JSON).content(body)
                 .header("X-Mock-Timestamp", ts).header("X-Mock-Sign", MockPayNotifySigner.sign(secret, ts, body));
     }
 
@@ -149,5 +159,65 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
                 Long.class, channel.getAppId());
         mockMvc.perform(post("/app-api/pay/notify/order/" + id).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isInternalServerError()).andExpect(content().string("error"));
+    }
+
+    /**
+     * 把 WT-N1 经签名回调置为已支付，再经服务发起 WT-RF1 的退款（渠道 DROP_NOTIFY：不会自行回调），返回退款单号
+     */
+    private String paidOrderWithRefund(int price) throws Exception {
+        mockMvc.perform(signedNotify(body(100), NOTIFY_SECRET)).andExpect(status().isOk());
+        Long id = TenantUtils.execute(TENANT, () -> refundService.createRefund(new PayRefundCreateReqDTO().setAppKey("webtest-notify")
+                .setMerchantOrderId("WT-N1").setMerchantRefundId("WT-RF1").setPrice(price).setReason("测试").setUserIp("127.0.0.1")));
+        return jdbcTemplate.queryForObject("SELECT no FROM pay_refund WHERE id = ?", String.class, id);
+    }
+
+    private String refundBody(String refundNo, int price) {
+        return "{\"type\":\"refund\",\"no\":\"" + refundNo + "\",\"status\":\"SUCCESS\",\"channelNo\":\"MOCK-" + refundNo
+                + "\",\"price\":" + price + ",\"successTime\":" + System.currentTimeMillis() + "}";
+    }
+
+    private Integer refundStatus() {
+        return jdbcTemplate.queryForObject("SELECT status FROM pay_refund WHERE merchant_refund_id = 'WT-RF1'", Integer.class);
+    }
+
+    @Test
+    void 退款回调验签通过后退款成功() throws Exception {
+        String refundNo = paidOrderWithRefund(40);
+        assertThat(refundStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
+
+        mockMvc.perform(signedNotify("refund", channel.getId(), refundBody(refundNo, 40), NOTIFY_SECRET))
+                .andExpect(status().isOk()).andExpect(content().string("success"));
+
+        assertThat(refundStatus()).isEqualTo(PayRefundStatusEnum.SUCCESS.getStatus());
+    }
+
+    @Test
+    void 退款回调验签失败或金额不一致返回400且退款不变() throws Exception {
+        String refundNo = paidOrderWithRefund(40);
+
+        mockMvc.perform(signedNotify("refund", channel.getId(), refundBody(refundNo, 40), "wrong-secret-000000"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(signedNotify("refund", channel.getId(), refundBody(refundNo, 1), NOTIFY_SECRET))
+                .andExpect(status().isBadRequest());
+
+        assertThat(refundStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
+    }
+
+    @Test
+    void 退款回调来自其他渠道时返回400且退款不变() throws Exception {
+        String refundNo = paidOrderWithRefund(40);
+        PayChannelDO other = TenantUtils.execute(TENANT, () -> {
+            PayAppDO otherApp = new PayAppDO().setAppKey("webtest-notify-other").setName("另一应用").setStatus(0);
+            appMapper.insert(otherApp);
+            PayChannelDO c = new PayChannelDO().setAppId(otherApp.getId()).setCode("mock").setStatus(0).setFeeRate(0D)
+                    .setConfig("{\"notifySecret\":\"" + NOTIFY_SECRET + "\",\"behavior\":\"DROP_NOTIFY\"}");
+            channelMapper.insert(c);
+            return c;
+        });
+        // 另一个渠道用自己的密钥验签通过，但退款不属于它
+        mockMvc.perform(signedNotify("refund", other.getId(), refundBody(refundNo, 40), NOTIFY_SECRET))
+                .andExpect(status().isBadRequest());
+
+        assertThat(refundStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
     }
 }

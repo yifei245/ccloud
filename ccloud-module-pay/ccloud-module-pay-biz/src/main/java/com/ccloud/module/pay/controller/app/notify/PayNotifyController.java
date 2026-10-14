@@ -9,6 +9,7 @@ import com.ccloud.module.pay.framework.pay.core.client.PayNotifyVerifyException;
 import com.ccloud.module.pay.framework.pay.core.client.dto.PayNotifyRequest;
 import com.ccloud.module.pay.service.channel.PayChannelService;
 import com.ccloud.module.pay.service.order.PayOrderService;
+import com.ccloud.module.pay.service.refund.PayRefundService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -39,6 +40,8 @@ public class PayNotifyController {
     private PayChannelService channelService;
     @Resource
     private PayOrderService orderService;
+    @Resource
+    private PayRefundService refundService;
 
     /**
      * 免登录、免租户头：按渠道确定租户，按渠道实现验签。成功应答渠道要求的报文；
@@ -87,6 +90,7 @@ public class PayNotifyController {
     private String handle(String type, PayChannelDO channel, PayClient client, PayNotifyRequest request) {
         switch (type) {
             case "order" -> orderService.notifyOrder(channel, client.parseOrderNotify(request));
+            case "refund" -> refundService.notifyRefund(channel, client.parseRefundNotify(request));
             default -> throw new PayNotifyVerifyException("暂不支持的回调类型：" + type);
         }
         return client.notifyAckBody();

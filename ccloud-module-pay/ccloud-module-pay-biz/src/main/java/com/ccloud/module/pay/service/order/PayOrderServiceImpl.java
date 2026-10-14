@@ -180,6 +180,11 @@ public class PayOrderServiceImpl implements PayOrderService {
             if (ext == null) {
                 throw exception(PAY_ORDER_EXTENSION_NOT_FOUND);
             }
+            // 回调须来自发起该支付尝试的渠道：用渠道 A 的密钥验过签的回调，不能完成渠道 B 上的支付尝试
+            if (!Objects.equals(ext.getChannelId(), channel.getId())) {
+                log.error("[notifyOrder] 支付尝试 {} 属于渠道 {}，却由渠道 {} 通知，拒绝", ext.getNo(), ext.getChannelId(), channel.getId());
+                throw exception(PAY_ORDER_EXTENSION_NOT_FOUND);
+            }
             if (result.getStatus() == PayClientStatus.SUCCESS) {
                 notifyOrderSuccess(channel, ext, result);
             } else if (result.getStatus() == PayClientStatus.FAILURE) {
@@ -197,8 +202,10 @@ public class PayOrderServiceImpl implements PayOrderService {
             log.error("[notifyOrderSuccess] 支付尝试 {} 渠道金额 {} 与订单金额 {} 不一致，拒绝", ext.getNo(), result.getPrice(), order.getPrice());
             throw exception(PAY_ORDER_NOTIFY_PRICE_MISMATCH);
         }
-        // 关闭的支付尝试也接受成功：关单后用户才付款，钱已到账，必须记下来
-        int updated = extensionMapper.updateByIdAndStatus(ext.getId(), ext.getStatus(), new PayOrderExtensionDO()
+        // 关闭的支付尝试也接受成功：关单后用户才付款，钱已到账，必须记下来。
+        // 条件是"尚未成功"而不是读到的状态：读取后超时关单可能把等待改成了关闭，按旧状态更新会丢掉这笔已到账的支付；
+        // 并发的另一笔通知会在行锁上等待，待其提交后看到已成功，影响 0 行，保证只入账一次
+        int updated = extensionMapper.updateByIdAndStatusNot(ext.getId(), PayOrderStatusEnum.SUCCESS.getStatus(), new PayOrderExtensionDO()
                 .setStatus(PayOrderStatusEnum.SUCCESS.getStatus())
                 .setChannelNotifyData(StrUtil.maxLength(result.getRawData(), 4000)));
         if (updated == 0) {
@@ -233,18 +240,26 @@ public class PayOrderServiceImpl implements PayOrderService {
     @Override
     public int syncOrder(int limit) {
         LocalDateTime now = LocalDateTime.now();
-        List<PayOrderExtensionDO> extensions = TenantUtils.executeIgnore(() -> extensionMapper.selectListByStatusAndCreateTimeBetween(
-                PayOrderStatusEnum.WAITING.getStatus(), now.minus(payProperties.getJob().getSyncWindow()),
-                now.minus(payProperties.getJob().getSyncDelay()), limit));
+        LocalDateTime from = now.minus(payProperties.getJob().getSyncWindow());
+        LocalDateTime to = now.minus(payProperties.getJob().getSyncDelay());
         int count = 0;
-        for (PayOrderExtensionDO ext : extensions) {
-            try {
-                TenantUtils.execute(ext.getTenantId(), () -> syncExtension(ext));
-                count++;
-            } catch (Exception e) {
-                log.warn("[syncOrder] 支付尝试 {} 补查失败", ext.getNo(), e);
+        long afterId = 0L;
+        List<PayOrderExtensionDO> page;
+        // 按编号游标逐页处理：某条长期查询失败时，不会占住队首、饿死后面的记录
+        do {
+            long cursor = afterId;
+            page = TenantUtils.executeIgnore(() -> extensionMapper.selectListByStatusAndCreateTimeBetween(
+                    PayOrderStatusEnum.WAITING.getStatus(), from, to, cursor, limit));
+            for (PayOrderExtensionDO ext : page) {
+                afterId = ext.getId();
+                try {
+                    TenantUtils.execute(ext.getTenantId(), () -> syncExtension(ext));
+                    count++;
+                } catch (Exception e) {
+                    log.warn("[syncOrder] 支付尝试 {} 补查失败", ext.getNo(), e);
+                }
             }
-        }
+        } while (page.size() >= limit);
         return count;
     }
 
@@ -261,18 +276,26 @@ public class PayOrderServiceImpl implements PayOrderService {
 
     @Override
     public int expireOrder(int limit) {
-        List<PayOrderDO> orders = TenantUtils.executeIgnore(() -> orderMapper.selectListByStatusAndExpireTimeLt(
-                PayOrderStatusEnum.WAITING.getStatus(), LocalDateTime.now(), limit));
+        LocalDateTime now = LocalDateTime.now();
         int closed = 0;
-        for (PayOrderDO order : orders) {
-            try {
-                if (Boolean.TRUE.equals(TenantUtils.execute(order.getTenantId(), () -> expireOne(order)))) {
-                    closed++;
+        long afterId = 0L;
+        List<PayOrderDO> page;
+        // 按编号游标逐页处理：某个订单长期关闭失败时，不会占住队首、饿死后面的订单
+        do {
+            long cursor = afterId;
+            page = TenantUtils.executeIgnore(() -> orderMapper.selectListByStatusAndExpireTimeLt(
+                    PayOrderStatusEnum.WAITING.getStatus(), now, cursor, limit));
+            for (PayOrderDO order : page) {
+                afterId = order.getId();
+                try {
+                    if (Boolean.TRUE.equals(TenantUtils.execute(order.getTenantId(), () -> expireOne(order)))) {
+                        closed++;
+                    }
+                } catch (Exception e) {
+                    log.warn("[expireOrder] 订单 {} 关闭失败", order.getId(), e);
                 }
-            } catch (Exception e) {
-                log.warn("[expireOrder] 订单 {} 关闭失败", order.getId(), e);
             }
-        }
+        } while (page.size() >= limit);
         return closed;
     }
 

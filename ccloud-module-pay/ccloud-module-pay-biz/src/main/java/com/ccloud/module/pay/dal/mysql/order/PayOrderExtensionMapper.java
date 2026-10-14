@@ -33,10 +33,21 @@ public interface PayOrderExtensionMapper extends BaseMapperX<PayOrderExtensionDO
                 .eq(PayOrderExtensionDO::getStatus, whereStatus));
     }
 
+    /**
+     * 条件更新：仅当当前状态不是 notStatus 时更新。用于"成功"不可被覆盖、但可由等待或关闭转入的场景
+     */
+    default int updateByIdAndStatusNot(Long id, Integer notStatus, PayOrderExtensionDO update) {
+        return update(update, new LambdaUpdateWrapper<PayOrderExtensionDO>().eq(PayOrderExtensionDO::getId, id)
+                .ne(PayOrderExtensionDO::getStatus, notStatus));
+    }
+
+    /**
+     * 按编号游标分页：只返回编号大于 afterId 的记录，调用方逐页推进，避免长期失败的记录占住队首
+     */
     default List<PayOrderExtensionDO> selectListByStatusAndCreateTimeBetween(Integer status, LocalDateTime from,
-                                                                            LocalDateTime to, int limit) {
+                                                                            LocalDateTime to, Long afterId, int limit) {
         return selectList(new LambdaQueryWrapperX<PayOrderExtensionDO>().eq(PayOrderExtensionDO::getStatus, status)
-                .between(PayOrderExtensionDO::getCreateTime, from, to).orderByAsc(PayOrderExtensionDO::getId)
+                .gt(PayOrderExtensionDO::getId, afterId).between(PayOrderExtensionDO::getCreateTime, from, to).orderByAsc(PayOrderExtensionDO::getId)
                 .last("LIMIT " + limit));
     }
 

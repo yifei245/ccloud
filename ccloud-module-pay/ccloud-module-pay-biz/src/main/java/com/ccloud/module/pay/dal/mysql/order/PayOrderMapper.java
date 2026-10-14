@@ -35,9 +35,9 @@ public interface PayOrderMapper extends BaseMapperX<PayOrderDO> {
         return update(update, new LambdaUpdateWrapper<PayOrderDO>().eq(PayOrderDO::getId, id).eq(PayOrderDO::getStatus, whereStatus));
     }
 
-    default List<PayOrderDO> selectListByStatusAndExpireTimeLt(Integer status, LocalDateTime time, int limit) {
+    default List<PayOrderDO> selectListByStatusAndExpireTimeLt(Integer status, LocalDateTime time, Long afterId, int limit) {
         return selectList(new LambdaQueryWrapperX<PayOrderDO>().eq(PayOrderDO::getStatus, status)
-                .lt(PayOrderDO::getExpireTime, time).orderByAsc(PayOrderDO::getId).last("LIMIT " + limit));
+                .gt(PayOrderDO::getId, afterId).lt(PayOrderDO::getExpireTime, time).orderByAsc(PayOrderDO::getId).last("LIMIT " + limit));
     }
 
     default Long selectCountByAppId(Long appId) {

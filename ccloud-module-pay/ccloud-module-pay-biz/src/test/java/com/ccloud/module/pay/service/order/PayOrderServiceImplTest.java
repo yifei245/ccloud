@@ -34,6 +34,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.LocalDateTime;
 
@@ -42,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -70,6 +72,8 @@ class PayOrderServiceImplTest extends BasePayDbAndRedisUnitTest {
     private OutboxMessageService outboxMessageService;
     @MockitoBean
     private OpenAppApi openAppApi;
+    @MockitoSpyBean
+    private PayOrderExtensionMapper extensionMapperSpy;
 
     private PayAppDO app;
     private PayChannelDO channel;
@@ -285,6 +289,104 @@ class PayOrderServiceImplTest extends BasePayDbAndRedisUnitTest {
 
         orderService.expireOrder(100);
         assertThat(orderMapper.selectById(id).getStatus()).isEqualTo(PayOrderStatusEnum.WAITING.getStatus());
+    }
+
+    /**
+     * 回调事务读到等待中的支付尝试后，超时关单抢先把它改成了关闭：成功仍须记下。
+     * 用 spy 让 selectByNo 返回读到的旧状态（等待），而库中已是关闭
+     */
+    private PayOrderExtensionDO closeExtensionBehindCallback(Long orderId) {
+        PayOrderExtensionDO ext = submitAndGetExtension(orderId);
+        extensionMapper.updateById(new PayOrderExtensionDO().setId(ext.getId()).setStatus(PayOrderStatusEnum.CLOSED.getStatus()));
+        assertThat(ext.getStatus()).isEqualTo(PayOrderStatusEnum.WAITING.getStatus());
+        doReturn(ext).when(extensionMapperSpy).selectByNo(ext.getNo());
+        return ext;
+    }
+
+    @Test
+    void 回调读到旧的等待状态时支付尝试已被关闭_订单待支付则仍记为成功() {
+        Long id = orderService.createOrder(orderReq("M30", 100));
+        PayOrderExtensionDO ext = closeExtensionBehindCallback(id);
+
+        orderService.notifyOrder(channel, success(ext, 100));
+
+        assertThat(extensionMapper.selectById(ext.getId()).getStatus()).isEqualTo(PayOrderStatusEnum.SUCCESS.getStatus());
+        assertThat(orderMapper.selectById(id).getStatus()).isEqualTo(PayOrderStatusEnum.SUCCESS.getStatus());
+        verify(outboxMessageService, times(1)).saveAndPublish(eq(PayOrderMessage.TOPIC_PAID), any());
+    }
+
+    @Test
+    void 回调读到旧的等待状态时支付尝试已被关闭_订单也已关闭则记为异常支付() {
+        Long id = orderService.createOrder(orderReq("M31", 100));
+        PayOrderExtensionDO ext = closeExtensionBehindCallback(id);
+        orderMapper.updateById(new PayOrderDO().setId(id).setStatus(PayOrderStatusEnum.CLOSED.getStatus()));
+
+        orderService.notifyOrder(channel, success(ext, 100));
+
+        assertThat(extensionMapper.selectById(ext.getId()).getStatus()).isEqualTo(PayOrderStatusEnum.SUCCESS.getStatus());
+        assertThat(orderMapper.selectById(id).getStatus()).isEqualTo(PayOrderStatusEnum.CLOSED.getStatus());
+        assertThat(orderService.getAbnormalExtensionPage(new PageParam()).getList())
+                .extracting(PayOrderExtensionDO::getId).contains(ext.getId());
+        verify(outboxMessageService, never()).saveAndPublish(any(), any());
+    }
+
+    @Test
+    void 通知渠道与支付尝试所属渠道不一致时拒绝且不改任何状态() {
+        Long id = orderService.createOrder(orderReq("M32", 100));
+        PayOrderExtensionDO ext = submitAndGetExtension(id);
+        PayChannelDO other = new PayChannelDO().setAppId(app.getId()).setCode("wx_lite").setStatus(0).setFeeRate(0D).setConfig("{}");
+        channelMapper.insert(other);
+
+        assertServiceException(() -> orderService.notifyOrder(other, success(ext, 100)), PAY_ORDER_EXTENSION_NOT_FOUND);
+        assertServiceException(() -> orderService.notifyOrder(other,
+                PayOrderResult.failure(ext.getNo(), "E", "x", "{}")), PAY_ORDER_EXTENSION_NOT_FOUND);
+
+        assertThat(extensionMapper.selectById(ext.getId()).getStatus()).isEqualTo(PayOrderStatusEnum.WAITING.getStatus());
+        assertThat(orderMapper.selectById(id).getStatus()).isEqualTo(PayOrderStatusEnum.WAITING.getStatus());
+        verify(outboxMessageService, never()).saveAndPublish(any(), any());
+    }
+
+    @Test
+    void 补查_每批一条时前一条查询异常不影响后一条() {
+        Long first = orderService.createOrder(orderReq("M33", 100));
+        Long second = orderService.createOrder(orderReq("M34", 100));
+        PayOrderExtensionDO ext1 = submitAndGetExtension(first);
+        PayOrderExtensionDO ext2 = submitAndGetExtension(second);
+        jdbcTemplate.update("UPDATE pay_order_extension SET create_time = ? WHERE id IN (?, ?)",
+                LocalDateTime.now().minusMinutes(5), ext1.getId(), ext2.getId());
+        fakeProvider.client().onGetOrder = no -> {
+            if (no.equals(ext1.getNo())) {
+                throw new IllegalStateException("timeout");
+            }
+            return PayOrderResult.success(no, "CH", 100, LocalDateTime.now(), "{}");
+        };
+
+        orderService.syncOrder(1);
+
+        assertThat(orderMapper.selectById(first).getStatus()).isEqualTo(PayOrderStatusEnum.WAITING.getStatus());
+        assertThat(orderMapper.selectById(second).getStatus()).isEqualTo(PayOrderStatusEnum.SUCCESS.getStatus());
+    }
+
+    @Test
+    void 超时关单_每批一条时前一个订单查询异常不影响后一个() {
+        Long first = orderService.createOrder(orderReq("M35", 100));
+        Long second = orderService.createOrder(orderReq("M36", 100));
+        PayOrderExtensionDO ext1 = submitAndGetExtension(first);
+        submitAndGetExtension(second);
+        LocalDateTime past = LocalDateTime.now().minusMinutes(1);
+        orderMapper.updateById(new PayOrderDO().setId(first).setExpireTime(past));
+        orderMapper.updateById(new PayOrderDO().setId(second).setExpireTime(past));
+        fakeProvider.client().onGetOrder = no -> {
+            if (no.equals(ext1.getNo())) {
+                throw new IllegalStateException("timeout");
+            }
+            return PayOrderResult.waiting(no, null, null);
+        };
+
+        orderService.expireOrder(1);
+
+        assertThat(orderMapper.selectById(first).getStatus()).isEqualTo(PayOrderStatusEnum.WAITING.getStatus());
+        assertThat(orderMapper.selectById(second).getStatus()).isEqualTo(PayOrderStatusEnum.CLOSED.getStatus());
     }
 
     @Test

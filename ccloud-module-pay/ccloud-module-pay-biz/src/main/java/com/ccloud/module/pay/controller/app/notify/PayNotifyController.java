@@ -1,0 +1,79 @@
+package com.ccloud.module.pay.controller.app.notify;
+
+import cn.hutool.core.util.StrUtil;
+import com.ccloud.framework.common.exception.ServiceException;
+import com.ccloud.framework.tenant.core.util.TenantUtils;
+import com.ccloud.module.pay.dal.dataobject.channel.PayChannelDO;
+import com.ccloud.module.pay.framework.pay.core.client.PayClient;
+import com.ccloud.module.pay.framework.pay.core.client.PayNotifyVerifyException;
+import com.ccloud.module.pay.framework.pay.core.client.dto.PayNotifyRequest;
+import com.ccloud.module.pay.service.channel.PayChannelService;
+import com.ccloud.module.pay.service.order.PayOrderService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Tag(name = "渠道回调")
+@RestController
+@RequestMapping("/app-api/pay/notify")
+@Slf4j
+public class PayNotifyController {
+
+    @Resource
+    private PayChannelService channelService;
+    @Resource
+    private PayOrderService orderService;
+
+    /**
+     * 免登录、免租户头：按渠道确定租户，按渠道实现验签。成功应答渠道要求的报文；
+     * 验签失败或业务校验不通过返回 400（渠道会重试，无害）；其他异常返回 500，等渠道重试
+     */
+    @PostMapping("/{type}/{channelId}")
+    @Operation(summary = "接收渠道回调")
+    public ResponseEntity<String> notify(@PathVariable("type") String type, @PathVariable("channelId") Long channelId,
+                                         @RequestParam Map<String, String> params,
+                                         @RequestBody(required = false) String body, HttpServletRequest request) {
+        PayChannelDO channel = channelService.getChannelIgnoreTenant(channelId);
+        if (channel == null || !List.of("order", "refund", "transfer").contains(type)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("not found");
+        }
+        Map<String, String> headers = new HashMap<>();
+        Collections.list(request.getHeaderNames()).forEach(name -> headers.put(name.toLowerCase(), request.getHeader(name)));
+        PayNotifyRequest notifyRequest = new PayNotifyRequest(params, headers, StrUtil.nullToEmpty(body));
+        try {
+            String ack = TenantUtils.execute(channel.getTenantId(), () -> handle(type, channel, notifyRequest));
+            return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(ack);
+        } catch (PayNotifyVerifyException e) {
+            log.warn("[notify] 渠道 {} 的 {} 回调验签失败：{}", channelId, type, e.getMessage());
+            return ResponseEntity.badRequest().body("invalid notify");
+        } catch (ServiceException e) {
+            log.error("[notify] 渠道 {} 的 {} 回调处理被拒绝：{}", channelId, type, e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    private String handle(String type, PayChannelDO channel, PayNotifyRequest request) {
+        PayClient client = channelService.getPayClient(channel);
+        switch (type) {
+            case "order" -> orderService.notifyOrder(channel, client.parseOrderNotify(request));
+            default -> throw new PayNotifyVerifyException("暂不支持的回调类型：" + type);
+        }
+        return client.notifyAckBody();
+    }
+}

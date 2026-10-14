@@ -14,6 +14,7 @@ import com.ccloud.module.pay.dal.dataobject.app.PayAppDO;
 import com.ccloud.module.pay.dal.dataobject.channel.PayChannelDO;
 import com.ccloud.module.pay.dal.mysql.app.PayAppMapper;
 import com.ccloud.module.pay.dal.mysql.channel.PayChannelMapper;
+import com.ccloud.module.pay.dal.mysql.order.PayOrderMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,8 @@ public class PayAppServiceImpl implements PayAppService {
     private PayAppMapper payAppMapper;
     @Resource
     private PayChannelMapper payChannelMapper;
+    @Resource
+    private PayOrderMapper payOrderMapper;
     @Resource
     private OpenAppApi openAppApi;
 
@@ -85,7 +88,9 @@ public class PayAppServiceImpl implements PayAppService {
     @Transactional(rollbackFor = Exception.class)
     public void deleteApp(Long id) {
         validateAppExists(id);
-        // TODO Task 8：应用下存在支付单时拒绝删除（PAY_APP_EXIST_ORDER）
+        if (payOrderMapper.selectCountByAppId(id) > 0) {
+            throw exception(PAY_APP_EXIST_ORDER);
+        }
         // 渠道客户端缓存不必主动清理：取用时带着库中的配置，已删除渠道的缓存项不会再被访问
         payChannelMapper.delete(PayChannelDO::getAppId, id);
         payAppMapper.deleteById(id);

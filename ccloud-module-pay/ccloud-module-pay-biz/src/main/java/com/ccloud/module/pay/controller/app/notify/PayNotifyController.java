@@ -50,7 +50,14 @@ public class PayNotifyController {
     public ResponseEntity<String> notify(@PathVariable("type") String type, @PathVariable("channelId") Long channelId,
                                          @RequestParam Map<String, String> params,
                                          @RequestBody(required = false) String body, HttpServletRequest request) {
-        PayChannelDO channel = channelService.getChannelIgnoreTenant(channelId);
+        PayChannelDO channel;
+        try {
+            channel = channelService.getChannelIgnoreTenant(channelId);
+        } catch (Exception e) {
+            // 数据库异常、配置解密失败等：服务端问题，返回 500 让渠道重试
+            log.error("[notify] 渠道 {} 的 {} 回调查询渠道失败", channelId, type, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("error");
+        }
         if (channel == null || !List.of("order", "refund", "transfer").contains(type)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("not found");
         }

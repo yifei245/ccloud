@@ -139,4 +139,15 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
         mockMvc.perform(signedNotify(body(100), NOTIFY_SECRET))
                 .andExpect(status().isInternalServerError()).andExpect(content().string("error"));
     }
+
+    @Test
+    void 渠道配置无法解密时返回500而不是404或200() throws Exception {
+        // 绕过 TypeHandler 直接写入明文配置，读取时解密失败
+        jdbcTemplate.update("INSERT INTO pay_channel (code, status, fee_rate, app_id, config, tenant_id) "
+                + "VALUES ('wx_pub', 0, 0, ?, 'plaintext-undecryptable', ?)", channel.getAppId(), TENANT);
+        Long id = jdbcTemplate.queryForObject("SELECT id FROM pay_channel WHERE app_id = ? AND code = 'wx_pub'",
+                Long.class, channel.getAppId());
+        mockMvc.perform(post("/app-api/pay/notify/order/" + id).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isInternalServerError()).andExpect(content().string("error"));
+    }
 }

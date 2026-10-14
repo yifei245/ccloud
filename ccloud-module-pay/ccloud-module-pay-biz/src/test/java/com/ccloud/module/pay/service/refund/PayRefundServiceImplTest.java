@@ -304,6 +304,7 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
             return PayRefundResult.waiting(req.getOutRefundNo());
         };
         // 租户上下文只包住发起，外层事务在它之外提交：提交时线程上已没有租户
+        TenantContextHolder.clear();
         new TransactionTemplate(transactionManager).executeWithoutResult(
                 status -> TenantUtils.execute(TENANT_ID, () -> refundService.createRefund(refundReq("RF37", 100))));
         assertThat(tenantAtCall.get()).isEqualTo(TENANT_ID);

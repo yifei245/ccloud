@@ -42,7 +42,8 @@ public class PayNotifyController {
 
     /**
      * 免登录、免租户头：按渠道确定租户，按渠道实现验签。成功应答渠道要求的报文；
-     * 验签失败或业务校验不通过返回 400（渠道会重试，无害）；其他异常返回 500，等渠道重试
+     * 验签失败或业务校验不通过返回 400（渠道会重试，无害；应答体不带细节，细节只记日志）；
+     * 渠道配置不可用等服务端问题与其他未预期异常返回 500，等渠道重试（全局异常处理会把异常包成 HTTP 200，渠道会当作已送达）
      */
     @PostMapping("/{type}/{channelId}")
     @Operation(summary = "接收渠道回调")
@@ -56,20 +57,27 @@ public class PayNotifyController {
         Map<String, String> headers = new HashMap<>();
         Collections.list(request.getHeaderNames()).forEach(name -> headers.put(name.toLowerCase(), request.getHeader(name)));
         PayNotifyRequest notifyRequest = new PayNotifyRequest(params, headers, StrUtil.nullToEmpty(body));
+        PayClient client;
         try {
-            String ack = TenantUtils.execute(channel.getTenantId(), () -> handle(type, channel, notifyRequest));
+            client = TenantUtils.execute(channel.getTenantId(), () -> channelService.getPayClient(channel));
+        } catch (Exception e) {
+            // 渠道类型未实现或配置不正确：服务端问题，不是回调方的错
+            log.error("[notify] 渠道 {} 无法创建客户端，{} 回调无法处理", channelId, type, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("error");
+        }
+        try {
+            String ack = TenantUtils.execute(channel.getTenantId(), () -> handle(type, channel, client, notifyRequest));
             return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(ack);
-        } catch (PayNotifyVerifyException e) {
-            log.warn("[notify] 渠道 {} 的 {} 回调验签失败：{}", channelId, type, e.getMessage());
-            return ResponseEntity.badRequest().body("invalid notify");
-        } catch (ServiceException e) {
-            log.error("[notify] 渠道 {} 的 {} 回调处理被拒绝：{}", channelId, type, e.getMessage());
-            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (PayNotifyVerifyException | ServiceException e) {
+            log.warn("[notify] 渠道 {} 的 {} 回调被拒绝：{}", channelId, type, e.getMessage());
+            return ResponseEntity.badRequest().body("rejected");
+        } catch (Exception e) {
+            log.error("[notify] 渠道 {} 的 {} 回调处理异常", channelId, type, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("error");
         }
     }
 
-    private String handle(String type, PayChannelDO channel, PayNotifyRequest request) {
-        PayClient client = channelService.getPayClient(channel);
+    private String handle(String type, PayChannelDO channel, PayClient client, PayNotifyRequest request) {
         switch (type) {
             case "order" -> orderService.notifyOrder(channel, client.parseOrderNotify(request));
             default -> throw new PayNotifyVerifyException("暂不支持的回调类型：" + type);

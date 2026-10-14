@@ -16,11 +16,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import com.ccloud.module.pay.enums.order.PayOrderStatusEnum;
 import com.ccloud.module.pay.framework.pay.core.client.impl.mock.MockPayNotifySigner;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,7 +38,7 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
     private PayAppMapper appMapper;
     @Resource
     private PayChannelMapper channelMapper;
-    @Resource
+    @MockitoSpyBean
     private PayOrderService orderService;
 
     private PayChannelDO channel;
@@ -102,5 +107,36 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
     void 渠道不存在或类型未知返回404() throws Exception {
         mockMvc.perform(post("/app-api/pay/notify/order/999999999").content("{}")).andExpect(status().isNotFound());
         mockMvc.perform(post("/app-api/pay/notify/unknown/" + channel.getId()).content("{}")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 拒绝时应答体不回显错误信息() throws Exception {
+        mockMvc.perform(signedNotify(body(1), NOTIFY_SECRET))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("rejected"))
+                .andExpect(content().string(not(containsString("金额"))));
+    }
+
+    @Test
+    void 渠道无法创建客户端时返回500而不是400() throws Exception {
+        // wx_lite 本期没有渠道实现，getPayClient 抛 CHANNEL_NOT_SUPPORTED：服务端问题，不是回调方的错
+        PayChannelDO unsupported = TenantUtils.execute(TENANT, () -> {
+            PayChannelDO c = new PayChannelDO().setAppId(channel.getAppId()).setCode("wx_lite").setStatus(0)
+                    .setFeeRate(0D).setConfig("{}");
+            channelMapper.insert(c);
+            return c;
+        });
+        long ts = System.currentTimeMillis();
+        mockMvc.perform(post("/app-api/pay/notify/order/" + unsupported.getId()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{}").header("X-Mock-Timestamp", ts)
+                        .header("X-Mock-Sign", MockPayNotifySigner.sign(NOTIFY_SECRET, ts, "{}")))
+                .andExpect(status().isInternalServerError()).andExpect(content().string("error"));
+    }
+
+    @Test
+    void 处理中出现未预期异常返回500() throws Exception {
+        doThrow(new IllegalStateException("boom")).when(orderService).notifyOrder(any(), any());
+        mockMvc.perform(signedNotify(body(100), NOTIFY_SECRET))
+                .andExpect(status().isInternalServerError()).andExpect(content().string("error"));
     }
 }

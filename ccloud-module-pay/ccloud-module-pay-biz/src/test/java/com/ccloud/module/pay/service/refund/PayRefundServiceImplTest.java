@@ -1,6 +1,8 @@
 package com.ccloud.module.pay.service.refund;
 
 import com.ccloud.framework.common.exception.ServiceException;
+import com.ccloud.framework.tenant.core.context.TenantContextHolder;
+import com.ccloud.framework.tenant.core.util.TenantUtils;
 import com.ccloud.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import com.ccloud.module.pay.dal.dataobject.channel.PayChannelDO;
 import com.ccloud.module.pay.dal.dataobject.order.PayOrderDO;
@@ -21,7 +23,6 @@ import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
-import org.junit.jupiter.api.Timeout;
 import org.springframework.context.annotation.Import;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -33,6 +34,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.ccloud.module.pay.enums.ErrorCodeConstants.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -207,6 +209,58 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
     }
 
     @Test
+    void 后到的重复请求撞上额度不足时返回原退款单而不是额度错误() {
+        fakeProvider.client().onUnifiedRefund = req -> PayRefundResult.success(req.getOutRefundNo(), "CR", req.getRefundPrice(), LocalDateTime.now(), "{}");
+        Long first = refundService.createRefund(refundReq("RF33", 600));
+        // 后到者在先到者提交前查重未命中；其预占是对最新已提交行的更新，600 + 600 > 1000 而被拒
+        doReturn(null).doCallRealMethod().when(refundMapper).selectByAppIdAndMerchantRefundId(any(), eq("RF33"));
+
+        assertThat(refundService.createRefund(refundReq("RF33", 600))).isEqualTo(first);
+
+        assertThat(orderMapper.selectById(paidOrderId).getRefundPrice()).isEqualTo(600);
+    }
+
+    @Test
+    void 后到的重复请求撞上先到者处理中时返回原退款单而不是处理中错误() {
+        Long first = refundService.createRefund(refundReq("RF34", 300));
+        assertThat(refundMapper.selectById(first).getStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
+        doReturn(null).doCallRealMethod().when(refundMapper).selectByAppIdAndMerchantRefundId(any(), eq("RF34"));
+
+        assertThat(refundService.createRefund(refundReq("RF34", 300))).isEqualTo(first);
+    }
+
+    @Test
+    void 后到的重复请求撞上额度不足但金额与原退款单不同时报不一致() {
+        fakeProvider.client().onUnifiedRefund = req -> PayRefundResult.success(req.getOutRefundNo(), "CR", req.getRefundPrice(), LocalDateTime.now(), "{}");
+        refundService.createRefund(refundReq("RF35", 600));
+        doReturn(null).doCallRealMethod().when(refundMapper).selectByAppIdAndMerchantRefundId(any(), eq("RF35"));
+
+        assertServiceException(() -> refundService.createRefund(refundReq("RF35", 700)), PAY_REFUND_EXISTS_MISMATCH);
+    }
+
+    @Test
+    void 额度不足且没有同号退款单时仍报额度错误() {
+        assertServiceException(() -> refundService.createRefund(refundReq("RF36", 1001)), PAY_REFUND_PRICE_EXCEED);
+    }
+
+    @Test
+    void 订单状态切换的条件在SQL里按当前行判断() {
+        Integer success = PayOrderStatusEnum.SUCCESS.getStatus();
+        Integer refunded = PayOrderStatusEnum.REFUND.getStatus();
+        // 已支付 1000：累计退款 999 时不切换，1000 时切换
+        jdbcTemplate.update("UPDATE pay_order SET refund_price = 999 WHERE id = ?", paidOrderId);
+        assertThat(orderMapper.updateStatusIfFullyRefunded(paidOrderId, success, refunded)).isZero();
+        jdbcTemplate.update("UPDATE pay_order SET refund_price = 1000 WHERE id = ?", paidOrderId);
+        assertThat(orderMapper.updateStatusIfFullyRefunded(paidOrderId, success, refunded)).isEqualTo(1);
+        assertThat(orderMapper.selectById(paidOrderId).getStatus()).isEqualTo(refunded);
+        // 已退款订单：仍等于支付金额时不回退，释放后小于支付金额才回退
+        assertThat(orderMapper.updateStatusIfRefundable(paidOrderId, refunded, success)).isZero();
+        jdbcTemplate.update("UPDATE pay_order SET refund_price = 999 WHERE id = ?", paidOrderId);
+        assertThat(orderMapper.updateStatusIfRefundable(paidOrderId, refunded, success)).isEqualTo(1);
+        assertThat(orderMapper.selectById(paidOrderId).getStatus()).isEqualTo(success);
+    }
+
+    @Test
     void 一笔退款失败释放额度后_因预占而显示已退款的订单回到支付成功_可再次退款() {
         Long a = refundService.createRefund(refundReq("RF27", 400));
         // 并行存在的另一笔等待中退款 600（预占额度已使订单累计达到 1000）
@@ -239,6 +293,20 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
         Mockito.reset(refundMapper);
 
         assertThat(refundMapper.selectById(id).getStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void 提交后的渠道调用在发起时的租户下执行() {
+        AtomicReference<Long> tenantAtCall = new AtomicReference<>(-1L);
+        fakeProvider.client().onUnifiedRefund = req -> {
+            tenantAtCall.set(TenantContextHolder.getTenantId());
+            return PayRefundResult.waiting(req.getOutRefundNo());
+        };
+        // 租户上下文只包住发起，外层事务在它之外提交：提交时线程上已没有租户
+        new TransactionTemplate(transactionManager).executeWithoutResult(
+                status -> TenantUtils.execute(TENANT_ID, () -> refundService.createRefund(refundReq("RF37", 100))));
+        assertThat(tenantAtCall.get()).isEqualTo(TENANT_ID);
     }
 
     @Test
@@ -298,7 +366,6 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
     }
 
     @Test
-    @Timeout(30)
     void 补查_每批一条时前一条查询异常不影响后一条() {
         Long first = refundService.createRefund(refundReq("RF19", 100));
         PayRefundDO firstRefund = refundMapper.selectById(first);
@@ -313,8 +380,13 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
                 .setRefundPrice(50).setReason("r").setChannelOrderNo("");
         refundMapper.insert(ok);
         jdbcTemplate.update("UPDATE pay_refund SET create_time = ? WHERE id IN (?, ?)", LocalDateTime.now().minusMinutes(5), failing, ok.getId());
+        AtomicInteger failingQueries = new AtomicInteger();
         fakeProvider.client().onGetRefund = no -> {
             if (no.equals(failingNo)) {
+                // 游标回归时同一条会被反复查询：用 Error 越过 syncRefund 的 catch (Exception) 立即失败，而不是无限循环
+                if (failingQueries.incrementAndGet() > 1) {
+                    throw new AssertionError("同一条退款被重复查询，游标没有向前推进");
+                }
                 throw new IllegalStateException("timeout");
             }
             return PayRefundResult.success(no, "CR", 50, LocalDateTime.now(), "{}");
@@ -327,13 +399,14 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
     }
 
     @Test
-    @Timeout(30)
     void 补查_所有退款都失败时每条只尝试一次并结束() {
         Long id = refundService.createRefund(refundReq("RF22", 100));
         jdbcTemplate.update("UPDATE pay_refund SET create_time = ? WHERE id = ?", LocalDateTime.now().minusMinutes(5), id);
         AtomicInteger queries = new AtomicInteger();
         fakeProvider.client().onGetRefund = no -> {
-            queries.incrementAndGet();
+            if (queries.incrementAndGet() > 1) {
+                throw new AssertionError("同一条退款被重复查询，游标没有向前推进");
+            }
             throw new IllegalStateException("timeout");
         };
 

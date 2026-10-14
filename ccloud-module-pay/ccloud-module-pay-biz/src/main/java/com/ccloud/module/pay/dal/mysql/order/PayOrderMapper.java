@@ -56,4 +56,18 @@ public interface PayOrderMapper extends BaseMapperX<PayOrderDO> {
      */
     @Update("UPDATE pay_order SET refund_price = refund_price - #{price} WHERE id = #{id} AND deleted = 0 AND refund_price >= #{price}")
     int releaseRefundPrice(@Param("id") Long id, @Param("price") int price);
+
+    /**
+     * 订单累计（含预占）退款已达支付金额时才切换状态。条件在被锁定的当前行上判断，不依赖调用方先前读到的快照
+     */
+    @Update("UPDATE pay_order SET status = #{toStatus} WHERE id = #{id} AND deleted = 0 "
+            + "AND status = #{fromStatus} AND refund_price >= price")
+    int updateStatusIfFullyRefunded(@Param("id") Long id, @Param("fromStatus") Integer fromStatus, @Param("toStatus") Integer toStatus);
+
+    /**
+     * 订单仍有可退额度时才切换状态（退款失败释放额度之后用）。条件在被锁定的当前行上判断
+     */
+    @Update("UPDATE pay_order SET status = #{toStatus} WHERE id = #{id} AND deleted = 0 "
+            + "AND status = #{fromStatus} AND refund_price < price")
+    int updateStatusIfRefundable(@Param("id") Long id, @Param("fromStatus") Integer fromStatus, @Param("toStatus") Integer toStatus);
 }

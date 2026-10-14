@@ -27,6 +27,7 @@ import com.ccloud.module.pay.service.channel.PayChannelService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import com.ccloud.framework.common.exception.ServiceException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionDefinition;
@@ -90,17 +91,15 @@ public class PayRefundServiceImpl implements PayRefundService {
         try {
             result = transactionTemplate.execute(status -> doCreateRefund(app, reqDTO));
         } catch (DuplicateKeyException e) {
-            if (TransactionSynchronizationManager.isActualTransactionActive()) {
-                // 在外层事务中：外层事务已被标记回滚（预占额度随之撤销），由外层调用方处理
-                throw e;
-            }
             // 并发重复创建：本事务（含预占额度）已回滚，以先写入的为准
-            PayOrderDO order = orderMapper.selectByAppIdAndMerchantOrderId(app.getId(), reqDTO.getMerchantOrderId());
-            PayRefundDO existing = refundMapper.selectByAppIdAndMerchantRefundId(app.getId(), reqDTO.getMerchantRefundId());
-            if (order == null || existing == null) {
+            result = findExistingAfterRace(app, reqDTO, e);
+        } catch (ServiceException e) {
+            // 后到者在先到者提交前通过了重复校验，随后因先到者占用了额度/处理中而被拒绝：预占是对最新已提交行的更新，
+            // 看得到先到者的提交；此时同一商户退款单号的记录已存在，应返回它而不是额度错误
+            if (!PAY_REFUND_PRICE_EXCEED.getCode().equals(e.getCode()) && !PAY_REFUND_HAS_REFUNDING.getCode().equals(e.getCode())) {
                 throw e;
             }
-            result = sameRefund(existing, order, reqDTO);
+            result = findExistingAfterRace(app, reqDTO, e);
         }
         CreateResult created = result;
         if (created.created()) {
@@ -116,6 +115,22 @@ public class PayRefundServiceImpl implements PayRefundService {
             });
         }
         return result.refundId();
+    }
+
+    /**
+     * 独立事务路径下重新读取同一商户退款单号的记录（事务已结束，读到的是已提交的行）。没有记录或处于外层事务中（无法确定）时重新抛出原异常
+     */
+    private CreateResult findExistingAfterRace(PayAppDO app, PayRefundCreateReqDTO reqDTO, RuntimeException cause) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            // 在外层事务中：外层事务已被标记回滚，由外层调用方处理
+            throw cause;
+        }
+        PayOrderDO order = orderMapper.selectByAppIdAndMerchantOrderId(app.getId(), reqDTO.getMerchantOrderId());
+        PayRefundDO existing = refundMapper.selectByAppIdAndMerchantRefundId(app.getId(), reqDTO.getMerchantRefundId());
+        if (order == null || existing == null) {
+            throw cause;
+        }
+        return sameRefund(existing, order, reqDTO);
     }
 
     /**
@@ -244,11 +259,9 @@ public class PayRefundServiceImpl implements PayRefundService {
                 .setSuccessTime(successTime).setChannelNotifyData(StrUtil.maxLength(result.getRawData(), 4000))) == 0) {
             return;
         }
-        PayOrderDO order = orderMapper.selectById(refund.getOrderId());
-        if (order.getRefundPrice() >= order.getPrice()) {
-            orderMapper.updateByIdAndStatus(order.getId(), PayOrderStatusEnum.SUCCESS.getStatus(),
-                    new PayOrderDO().setStatus(PayOrderStatusEnum.REFUND.getStatus()));
-        }
+        // 条件在 SQL 里按当前行判断，不用先前读到的快照（并发的其他退款可能刚改过额度）
+        orderMapper.updateStatusIfFullyRefunded(refund.getOrderId(), PayOrderStatusEnum.SUCCESS.getStatus(),
+                PayOrderStatusEnum.REFUND.getStatus());
         publish(PayRefundMessage.TOPIC_SUCCESS, refund, PayRefundStatusEnum.SUCCESS, successTime, null);
     }
 
@@ -261,17 +274,14 @@ public class PayRefundServiceImpl implements PayRefundService {
         }
         orderMapper.releaseRefundPrice(refund.getOrderId(), refund.getRefundPrice());
         // 预占额度曾使订单看似已退完（其他退款成功时按预占额度判断）：释放后若还有可退额度，订单回到支付成功
-        PayOrderDO order = orderMapper.selectById(refund.getOrderId());
-        if (order != null && order.getRefundPrice() < order.getPrice()) {
-            orderMapper.updateByIdAndStatus(order.getId(), PayOrderStatusEnum.REFUND.getStatus(),
-                    new PayOrderDO().setStatus(PayOrderStatusEnum.SUCCESS.getStatus()));
-        }
+        orderMapper.updateStatusIfRefundable(refund.getOrderId(), PayOrderStatusEnum.REFUND.getStatus(),
+                PayOrderStatusEnum.SUCCESS.getStatus());
         publish(PayRefundMessage.TOPIC_FAILURE, refund, PayRefundStatusEnum.FAILURE, null, result.getErrorMsg());
     }
 
     private void publish(String topic, PayRefundDO refund, PayRefundStatusEnum status, LocalDateTime successTime, String errorMsg) {
         PayAppDO app = appService.getApp(refund.getAppId());
-        outboxMessageService.saveAndPublish(topic, new PayRefundMessage().setTenantId(TenantContextHolder.getTenantId())
+        outboxMessageService.saveAndPublish(topic, new PayRefundMessage().setTenantId(refund.getTenantId())
                 .setAppId(app.getId()).setAppKey(app.getAppKey()).setRefundId(refund.getId()).setRefundNo(refund.getNo())
                 .setOrderId(refund.getOrderId()).setMerchantOrderId(refund.getMerchantOrderId())
                 .setMerchantRefundId(refund.getMerchantRefundId()).setRefundPrice(refund.getRefundPrice())

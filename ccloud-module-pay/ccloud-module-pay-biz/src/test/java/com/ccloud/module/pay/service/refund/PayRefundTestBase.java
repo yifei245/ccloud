@@ -23,6 +23,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +44,7 @@ abstract class PayRefundTestBase extends BasePayDbAndRedisUnitTest {
     protected PayOrderMapper orderMapper;
     @Resource
     protected PayOrderExtensionMapper extensionMapper;
-    @Resource
+    @MockitoSpyBean
     protected PayRefundMapper refundMapper;
     @Resource
     protected PayAppMapper appMapper;

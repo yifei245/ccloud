@@ -27,6 +27,7 @@ import com.ccloud.module.pay.service.channel.PayChannelService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -85,11 +86,46 @@ public class PayRefundServiceImpl implements PayRefundService {
 
     @Override
     public Long createRefund(PayAppDO app, PayRefundCreateReqDTO reqDTO) {
-        CreateResult result = transactionTemplate.execute(status -> doCreateRefund(app, reqDTO));
-        if (result.created()) {
-            runAfterCommit(() -> noTransactionTemplate.executeWithoutResult(status -> invokeRefund(result.refundId())));
+        CreateResult result;
+        try {
+            result = transactionTemplate.execute(status -> doCreateRefund(app, reqDTO));
+        } catch (DuplicateKeyException e) {
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                // 在外层事务中：外层事务已被标记回滚（预占额度随之撤销），由外层调用方处理
+                throw e;
+            }
+            // 并发重复创建：本事务（含预占额度）已回滚，以先写入的为准
+            PayOrderDO order = orderMapper.selectByAppIdAndMerchantOrderId(app.getId(), reqDTO.getMerchantOrderId());
+            PayRefundDO existing = refundMapper.selectByAppIdAndMerchantRefundId(app.getId(), reqDTO.getMerchantRefundId());
+            if (order == null || existing == null) {
+                throw e;
+            }
+            result = sameRefund(existing, order, reqDTO);
+        }
+        CreateResult created = result;
+        if (created.created()) {
+            // 提交后的任务：保留发起时的租户；任何异常都不外抛（退款已落库，结果由补查任务确定）
+            Long tenantId = TenantContextHolder.getTenantId();
+            runAfterCommit(() -> {
+                try {
+                    TenantUtils.execute(tenantId, () -> noTransactionTemplate.executeWithoutResult(
+                            status -> invokeRefund(created.refundId())));
+                } catch (Throwable t) {
+                    log.error("[createRefund] 退款 {} 提交后发起渠道退款失败，等待补查", created.refundId(), t);
+                }
+            });
         }
         return result.refundId();
+    }
+
+    /**
+     * 同一商户退款单号重复创建：订单与金额一致返回原单，否则拒绝
+     */
+    private static CreateResult sameRefund(PayRefundDO existing, PayOrderDO order, PayRefundCreateReqDTO reqDTO) {
+        if (!existing.getOrderId().equals(order.getId()) || !existing.getRefundPrice().equals(reqDTO.getPrice())) {
+            throw exception(PAY_REFUND_EXISTS_MISMATCH);
+        }
+        return new CreateResult(existing.getId(), false);
     }
 
     private CreateResult doCreateRefund(PayAppDO app, PayRefundCreateReqDTO reqDTO) {
@@ -99,10 +135,7 @@ public class PayRefundServiceImpl implements PayRefundService {
         }
         PayRefundDO existing = refundMapper.selectByAppIdAndMerchantRefundId(app.getId(), reqDTO.getMerchantRefundId());
         if (existing != null) {
-            if (!existing.getOrderId().equals(order.getId()) || !existing.getRefundPrice().equals(reqDTO.getPrice())) {
-                throw exception(PAY_REFUND_EXISTS_MISMATCH);
-            }
-            return new CreateResult(existing.getId(), false);
+            return sameRefund(existing, order, reqDTO);
         }
         if (!PayOrderStatusEnum.SUCCESS.getStatus().equals(order.getStatus())) {
             throw exception(PayOrderStatusEnum.REFUND.getStatus().equals(order.getStatus())
@@ -227,6 +260,12 @@ public class PayRefundServiceImpl implements PayRefundService {
             return;
         }
         orderMapper.releaseRefundPrice(refund.getOrderId(), refund.getRefundPrice());
+        // 预占额度曾使订单看似已退完（其他退款成功时按预占额度判断）：释放后若还有可退额度，订单回到支付成功
+        PayOrderDO order = orderMapper.selectById(refund.getOrderId());
+        if (order != null && order.getRefundPrice() < order.getPrice()) {
+            orderMapper.updateByIdAndStatus(order.getId(), PayOrderStatusEnum.REFUND.getStatus(),
+                    new PayOrderDO().setStatus(PayOrderStatusEnum.SUCCESS.getStatus()));
+        }
         publish(PayRefundMessage.TOPIC_FAILURE, refund, PayRefundStatusEnum.FAILURE, null, result.getErrorMsg());
     }
 
@@ -270,6 +309,7 @@ public class PayRefundServiceImpl implements PayRefundService {
     private void syncOne(PayRefundDO refund) {
         PayChannelDO channel = channelService.getChannel(refund.getChannelId());
         if (channel == null) {
+            log.error("[syncRefund] 退款 {} 的渠道 {} 已删除，无法补查", refund.getId(), refund.getChannelId());
             return;
         }
         PayRefundResult result = channelService.getPayClient(channel).getRefund(refund.getOrderNo(), refund.getNo());

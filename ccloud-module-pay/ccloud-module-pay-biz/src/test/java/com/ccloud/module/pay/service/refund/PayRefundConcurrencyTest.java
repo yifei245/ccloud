@@ -59,4 +59,30 @@ class PayRefundConcurrencyTest extends PayRefundTestBase {
                 Integer.class, paidOrderId);
         assertThat(reserved).isEqualTo(order.getRefundPrice());
     }
+
+    @Test
+    void 并发预占额度的条件更新合计不超过支付金额() throws Exception {
+        int threads = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch ready = new CountDownLatch(threads);
+        CountDownLatch go = new CountDownLatch(1);
+        List<Future<Integer>> futures = new ArrayList<>();
+        for (int i = 0; i < threads; i++) {
+            futures.add(pool.submit(() -> {
+                ready.countDown();
+                go.await();
+                return TenantUtils.execute(TENANT_ID, () -> orderMapper.reserveRefundPrice(paidOrderId, 300));
+            }));
+        }
+        ready.await();
+        go.countDown();
+        int successes = 0;
+        for (Future<Integer> f : futures) {
+            successes += f.get();
+        }
+        pool.shutdown();
+        PayOrderDO order = TenantUtils.execute(TENANT_ID, () -> orderMapper.selectById(paidOrderId));
+        assertThat(successes).isEqualTo(3);
+        assertThat(order.getRefundPrice()).isEqualTo(900).isLessThanOrEqualTo(order.getPrice());
+    }
 }

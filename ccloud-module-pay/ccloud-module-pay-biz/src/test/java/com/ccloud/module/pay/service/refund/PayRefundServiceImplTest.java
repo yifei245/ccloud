@@ -19,6 +19,9 @@ import com.ccloud.module.pay.service.order.PayOrderServiceImpl;
 import com.ccloud.module.pay.support.FakePayClientProvider;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.context.annotation.Import;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -26,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,6 +38,8 @@ import static com.ccloud.module.pay.enums.ErrorCodeConstants.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -128,6 +134,8 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
         assertThat(refundMapper.selectById(id).getStatus()).isEqualTo(PayRefundStatusEnum.SUCCESS.getStatus());
     }
 
+    // 本用例的外层事务由测试管理、结束时回滚，对 runAfterCommit 的回归并不敏感；真正守住"提交后才调渠道"的是下面两个让外层事务真正提交的用例
+    // （外层事务提交后才调用渠道_同步返回的结果在提交后落库、外层事务提交后调用渠道时不处于任何事务中_…）
     @Test
     @Transactional
     void 在外层事务中发起时_渠道调用推迟到外层提交之后() {
@@ -171,6 +179,65 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
     void 渠道同步返回的金额与退款单不一致时退款保持等待_发起方仍拿到退款单() {
         fakeProvider.client().onUnifiedRefund = req -> PayRefundResult.success(req.getOutRefundNo(), "CR", 1, LocalDateTime.now(), "{}");
         Long id = refundService.createRefund(refundReq("RF24", 100));
+        assertThat(refundMapper.selectById(id).getStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
+    }
+
+    @Test
+    void 并发重复发起同一商户退款单号_后到者拿到原退款单而不是异常() {
+        fakeProvider.client().onUnifiedRefund = req -> PayRefundResult.success(req.getOutRefundNo(), "CR", req.getRefundPrice(), LocalDateTime.now(), "{}");
+        Long first = refundService.createRefund(refundReq("RF25", 300));
+        // 模拟后到者在先到者提交之前查过一次、没查到：它随后预占额度、插入时撞上唯一键
+        doReturn(null).doCallRealMethod().when(refundMapper).selectByAppIdAndMerchantRefundId(any(), eq("RF25"));
+
+        assertThat(refundService.createRefund(refundReq("RF25", 300))).isEqualTo(first);
+
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM pay_refund WHERE order_id = ?", Integer.class, paidOrderId)).isEqualTo(1);
+        assertThat(orderMapper.selectById(paidOrderId).getRefundPrice()).as("后到者的预占额度随事务回滚").isEqualTo(300);
+    }
+
+    @Test
+    void 并发重复发起同一商户退款单号但金额不同_后到者报不一致且额度不变() {
+        fakeProvider.client().onUnifiedRefund = req -> PayRefundResult.success(req.getOutRefundNo(), "CR", req.getRefundPrice(), LocalDateTime.now(), "{}");
+        refundService.createRefund(refundReq("RF26", 300));
+        doReturn(null).doCallRealMethod().when(refundMapper).selectByAppIdAndMerchantRefundId(any(), eq("RF26"));
+
+        assertServiceException(() -> refundService.createRefund(refundReq("RF26", 301)), PAY_REFUND_EXISTS_MISMATCH);
+
+        assertThat(orderMapper.selectById(paidOrderId).getRefundPrice()).isEqualTo(300);
+    }
+
+    @Test
+    void 一笔退款失败释放额度后_因预占而显示已退款的订单回到支付成功_可再次退款() {
+        Long a = refundService.createRefund(refundReq("RF27", 400));
+        // 并行存在的另一笔等待中退款 600（预占额度已使订单累计达到 1000）
+        PayRefundDO b = new PayRefundDO().setNo("R-UT-B").setAppId(app.getId()).setChannelId(channel.getId())
+                .setChannelCode("mock").setOrderId(paidOrderId).setOrderNo(refundMapper.selectById(a).getOrderNo())
+                .setMerchantOrderId("M-PAID").setMerchantRefundId("RF28").setStatus(PayRefundStatusEnum.WAITING.getStatus())
+                .setPayPrice(1000).setRefundPrice(600).setReason("r").setChannelOrderNo("");
+        refundMapper.insert(b);
+        jdbcTemplate.update("UPDATE pay_order SET refund_price = 1000 WHERE id = ?", paidOrderId);
+
+        refundService.notifyRefund(channel, PayRefundResult.success(refundMapper.selectById(a).getNo(), "CR", 400, LocalDateTime.now(), "{}"));
+        assertThat(orderMapper.selectById(paidOrderId).getStatus()).isEqualTo(PayOrderStatusEnum.REFUND.getStatus());
+
+        refundService.notifyRefund(channel, PayRefundResult.failure("R-UT-B", "E", "余额不足", "{}"));
+
+        PayOrderDO order = orderMapper.selectById(paidOrderId);
+        assertThat(order.getStatus()).isEqualTo(PayOrderStatusEnum.SUCCESS.getStatus());
+        assertThat(order.getRefundPrice()).isEqualTo(400);
+        Long retry = refundService.createRefund(refundReq("RF29", 600));
+        assertThat(refundMapper.selectById(retry).getStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
+        assertThat(orderMapper.selectById(paidOrderId).getRefundPrice()).isEqualTo(1000);
+    }
+
+    @Test
+    void 提交后发起渠道退款时出现任何异常都不外传_退款保持等待() {
+        // 渠道调用之外的环节出错（这里是读退款单失败）：退款已落库，不能让发起方收到异常
+        doThrow(new IllegalStateException("db down")).when(refundMapper).selectById(ArgumentMatchers.<Serializable>any());
+
+        Long id = refundService.createRefund(refundReq("RF32", 100));
+        Mockito.reset(refundMapper);
+
         assertThat(refundMapper.selectById(id).getStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
     }
 
@@ -231,6 +298,7 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
     }
 
     @Test
+    @Timeout(30)
     void 补查_每批一条时前一条查询异常不影响后一条() {
         Long first = refundService.createRefund(refundReq("RF19", 100));
         PayRefundDO firstRefund = refundMapper.selectById(first);
@@ -259,6 +327,7 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
     }
 
     @Test
+    @Timeout(30)
     void 补查_所有退款都失败时每条只尝试一次并结束() {
         Long id = refundService.createRefund(refundReq("RF22", 100));
         jdbcTemplate.update("UPDATE pay_refund SET create_time = ? WHERE id = ?", LocalDateTime.now().minusMinutes(5), id);

@@ -1,10 +1,8 @@
 package com.ccloud.module.pay.controller.admin.channel;
 
-import com.ccloud.module.pay.support.FakePayClientProvider;
 import com.ccloud.module.pay.test.BasePayWebIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 
 import static org.hamcrest.Matchers.containsString;
@@ -13,8 +11,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
-// 此时还没有真实的渠道实现，用测试渠道（编码 mock，敏感字段 secret）验证脱敏
-@Import(FakePayClientProvider.class)
 class PayChannelControllerTest extends BasePayWebIntegrationTest {
 
     private static final String SECRET_VALUE = "0123456789abcdef-secret";
@@ -32,7 +28,7 @@ class PayChannelControllerTest extends BasePayWebIntegrationTest {
 
     private static String body(long appId) {
         return "{\"appId\":" + appId + ",\"code\":\"mock\",\"status\":0,\"feeRate\":0.6,"
-                + "\"config\":\"{\\\"secret\\\":\\\"" + SECRET_VALUE + "\\\"}\"}";
+                + "\"config\":\"{\\\"notifySecret\\\":\\\"" + SECRET_VALUE + "\\\",\\\"behavior\\\":\\\"SUCCESS\\\",\\\"delaySeconds\\\":3}\"}";
     }
 
     @Test
@@ -47,7 +43,8 @@ class PayChannelControllerTest extends BasePayWebIntegrationTest {
         mockMvc.perform(asAdmin(get("/admin-api/pay/channel/get").param("id", id), ADMIN_ID))
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.config", not(containsString(SECRET_VALUE))))
-                .andExpect(jsonPath("$.data.config", containsString("***")));
+                .andExpect(jsonPath("$.data.config", containsString("\"notifySecret\":\"***\"")))
+                .andExpect(jsonPath("$.data.config", containsString("SUCCESS")));
         mockMvc.perform(asAdmin(get("/admin-api/pay/channel/list").param("appId", String.valueOf(appId)), ADMIN_ID))
                 .andExpect(jsonPath("$.data[0].config", not(containsString(SECRET_VALUE))));
     }

@@ -25,8 +25,7 @@ class RpcApiCoverageTest {
     private static final Map<String, String> PENDING_APIS = Map.of(
             "PayOrderApi", "Task 8",
             "PayRefundApi", "Task 10",
-            "PayTransferApi", "Task 11",
-            "PayWalletApi", "Task 6");
+            "PayTransferApi", "Task 11");
 
     @Test
     void 每个Feign接口都已实现或登记为待实现() throws Exception {

@@ -2,6 +2,7 @@ package com.ccloud.module.pay.framework.pay.core.client.impl.wallet;
 
 import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.exception.ServiceException;
+import com.ccloud.framework.tenant.core.util.TenantUtils;
 import com.ccloud.module.pay.dal.dataobject.wallet.PayWalletDO;
 import com.ccloud.module.pay.dal.redis.no.PayNoRedisDAO;
 import com.ccloud.module.pay.enums.wallet.PayWalletBizTypeEnum;
@@ -10,6 +11,7 @@ import com.ccloud.module.pay.framework.pay.core.client.dto.PayDisplayMode;
 import com.ccloud.module.pay.framework.pay.core.client.dto.PayNotifyRequest;
 import com.ccloud.module.pay.framework.pay.core.client.dto.PayOrderResult;
 import com.ccloud.module.pay.framework.pay.core.client.dto.PayOrderUnifiedReq;
+import com.ccloud.module.pay.framework.pay.core.client.dto.PayRefundResult;
 import com.ccloud.module.pay.framework.pay.core.client.dto.PayRefundUnifiedReq;
 import com.ccloud.module.pay.framework.pay.core.client.dto.PayTransferUnifiedReq;
 import com.ccloud.module.pay.service.wallet.PayWalletServiceImpl;
@@ -17,8 +19,18 @@ import com.ccloud.module.pay.test.BasePayDbAndRedisUnitTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static com.ccloud.module.pay.enums.ErrorCodeConstants.CHANNEL_OPERATION_NOT_SUPPORTED;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +43,9 @@ class WalletPayClientTest extends BasePayDbAndRedisUnitTest {
     private WalletPayClientProvider provider;
     @Resource
     private PayWalletServiceImpl walletService;
+
+    @Resource
+    private JdbcTemplate jdbcTemplate;
 
     private WalletPayClient client() {
         return (WalletPayClient) provider.create(1L, new WalletPayClientConfig());
@@ -96,5 +111,81 @@ class WalletPayClientTest extends BasePayDbAndRedisUnitTest {
     void 钱包渠道没有回调() {
         assertThatThrownBy(() -> client().parseOrderNotify(new PayNotifyRequest(Map.of(), Map.of(), "{}")))
                 .isInstanceOf(ServiceException.class).extracting("code").isEqualTo(CHANNEL_OPERATION_NOT_SUPPORTED.getCode());
+    }
+
+    private void cleanUpWallet(long userId) {
+        jdbcTemplate.update("DELETE FROM pay_wallet_transaction WHERE wallet_id IN "
+                + "(SELECT id FROM (SELECT id FROM pay_wallet WHERE user_id = ?) t)", userId);
+        jdbcTemplate.update("DELETE FROM pay_wallet WHERE user_id = ?", userId);
+    }
+
+    private <T> List<T> runConcurrently(int threads, Callable<T> task) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CyclicBarrier barrier = new CyclicBarrier(threads);
+        try {
+            List<Future<T>> futures = new ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> TenantUtils.execute(TENANT_ID, () -> {
+                    try {
+                        barrier.await();
+                        return task.call();
+                    } catch (Exception e) {
+                        throw new IllegalStateException(e);
+                    }
+                })));
+            }
+            List<T> results = new ArrayList<>();
+            for (Future<T> f : futures) {
+                results.add(f.get());
+            }
+            return results;
+        } finally {
+            pool.shutdown();
+        }
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void 并发重复退款_每个请求都得到成功且只退一次() throws Exception {
+        long userId = 71007L;
+        cleanUpWallet(userId);
+        try {
+            TenantUtils.execute(TENANT_ID, () -> {
+                PayWalletDO wallet = walletService.getOrCreateWallet(userId, 1);
+                walletService.addBalance(wallet.getId(), PayWalletBizTypeEnum.ADJUST, "init", "初始", 1000);
+                client().unifiedOrder(orderReq("P71007", userId, 300));
+            });
+            PayRefundUnifiedReq req = new PayRefundUnifiedReq().setOutTradeNo("P71007").setOutRefundNo("R71007")
+                    .setRefundPrice(100).setPayPrice(300).setReason("退");
+            List<PayRefundResult> results = runConcurrently(6, () -> client().unifiedRefund(req));
+            assertThat(results).hasSize(6).allSatisfy(r -> assertThat(r.getStatus()).isEqualTo(PayClientStatus.SUCCESS));
+            assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM pay_wallet_transaction WHERE biz_type = ? AND biz_id = ?",
+                    Integer.class, PayWalletBizTypeEnum.PAYMENT_REFUND.getType(), "R71007")).isEqualTo(1);
+            assertThat(jdbcTemplate.queryForObject("SELECT balance FROM pay_wallet WHERE user_id = ?", Integer.class, userId))
+                    .isEqualTo(800);
+        } finally {
+            cleanUpWallet(userId);
+        }
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void 并发重复支付_每个请求都得到成功且只扣一次() throws Exception {
+        long userId = 71008L;
+        cleanUpWallet(userId);
+        try {
+            TenantUtils.execute(TENANT_ID, () -> {
+                PayWalletDO wallet = walletService.getOrCreateWallet(userId, 1);
+                walletService.addBalance(wallet.getId(), PayWalletBizTypeEnum.ADJUST, "init", "初始", 1000);
+            });
+            List<PayOrderResult> results = runConcurrently(6, () -> client().unifiedOrder(orderReq("P71008", userId, 300)));
+            assertThat(results).hasSize(6).allSatisfy(r -> assertThat(r.getStatus()).isEqualTo(PayClientStatus.SUCCESS));
+            assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM pay_wallet_transaction WHERE biz_type = ? AND biz_id = ?",
+                    Integer.class, PayWalletBizTypeEnum.PAYMENT.getType(), "P71008")).isEqualTo(1);
+            assertThat(jdbcTemplate.queryForObject("SELECT balance FROM pay_wallet WHERE user_id = ?", Integer.class, userId))
+                    .isEqualTo(700);
+        } finally {
+            cleanUpWallet(userId);
+        }
     }
 }

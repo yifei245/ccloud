@@ -19,6 +19,8 @@ import com.ccloud.module.pay.framework.pay.core.client.dto.PayTransferResult;
 import com.ccloud.module.pay.framework.pay.core.client.dto.PayTransferUnifiedReq;
 import com.ccloud.module.pay.service.wallet.PayWalletService;
 
+import org.springframework.dao.DuplicateKeyException;
+
 import java.time.LocalDateTime;
 
 import static com.ccloud.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -26,7 +28,12 @@ import static com.ccloud.module.pay.enums.ErrorCodeConstants.CHANNEL_OPERATION_N
 import static com.ccloud.module.pay.enums.ErrorCodeConstants.WALLET_BALANCE_NOT_ENOUGH;
 
 /**
- * 钱包渠道：站内余额支付。没有回调，查询按流水判断；扣款流水的业务编号即支付尝试的外部单号
+ * 钱包渠道：站内余额支付。没有回调，查询按流水判断；扣款流水的业务编号即支付尝试的外部单号。
+ * <p>
+ * 渠道客户端的方法必须在调用方事务之外调用：钱包服务的 reduceBalance 使用 REQUIRED 事务，
+ * 若被包在调用方事务里，余额不足抛出的异常会把调用方事务标记为仅回滚，"返回失败结果而不抛异常"的约定就失效了。
+ * 同一外部单号被并发重复调用时，钱包服务会因 uk_wallet_biz 抛 DuplicateKeyException（整个事务回滚，余额不受影响），
+ * 这里在非加入事务的边界捕获，按已入账的流水返回成功结果
  */
 public class WalletPayClient implements PayClient {
 
@@ -50,8 +57,14 @@ public class WalletPayClient implements PayClient {
         }
         PayWalletDO wallet = walletService.getOrCreateWallet(req.getUserId(), req.getUserType());
         try {
-            PayWalletTransactionDO tx = walletService.reduceBalance(wallet.getId(), PayWalletBizTypeEnum.PAYMENT,
-                    req.getOutTradeNo(), "支付：" + req.getSubject(), req.getPrice());
+            PayWalletTransactionDO tx;
+            try {
+                tx = walletService.reduceBalance(wallet.getId(), PayWalletBizTypeEnum.PAYMENT,
+                        req.getOutTradeNo(), "支付：" + req.getSubject(), req.getPrice());
+            } catch (DuplicateKeyException e) {
+                // 并发重复提交：另一请求已入账
+                tx = existing(PayWalletBizTypeEnum.PAYMENT, req.getOutTradeNo(), e);
+            }
             return PayOrderResult.success(req.getOutTradeNo(), tx.getNo(), req.getPrice(), LocalDateTime.now(), null);
         } catch (ServiceException e) {
             if (!WALLET_BALANCE_NOT_ENOUGH.getCode().equals(e.getCode())) {
@@ -59,6 +72,17 @@ public class WalletPayClient implements PayClient {
             }
             return PayOrderResult.failure(req.getOutTradeNo(), String.valueOf(e.getCode()), e.getMessage(), null);
         }
+    }
+
+    /**
+     * 并发写入同一业务单据时唯一约束冲突，对方事务已提交：取回其流水。取不到说明冲突并非来自流水，原异常继续抛出
+     */
+    private PayWalletTransactionDO existing(PayWalletBizTypeEnum bizType, String bizId, DuplicateKeyException cause) {
+        PayWalletTransactionDO tx = walletService.getTransaction(bizType, bizId);
+        if (tx == null) {
+            throw cause;
+        }
+        return tx;
     }
 
     @Override
@@ -74,8 +98,13 @@ public class WalletPayClient implements PayClient {
         if (payment == null) {
             return PayRefundResult.failure(req.getOutRefundNo(), "PAYMENT_NOT_FOUND", "未找到钱包支付流水", null);
         }
-        PayWalletTransactionDO tx = walletService.addBalance(payment.getWalletId(), PayWalletBizTypeEnum.PAYMENT_REFUND,
-                req.getOutRefundNo(), "退款：" + StrUtil.nullToEmpty(req.getReason()), req.getRefundPrice());
+        PayWalletTransactionDO tx;
+        try {
+            tx = walletService.addBalance(payment.getWalletId(), PayWalletBizTypeEnum.PAYMENT_REFUND,
+                    req.getOutRefundNo(), "退款：" + StrUtil.nullToEmpty(req.getReason()), req.getRefundPrice());
+        } catch (DuplicateKeyException e) {
+            tx = existing(PayWalletBizTypeEnum.PAYMENT_REFUND, req.getOutRefundNo(), e);
+        }
         return PayRefundResult.success(req.getOutRefundNo(), tx.getNo(), req.getRefundPrice(), LocalDateTime.now(), null);
     }
 
@@ -94,8 +123,13 @@ public class WalletPayClient implements PayClient {
             return PayTransferResult.failure(req.getOutTransferNo(), "ACCOUNT_INVALID", "收款账号不是会员编号", null);
         }
         PayWalletDO wallet = walletService.getOrCreateWallet(userId, UserTypeEnum.MEMBER.getValue());
-        PayWalletTransactionDO tx = walletService.addBalance(wallet.getId(), PayWalletBizTypeEnum.TRANSFER_IN,
-                req.getOutTransferNo(), "转账：" + StrUtil.nullToEmpty(req.getSubject()), req.getPrice());
+        PayWalletTransactionDO tx;
+        try {
+            tx = walletService.addBalance(wallet.getId(), PayWalletBizTypeEnum.TRANSFER_IN,
+                    req.getOutTransferNo(), "转账：" + StrUtil.nullToEmpty(req.getSubject()), req.getPrice());
+        } catch (DuplicateKeyException e) {
+            tx = existing(PayWalletBizTypeEnum.TRANSFER_IN, req.getOutTransferNo(), e);
+        }
         return PayTransferResult.success(req.getOutTransferNo(), tx.getNo(), req.getPrice(), LocalDateTime.now(), null);
     }
 

@@ -37,11 +37,11 @@ public class OpenPayOrderRespVO {
     @Schema(description = "支付方式", example = "wx_lite")
     private String payMethod;
 
-    @Schema(description = "过期时间，毫秒时间戳（系统时区）", type = "integer", format = "int64", example = "1791000000000")
+    @Schema(description = "过期时间，毫秒时间戳，精度为秒", type = "integer", format = "int64", example = "1791000000000")
     @JsonSerialize(using = OpenEpochMilliSerializer.class)
     private LocalDateTime expireTime;
 
-    @Schema(description = "支付成功时间，毫秒时间戳（系统时区）；未支付成功为空", type = "integer", format = "int64", example = "1791000000000")
+    @Schema(description = "支付成功时间，毫秒时间戳，精度为秒；未支付成功为空", type = "integer", format = "int64", example = "1791000000000")
     @JsonSerialize(using = OpenEpochMilliSerializer.class)
     private LocalDateTime successTime;
 }

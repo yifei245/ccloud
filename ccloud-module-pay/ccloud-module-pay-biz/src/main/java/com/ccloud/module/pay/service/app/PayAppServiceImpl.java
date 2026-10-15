@@ -15,6 +15,7 @@ import com.ccloud.module.pay.dal.dataobject.channel.PayChannelDO;
 import com.ccloud.module.pay.dal.mysql.app.PayAppMapper;
 import com.ccloud.module.pay.dal.mysql.channel.PayChannelMapper;
 import com.ccloud.module.pay.dal.mysql.order.PayOrderMapper;
+import com.ccloud.module.pay.framework.config.PayProperties;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,8 @@ public class PayAppServiceImpl implements PayAppService {
     private PayOrderMapper payOrderMapper;
     @Resource
     private OpenAppApi openAppApi;
+    @Resource
+    private PayProperties payProperties;
 
     @Override
     public Long createApp(PayAppSaveReqVO reqVO) {
@@ -128,6 +131,11 @@ public class PayAppServiceImpl implements PayAppService {
             throw exception(PAY_APP_NOT_OPENED_FOR_OPEN_APP);
         }
         return validateEnabled(app);
+    }
+
+    @Override
+    public boolean isRechargeApp(PayAppDO app) {
+        return app != null && app.getAppKey().equals(payProperties.getWallet().getRechargeAppKey());
     }
 
     @Override

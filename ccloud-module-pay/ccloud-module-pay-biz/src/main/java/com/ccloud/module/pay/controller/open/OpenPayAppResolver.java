@@ -1,7 +1,6 @@
 package com.ccloud.module.pay.controller.open;
 
 import com.ccloud.module.pay.dal.dataobject.app.PayAppDO;
-import com.ccloud.module.pay.framework.config.PayProperties;
 import com.ccloud.module.pay.service.app.PayAppService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
@@ -20,15 +19,13 @@ public class OpenPayAppResolver {
 
     @Resource
     private PayAppService appService;
-    @Resource
-    private PayProperties payProperties;
 
     /**
      * 网关验签后下发的开放应用身份：登录编号即开放应用编号
      */
     public PayAppDO validApp() {
         PayAppDO app = appService.validPayAppByOpenAppId(getLoginUserId());
-        if (app.getAppKey().equals(payProperties.getWallet().getRechargeAppKey())) {
+        if (appService.isRechargeApp(app)) {
             throw exception(PAY_APP_NOT_OPENED_FOR_OPEN_APP);
         }
         return app;

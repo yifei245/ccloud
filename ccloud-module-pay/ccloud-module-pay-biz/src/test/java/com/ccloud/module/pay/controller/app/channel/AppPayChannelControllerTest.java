@@ -90,6 +90,12 @@ class AppPayChannelControllerTest extends BasePayWebIntegrationTest {
     }
 
     @Test
+    void 匿名访问返回401() throws Exception {
+        mockMvc.perform(get("/app-api/pay/channel/list").param("appId", String.valueOf(shopAppId)).header("X-Tenant-Id", TENANT))
+                .andExpect(jsonPath("$.code").value(401));
+    }
+
+    @Test
     void 缺少应用编号返回400_管理员身份返回401() throws Exception {
         mockMvc.perform(asMember(get("/app-api/pay/channel/list"), MEMBER_ID))
                 .andExpect(jsonPath("$.code").value(400));

@@ -28,7 +28,7 @@ public class OpenPayRefundRespVO {
     @Schema(description = "退款状态：0 未退款（处理中），10 退款成功，20 退款失败", requiredMode = Schema.RequiredMode.REQUIRED, example = "0")
     private Integer status;
 
-    @Schema(description = "退款成功时间，毫秒时间戳（系统时区）；未成功为空", type = "integer", format = "int64", example = "1791000000000")
+    @Schema(description = "退款成功时间，毫秒时间戳，精度为秒；未成功为空", type = "integer", format = "int64", example = "1791000000000")
     @JsonSerialize(using = OpenEpochMilliSerializer.class)
     private LocalDateTime successTime;
 

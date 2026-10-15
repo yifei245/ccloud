@@ -116,6 +116,9 @@ class AppPayOrderControllerTest extends BasePayWebIntegrationTest {
         // 订单不存在：与上面完全一致，不泄露订单是否存在
         mockMvc.perform(asMember(get("/app-api/pay/order/get").param("id", "-1"), MEMBER_ID))
                 .andExpect(jsonPath("$.code").value(1_007_002_000));
+        mockMvc.perform(asMember(post("/app-api/pay/order/submit").contentType(MediaType.APPLICATION_JSON)
+                        .content(submitBody(-1L)), MEMBER_ID))
+                .andExpect(jsonPath("$.code").value(1_007_002_000));
         // 被拒绝的提交没有产生支付尝试
         Integer attempts = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM pay_order_extension e "
                 + "JOIN pay_order o ON e.order_id = o.id JOIN pay_app a ON o.app_id = a.id "

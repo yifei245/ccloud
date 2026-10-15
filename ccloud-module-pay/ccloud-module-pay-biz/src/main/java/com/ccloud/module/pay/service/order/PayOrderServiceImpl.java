@@ -112,7 +112,7 @@ public class PayOrderServiceImpl implements PayOrderService {
             if (order.getUserId() == null || !UserTypeEnum.MEMBER.getValue().equals(order.getUserType())) {
                 throw exception(PAY_ORDER_WALLET_REQUIRE_MEMBER);
             }
-            if (isRechargeApp(order.getAppId())) {
+            if (appService.isRechargeApp(appService.getApp(order.getAppId()))) {
                 throw exception(PAY_ORDER_RECHARGE_NOT_ALLOW_WALLET);
             }
         }
@@ -160,14 +160,6 @@ public class PayOrderServiceImpl implements PayOrderService {
             throw exception(PAY_ORDER_IS_EXPIRED);
         }
         return order;
-    }
-
-    /**
-     * 钱包充值订单不能用钱包付。这里直接比对应用标识，不依赖充值服务（充值服务依赖本服务）
-     */
-    boolean isRechargeApp(Long appId) {
-        PayAppDO app = appService.getApp(appId);
-        return app != null && app.getAppKey().equals(payProperties.getWallet().getRechargeAppKey());
     }
 
     /**

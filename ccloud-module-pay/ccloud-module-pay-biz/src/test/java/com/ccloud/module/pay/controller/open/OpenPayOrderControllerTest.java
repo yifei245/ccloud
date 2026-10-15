@@ -2,6 +2,7 @@ package com.ccloud.module.pay.controller.open;
 
 import cn.hutool.core.date.LocalDateTimeUtil;
 import com.ccloud.framework.tenant.core.util.TenantUtils;
+import com.ccloud.module.pay.controller.open.json.OpenEpochMilliDeserializer;
 import com.ccloud.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import com.ccloud.module.pay.controller.admin.order.vo.PayOrderSubmitReqVO;
 import com.ccloud.module.pay.dal.dataobject.app.PayAppDO;
@@ -17,13 +18,18 @@ import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.LocalDateTime;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -78,6 +84,8 @@ class OpenPayOrderControllerTest extends BasePayWebIntegrationTest {
         jdbcTemplate.update("DELETE o FROM pay_order o JOIN pay_app a ON o.app_id = a.id WHERE a.app_key LIKE 'webtest-%'");
         jdbcTemplate.update("DELETE c FROM pay_channel c JOIN pay_app a ON c.app_id = a.id WHERE a.app_key LIKE 'webtest-%'");
         jdbcTemplate.update("DELETE FROM pay_app WHERE app_key LIKE 'webtest-%'");
+        // 支付成功会写 pay.order.paid 消息；只删本类用到的商户单号（WT-O1…、WT-RC1…）
+        jdbcTemplate.update("DELETE FROM infra_message_outbox WHERE payload REGEXP '\"WT-(O|RC)[0-9]+\"'");
     }
 
     private MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder builder, String body) {
@@ -121,6 +129,27 @@ class OpenPayOrderControllerTest extends BasePayWebIntegrationTest {
     }
 
     @Test
+    void 支付成功后重复创建_返回原单与同一个外部订单号() throws Exception {
+        String body = createBody("WT-O1", hourLater());
+        mockMvc.perform(asOpenApp(json(post("/open-api/pay/order/create"), body), OPEN_APP_ID))
+                .andExpect(jsonPath("$.code").value(0)).andExpect(jsonPath("$.data.no").value(nullValue()));
+        Long orderId = jdbcTemplate.queryForObject("SELECT id FROM pay_order WHERE merchant_order_id = 'WT-O1'", Long.class);
+        TenantUtils.execute(TENANT, () -> {
+            String no = orderService.submitOrder(orderId, new PayOrderSubmitReqVO().setChannelCode("mock"), "127.0.0.1").getNo();
+            orderService.notifyOrder(mockChannel, PayOrderResult.success(no, "CH-" + no, 100, LocalDateTime.now(), "{}"));
+        });
+        String paidNo = jdbcTemplate.queryForObject("SELECT no FROM pay_order WHERE id = ?", String.class, orderId);
+        assertThat(paidNo).isNotBlank();
+        mockMvc.perform(asOpenApp(json(post("/open-api/pay/order/create"), body), OPEN_APP_ID))
+                .andExpect(jsonPath("$.code").value(0)).andExpect(jsonPath("$.data.status").value(10))
+                .andExpect(jsonPath("$.data.no").value(paidNo));
+        mockMvc.perform(asOpenApp(get("/open-api/pay/order/get").param("merchantOrderId", "WT-O1"), OPEN_APP_ID))
+                .andExpect(jsonPath("$.data.no").value(paidNo));
+        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM pay_order WHERE merchant_order_id = 'WT-O1'", Integer.class);
+        assertThat(count).isEqualTo(1);
+    }
+
+    @Test
     void 同一商户订单号金额不同_创建被拒绝() throws Exception {
         mockMvc.perform(asOpenApp(json(post("/open-api/pay/order/create"), createBody("WT-O1", hourLater())), OPEN_APP_ID))
                 .andExpect(jsonPath("$.code").value(0));
@@ -135,8 +164,8 @@ class OpenPayOrderControllerTest extends BasePayWebIntegrationTest {
         mockMvc.perform(asOpenApp(json(post("/open-api/pay/order/create"), createBody("WT-O1", expire)), OPEN_APP_ID))
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.expireTime").value(expire))
-                // 尚未支付：键存在，值为空
-                .andExpect(jsonPath("$.data.successTime").doesNotExist());
+                // 尚未支付：键存在，值为 null
+                .andExpect(jsonPath("$.data.successTime").value(nullValue()));
         LocalDateTime stored = jdbcTemplate.queryForObject(
                 "SELECT expire_time FROM pay_order WHERE merchant_order_id = 'WT-O1'", LocalDateTime.class);
         assertThat(LocalDateTimeUtil.toEpochMilli(stored)).isEqualTo(expire);
@@ -164,6 +193,12 @@ class OpenPayOrderControllerTest extends BasePayWebIntegrationTest {
                 "[2099,1,1,0,0,0]",                   // 数组
                 "1.5",
                 "null",
+                // 超出范围：不能变成 500
+                "-1",
+                String.valueOf(Long.MAX_VALUE),
+                "9223372036854775808",                // 超过 long
+                "99999999999999",                     // 约公元 5138 年
+                String.valueOf(LocalDateTimeUtil.toEpochMilli(OpenEpochMilliDeserializer.MAX_TIME) + 1000),
                 String.valueOf(LocalDateTimeUtil.toEpochMilli(LocalDateTime.now().minusMinutes(1)))
         };
         for (String expireTime : bad) {
@@ -175,13 +210,44 @@ class OpenPayOrderControllerTest extends BasePayWebIntegrationTest {
     }
 
     @Test
-    void 创建参数不合法返回400() throws Exception {
+    void 过期时间取上限_按秒取整() throws Exception {
+        long max = LocalDateTimeUtil.toEpochMilli(OpenEpochMilliDeserializer.MAX_TIME);
+        mockMvc.perform(asOpenApp(json(post("/open-api/pay/order/create"), createBody("WT-O1", max)), OPEN_APP_ID))
+                .andExpect(jsonPath("$.code").value(0)).andExpect(jsonPath("$.data.expireTime").value(max));
+        // 毫秒部分忽略：入库与响应都是整秒
+        long withMillis = hourLater() + 789;
+        mockMvc.perform(asOpenApp(json(post("/open-api/pay/order/create"), createBody("WT-O2", withMillis)), OPEN_APP_ID))
+                .andExpect(jsonPath("$.code").value(0)).andExpect(jsonPath("$.data.expireTime").value(withMillis - 789));
+    }
+
+    static Stream<Arguments> createBodies() {
         long expire = hourLater();
-        mockMvc.perform(asOpenApp(json(post("/open-api/pay/order/create"), "{\"subject\":\"x\",\"price\":100,\"expireTime\":" + expire + "}"), OPEN_APP_ID))
-                .andExpect(jsonPath("$.code").value(400));
-        mockMvc.perform(asOpenApp(json(post("/open-api/pay/order/create"),
-                createBody("WT-O1", expire).replace("\"price\":100", "\"price\":0")), OPEN_APP_ID))
-                .andExpect(jsonPath("$.code").value(400));
+        return Stream.of(
+                Arguments.of("商户订单号 64 位", create("a".repeat(64), "标题", "描述", 100, expire), 0),
+                Arguments.of("商户订单号 65 位", create("a".repeat(65), "标题", "描述", 100, expire), 400),
+                Arguments.of("商户订单号为空", create("", "标题", "描述", 100, expire), 400),
+                Arguments.of("标题 32 位", create("WT-O1", "t".repeat(32), "描述", 100, expire), 0),
+                Arguments.of("标题 33 位", create("WT-O1", "t".repeat(33), "描述", 100, expire), 400),
+                Arguments.of("标题为空", create("WT-O1", "", "描述", 100, expire), 400),
+                Arguments.of("描述 128 位", create("WT-O1", "标题", "b".repeat(128), 100, expire), 0),
+                Arguments.of("描述 129 位", create("WT-O1", "标题", "b".repeat(129), 100, expire), 400),
+                Arguments.of("金额 1", create("WT-O1", "标题", "描述", 1, expire), 0),
+                Arguments.of("金额 0", create("WT-O1", "标题", "描述", 0, expire), 400),
+                Arguments.of("金额为负", create("WT-O1", "标题", "描述", -1, expire), 400),
+                Arguments.of("缺少金额", "{\"merchantOrderId\":\"WT-O1\",\"subject\":\"x\",\"expireTime\":" + expire + "}", 400),
+                Arguments.of("缺少商户订单号", "{\"subject\":\"x\",\"price\":100,\"expireTime\":" + expire + "}", 400));
+    }
+
+    private static String create(String merchantOrderId, String subject, String body, int price, long expire) {
+        return "{\"merchantOrderId\":\"" + merchantOrderId + "\",\"subject\":\"" + subject + "\",\"body\":\"" + body
+                + "\",\"price\":" + price + ",\"expireTime\":" + expire + "}";
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("createBodies")
+    void 创建参数的长度与金额边界(String name, String body, int expectedCode) throws Exception {
+        mockMvc.perform(asOpenApp(json(post("/open-api/pay/order/create"), body), OPEN_APP_ID))
+                .andExpect(jsonPath("$.code").value(expectedCode));
     }
 
     @Test

@@ -40,6 +40,12 @@ public interface PayAppService {
     PayAppDO validPayAppByOpenAppId(Long openAppId);
 
     /**
+     * 是否钱包充值应用（标识等于 ccloud.pay.wallet.recharge-app-key）。空应用返回 false。
+     * 判断“能否用钱包付”“能否经开放平台使用”的各处共用这一个口径
+     */
+    boolean isRechargeApp(PayAppDO app);
+
+    /**
      * 忽略租户查询应用，供消息消费、回调转发使用
      */
     PayAppDO getAppIgnoreTenant(Long id);

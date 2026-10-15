@@ -100,8 +100,7 @@ public class PayWalletRechargeServiceImpl implements PayWalletRechargeService {
 
     @Override
     public boolean isRechargeApp(Long appId) {
-        PayAppDO app = appService.getApp(appId);
-        return app != null && app.getAppKey().equals(payProperties.getWallet().getRechargeAppKey());
+        return appService.isRechargeApp(appService.getApp(appId));
     }
 
     @Override

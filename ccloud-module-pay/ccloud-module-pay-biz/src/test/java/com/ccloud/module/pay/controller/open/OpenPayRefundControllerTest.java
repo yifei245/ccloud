@@ -18,11 +18,15 @@ import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.LocalDateTime;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -89,7 +93,7 @@ class OpenPayRefundControllerTest extends BasePayWebIntegrationTest {
         jdbcTemplate.update("DELETE o FROM pay_order o JOIN pay_app a ON o.app_id = a.id WHERE a.app_key LIKE 'webtest-%'");
         jdbcTemplate.update("DELETE c FROM pay_channel c JOIN pay_app a ON c.app_id = a.id WHERE a.app_key LIKE 'webtest-%'");
         jdbcTemplate.update("DELETE FROM pay_app WHERE app_key LIKE 'webtest-%'");
-        jdbcTemplate.update("DELETE FROM infra_message_outbox WHERE payload LIKE '%WT-%'");
+        jdbcTemplate.update("DELETE FROM infra_message_outbox WHERE payload REGEXP '\"WT-R[0-9]+\"'");
     }
 
     private MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder builder, String body) {
@@ -177,16 +181,35 @@ class OpenPayRefundControllerTest extends BasePayWebIntegrationTest {
                 .andExpect(jsonPath("$.code").value(1_007_000_006));
     }
 
-    @Test
-    void 参数不合法返回400() throws Exception {
-        mockMvc.perform(asOpenApp(json(post("/open-api/pay/refund/create"), refundBody("WT-R1", "WT-RF1", 0)), OPEN_APP_ID))
-                .andExpect(jsonPath("$.code").value(400));
-        mockMvc.perform(asOpenApp(json(post("/open-api/pay/refund/create"),
-                refundBody("WT-R1", "WT-RF1", 30).replace("测试退款", "")), OPEN_APP_ID))
-                .andExpect(jsonPath("$.code").value(400));
-        mockMvc.perform(asOpenApp(json(post("/open-api/pay/refund/create"),
-                "{\"merchantRefundId\":\"WT-RF1\",\"price\":30,\"reason\":\"x\"}"), OPEN_APP_ID))
-                .andExpect(jsonPath("$.code").value(400));
+    static Stream<Arguments> refundBodies() {
+        return Stream.of(
+                Arguments.of("商户退款单号 64 位", body("WT-R1", "r".repeat(64), 30, "原因"), 0),
+                Arguments.of("商户退款单号 65 位", body("WT-R1", "r".repeat(65), 30, "原因"), 400),
+                Arguments.of("商户退款单号为空", body("WT-R1", "", 30, "原因"), 400),
+                Arguments.of("商户订单号 65 位", body("o".repeat(65), "WT-RF1", 30, "原因"), 400),
+                // 64 位通过校验，随后因订单不存在报业务错误，而不是 400
+                Arguments.of("商户订单号 64 位", body("o".repeat(64), "WT-RF1", 30, "原因"), 1_007_002_000),
+                Arguments.of("商户订单号为空", body("", "WT-RF1", 30, "原因"), 400),
+                Arguments.of("原因 256 位", body("WT-R1", "WT-RF1", 30, "x".repeat(256)), 0),
+                Arguments.of("原因 257 位", body("WT-R1", "WT-RF1", 30, "x".repeat(257)), 400),
+                Arguments.of("原因为空", body("WT-R1", "WT-RF1", 30, ""), 400),
+                Arguments.of("金额 1", body("WT-R1", "WT-RF1", 1, "原因"), 0),
+                Arguments.of("金额 0", body("WT-R1", "WT-RF1", 0, "原因"), 400),
+                Arguments.of("金额为负", body("WT-R1", "WT-RF1", -1, "原因"), 400),
+                Arguments.of("缺少商户订单号", "{\"merchantRefundId\":\"WT-RF1\",\"price\":30,\"reason\":\"x\"}", 400),
+                Arguments.of("缺少金额", "{\"merchantOrderId\":\"WT-R1\",\"merchantRefundId\":\"WT-RF1\",\"reason\":\"x\"}", 400));
+    }
+
+    private static String body(String merchantOrderId, String merchantRefundId, int price, String reason) {
+        return "{\"merchantOrderId\":\"" + merchantOrderId + "\",\"merchantRefundId\":\"" + merchantRefundId
+                + "\",\"price\":" + price + ",\"reason\":\"" + reason + "\"}";
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("refundBodies")
+    void 发起退款参数的长度与金额边界(String name, String body, int expectedCode) throws Exception {
+        mockMvc.perform(asOpenApp(json(post("/open-api/pay/refund/create"), body), OPEN_APP_ID))
+                .andExpect(jsonPath("$.code").value(expectedCode));
     }
 
     @Test

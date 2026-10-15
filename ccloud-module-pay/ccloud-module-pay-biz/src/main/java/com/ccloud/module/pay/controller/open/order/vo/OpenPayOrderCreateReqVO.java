@@ -37,7 +37,7 @@ public class OpenPayOrderCreateReqVO {
     @Min(value = 1, message = "支付金额必须大于 0")
     private Integer price;
 
-    @Schema(description = "过期时间。毫秒时间戳（整数，系统时区），须晚于当前时间；不接受 ISO 字符串、带引号的数字或数组",
+    @Schema(description = "过期时间。毫秒时间戳（整数），精度为秒（毫秒部分忽略），须晚于当前时间且不晚于 2099-12-31 23:59:59；不接受 ISO 字符串、带引号的数字或数组",
             type = "integer", format = "int64", requiredMode = Schema.RequiredMode.REQUIRED, example = "1791000000000")
     @NotNull(message = "过期时间不能为空")
     @Future(message = "过期时间必须晚于当前时间")

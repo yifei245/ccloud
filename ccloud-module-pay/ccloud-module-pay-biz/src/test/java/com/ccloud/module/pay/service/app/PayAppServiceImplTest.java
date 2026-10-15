@@ -8,6 +8,7 @@ import com.ccloud.module.pay.dal.dataobject.app.PayAppDO;
 import com.ccloud.module.pay.dal.dataobject.channel.PayChannelDO;
 import com.ccloud.module.pay.dal.mysql.app.PayAppMapper;
 import com.ccloud.module.pay.dal.mysql.channel.PayChannelMapper;
+import com.ccloud.module.pay.framework.config.PayProperties;
 import com.ccloud.module.pay.test.BasePayDbUnitTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ import static com.ccloud.module.pay.enums.ErrorCodeConstants.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-@Import({PayAppServiceImpl.class})
+@Import({PayAppServiceImpl.class, PayProperties.class})
 class PayAppServiceImplTest extends BasePayDbUnitTest {
 
     @Resource
@@ -40,6 +41,15 @@ class PayAppServiceImplTest extends BasePayDbUnitTest {
         snapshot.setAppKey(appKey);
         snapshot.setTenantId(tenantId);
         when(openAppApi.getAppSnapshot(appKey)).thenReturn(CommonResult.success(snapshot));
+    }
+
+    @Test
+    void 钱包充值应用按配置的标识判断_空应用不是() {
+        // 默认的充值应用标识是 wallet
+        assertThat(payAppService.isRechargeApp(new PayAppDO().setAppKey("wallet"))).isTrue();
+        assertThat(payAppService.isRechargeApp(new PayAppDO().setAppKey("mall"))).isFalse();
+        assertThat(payAppService.isRechargeApp(new PayAppDO().setAppKey("Wallet"))).isFalse();
+        assertThat(payAppService.isRechargeApp(null)).isFalse();
     }
 
     @Test

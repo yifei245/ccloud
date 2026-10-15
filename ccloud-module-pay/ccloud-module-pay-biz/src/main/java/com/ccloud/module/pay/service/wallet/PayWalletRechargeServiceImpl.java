@@ -142,7 +142,8 @@ public class PayWalletRechargeServiceImpl implements PayWalletRechargeService {
 
     /**
      * 先扣回到账总额（实付加赠送），再对原支付单退实付金额。退款渠道调用由退款服务推迟到本事务提交之后；
-     * 退款失败时由 handleRechargeRefunded 把扣回的金额退回。
+     * 退款失败时由 handleRechargeRefunded 把扣回的金额退回；失败后该充值不能再次发起退款（设计如此：扣回的金额已退回，
+     * 充值记录保留退款单编号与失败状态，需要再退时由人工处理）。
      * 先对充值记录加行锁再校验状态：并发的退款在此串行，后到者读到先到者写入的退款单编号而被拒绝，不会重复扣回
      */
     @Override
@@ -186,6 +187,11 @@ public class PayWalletRechargeServiceImpl implements PayWalletRechargeService {
             return;
         }
         boolean success = PayRefundStatusEnum.SUCCESS.getStatus().equals(message.getStatus());
+        // 只处理明确的成功与失败；等待中、空或未知状态不得动余额，否则之后的成功消息会造成重复出款
+        if (!success && !PayRefundStatusEnum.FAILURE.getStatus().equals(message.getStatus())) {
+            log.warn("[handleRechargeRefunded] 充值 {} 的退款消息状态 {} 不是成功或失败，忽略", recharge.getId(), message.getStatus());
+            return;
+        }
         int updated = rechargeMapper.updateWhenRefundFinished(recharge.getId(), new PayWalletRechargeDO()
                 .setRefundStatus(message.getStatus()).setRefundTime(success ? message.getSuccessTime() : null));
         if (updated == 0 || success) {

@@ -14,6 +14,8 @@ import com.ccloud.module.pay.mq.message.PayRefundMessage;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.time.LocalDateTime;
+
 import static com.ccloud.module.pay.enums.ErrorCodeConstants.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
@@ -197,19 +199,48 @@ class PayWalletRechargeServiceImplTest extends PayWalletRechargeTestBase {
     }
 
     @Test
-    void 并发的重复入账消息读到的都是未支付_条件更新保证只入账一次() {
+    void 并发的重复入账消息读到的都是未支付_条件更新不覆盖先到者写入的支付信息() {
         PayWalletRechargeDO r = recharge(pkg.getId(), null);
         PayWalletRechargeDO staleUnpaid = rechargeMapper.selectById(r.getId());
         paid(r);
-        // 后到的消息在先到者提交之前读过一次，读到的仍是未支付
+        PayWalletRechargeDO first = rechargeMapper.selectById(r.getId());
+        // 后到的消息在先到者提交之前读过一次，读到的仍是未支付；它携带的渠道与时间不同
         doReturn(staleUnpaid).when(rechargeMapper).selectById(r.getId());
 
-        paid(r);
+        rechargeService.handleRechargePaid(paidMessage(r).setChannelCode("other-channel")
+                .setSuccessTime(LocalDateTime.now().plusHours(1)));
 
         Mockito.reset(rechargeMapper);
+        PayWalletRechargeDO after = rechargeMapper.selectById(r.getId());
+        assertThat(after.getPayChannelCode()).as("条件更新影响 0 行，不覆盖先到者").isEqualTo(first.getPayChannelCode()).isEqualTo("mock");
+        assertThat(after.getPayTime()).isEqualTo(first.getPayTime());
         assertThat(balanceOf(r)).isEqualTo(11000);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM pay_wallet_transaction WHERE wallet_id = ? AND biz_type = ?",
                 Integer.class, r.getWalletId(), PayWalletBizTypeEnum.RECHARGE.getType())).isEqualTo(1);
+    }
+
+    @Test
+    void 退款消息状态是等待或空或未知时不动余额_之后的成功消息正常完成_不会重复出款() {
+        PayWalletRechargeDO r = paidAndRefunding();
+        int debited = balanceOf(r);
+
+        rechargeService.handleRechargeRefunded(refundMessage(r, PayRefundStatusEnum.WAITING));
+        rechargeService.handleRechargeRefunded(refundMessage(r, PayRefundStatusEnum.WAITING).setStatus(null));
+        var logs = captureLogs(() -> {
+            rechargeService.handleRechargeRefunded(refundMessage(r, PayRefundStatusEnum.WAITING).setStatus(99));
+            return null;
+        });
+        assertThat(hasLog(logs, Level.WARN, String.valueOf(r.getId()), "忽略")).isTrue();
+        assertThat(balanceOf(r)).as("非成功非失败的消息不退回金额").isEqualTo(debited);
+        assertThat(rechargeMapper.selectById(r.getId()).getRefundStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
+
+        rechargeService.handleRechargeRefunded(refundMessage(r, PayRefundStatusEnum.SUCCESS));
+
+        assertThat(rechargeMapper.selectById(r.getId()).getRefundStatus()).isEqualTo(PayRefundStatusEnum.SUCCESS.getStatus());
+        assertThat(balanceOf(r)).as("退款成功后余额保持已扣回").isEqualTo(debited);
+        // 成功后即使再收到失败消息也不退回（状态已不是等待）
+        rechargeService.handleRechargeRefunded(refundMessage(r, PayRefundStatusEnum.FAILURE));
+        assertThat(balanceOf(r)).isEqualTo(debited);
     }
 
     @Test

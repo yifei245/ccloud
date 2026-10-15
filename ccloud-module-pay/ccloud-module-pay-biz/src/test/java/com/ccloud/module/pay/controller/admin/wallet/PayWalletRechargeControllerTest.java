@@ -45,6 +45,16 @@ class PayWalletRechargeControllerTest extends BasePayWebIntegrationTest {
     }
 
     @Test
+    void 分页返回退款单编号以区分退款中与未退款() throws Exception {
+        jdbcTemplate.update("INSERT INTO pay_wallet_recharge (wallet_id, total_price, pay_price, bonus_price, pay_status, "
+                + "pay_refund_id, refund_status, tenant_id) VALUES (?, 11000, 10000, 1000, b'1', 4242, 0, ?)", walletId, TENANT);
+        mockMvc.perform(asAdmin(get("/admin-api/pay/wallet-recharge/page").param("walletId", String.valueOf(walletId)), ADMIN_ID))
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.list[0].payRefundId").value(4242))
+                .andExpect(jsonPath("$.data.list[1].id").value(rechargeId));
+    }
+
+    @Test
     void 未支付的充值退款返回业务错误_不存在的充值返回业务错误() throws Exception {
         mockMvc.perform(asAdmin(put("/admin-api/pay/wallet-recharge/refund").param("id", String.valueOf(rechargeId)), ADMIN_ID))
                 .andExpect(jsonPath("$.code").value(1_007_005_007));

@@ -3,6 +3,7 @@ package com.ccloud.module.pay.controller.admin.wallet.vo;
 import com.ccloud.framework.common.enums.CommonStatusEnum;
 import com.ccloud.framework.common.validation.InEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -26,11 +27,13 @@ public class PayWalletRechargePackageSaveReqVO {
     @Schema(description = "支付金额，单位分", requiredMode = Schema.RequiredMode.REQUIRED, example = "10000")
     @NotNull(message = "支付金额不能为空")
     @Min(value = 1, message = "支付金额必须大于 0")
+    @Max(value = 100_000_000, message = "支付金额超过上限")
     private Integer payPrice;
 
     @Schema(description = "赠送金额，单位分", requiredMode = Schema.RequiredMode.REQUIRED, example = "1000")
     @NotNull(message = "赠送金额不能为空")
     @Min(value = 0, message = "赠送金额不能为负数")
+    @Max(value = 100_000_000, message = "赠送金额超过上限")
     private Integer bonusPrice;
 
     @Schema(description = "状态，对应字典 common_status", requiredMode = Schema.RequiredMode.REQUIRED, example = "0")

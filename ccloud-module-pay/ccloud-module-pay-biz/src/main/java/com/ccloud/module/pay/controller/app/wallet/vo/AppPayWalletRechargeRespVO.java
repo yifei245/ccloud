@@ -32,6 +32,9 @@ public class AppPayWalletRechargeRespVO {
     @Schema(description = "支付成功时间")
     private LocalDateTime payTime;
 
+    @Schema(description = "退款单编号，非空即已发起退款（退款中、成功或失败以退款状态区分）", example = "8192")
+    private Long payRefundId;
+
     @Schema(description = "退款状态，对应字典 pay_refund_status", example = "0")
     private Integer refundStatus;
 

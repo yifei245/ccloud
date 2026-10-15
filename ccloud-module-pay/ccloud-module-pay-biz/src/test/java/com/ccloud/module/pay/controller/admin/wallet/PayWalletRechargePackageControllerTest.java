@@ -53,6 +53,13 @@ class PayWalletRechargePackageControllerTest extends BasePayWebIntegrationTest {
         mockMvc.perform(asAdmin(post("/admin-api/pay/wallet-recharge-package/create"), ADMIN_ID)
                         .contentType(MediaType.APPLICATION_JSON).content(body(null, "webtest-bad", 0)))
                 .andExpect(jsonPath("$.code").value(400));
+        mockMvc.perform(asAdmin(post("/admin-api/pay/wallet-recharge-package/create"), ADMIN_ID)
+                        .contentType(MediaType.APPLICATION_JSON).content(body(null, "webtest-huge", 100_000_001)))
+                .andExpect(jsonPath("$.code").value(400));
+        mockMvc.perform(asAdmin(post("/admin-api/pay/wallet-recharge-package/create"), ADMIN_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"webtest-huge-bonus\",\"payPrice\":100,\"bonusPrice\":100000001,\"status\":0}"))
+                .andExpect(jsonPath("$.code").value(400));
         mockMvc.perform(asAdmin(post("/admin-api/pay/wallet-recharge-package/create"), NO_PERM_ADMIN_ID)
                         .contentType(MediaType.APPLICATION_JSON).content(body(null, "webtest-x", 100)))
                 .andExpect(jsonPath("$.code").value(403));

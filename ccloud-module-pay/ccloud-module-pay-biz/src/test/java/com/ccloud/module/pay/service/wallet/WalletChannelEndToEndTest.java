@@ -130,7 +130,7 @@ class WalletChannelEndToEndTest extends BasePayDbAndRedisUnitTest {
         // 退款在一个真正提交的外层事务里发起：渠道调用推迟到提交之后，钱包的本地事务不能加入已完成的外层事务。
         // MySQL 下，加入已完成事务的写入会在事务清理时因恢复自动提交而被隐式提交，仅看数据最终是否可见分辨不出，
         // 所以给外层事务命名，在退款结果回写（经渠道返回后写消息）时检查当前事务不是那个外层事务
-        AtomicReference<String> txNameAtRefundPublish = new AtomicReference<>("未触发");
+        AtomicReference<String> txNameAtRefundPublish = new AtomicReference<>("e2e-not-triggered");
         doAnswer(invocation -> {
             txNameAtRefundPublish.set(String.valueOf(TransactionSynchronizationManager.getCurrentTransactionName()));
             return null;
@@ -141,7 +141,8 @@ class WalletChannelEndToEndTest extends BasePayDbAndRedisUnitTest {
                 new PayRefundCreateReqDTO().setAppKey("ut-e2e").setMerchantOrderId("E2E-1").setMerchantRefundId("E2E-1-R")
                         .setPrice(1000).setReason("端到端退款").setUserIp("1.1.1.1")));
 
-        assertThat(txNameAtRefundPublish.get()).as("提交后的渠道调用与结果回写不在已完成的外层事务中").isEqualTo("null");
+        assertThat(txNameAtRefundPublish.get()).as("退款成功消息确实写过").isNotEqualTo("e2e-not-triggered");
+        assertThat(txNameAtRefundPublish.get()).as("提交后的渠道调用与结果回写不在已完成的外层事务中").isNotEqualTo("e2e-outer");
         assertThat(balanceOf(PAYER)).as("退款退回余额（已提交，独立连接可见）").isEqualTo(5000);
         assertThat(queryInt("SELECT total_expense FROM pay_wallet WHERE user_id = ?", PAYER)).as("累计支出随退款冲回").isZero();
         assertThat(queryInt("SELECT status FROM pay_refund WHERE id = ?", refundId)).isEqualTo(PayRefundStatusEnum.SUCCESS.getStatus());

@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -90,7 +91,8 @@ class AppPayWalletRechargeControllerTest extends BasePayWebIntegrationTest {
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.list[0].payPrice").value(10000))
                 .andExpect(jsonPath("$.data.list[0].totalPrice").value(11000))
-                .andExpect(jsonPath("$.data.list[0].payStatus").value(false));
+                .andExpect(jsonPath("$.data.list[0].payStatus").value(false))
+                .andExpect(jsonPath("$.data.list[0]").value(hasKey("payRefundId")));
     }
 
     @Test

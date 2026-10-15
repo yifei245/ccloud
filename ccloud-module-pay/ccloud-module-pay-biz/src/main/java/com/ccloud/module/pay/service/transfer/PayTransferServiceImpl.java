@@ -72,7 +72,7 @@ public class PayTransferServiceImpl implements PayTransferService {
             return sameTransfer(existing, reqDTO);
         }
         PayChannelDO channel = channelService.validPayChannel(app.getId(), reqDTO.getChannelCode());
-        if (PayChannelEnum.WALLET.getCode().equals(channel.getCode()) && !NumberUtil.isLong(reqDTO.getUserAccount())) {
+        if (PayChannelEnum.WALLET.getCode().equals(channel.getCode()) && !isPositiveLong(reqDTO.getUserAccount())) {
             throw exception(PAY_TRANSFER_WALLET_ACCOUNT_INVALID);
         }
         PayTransferDO transfer = new PayTransferDO().setNo(noRedisDAO.generate(PayNoRedisDAO.TRANSFER_PREFIX))
@@ -89,6 +89,13 @@ public class PayTransferServiceImpl implements PayTransferService {
         Long transferId = transfer.getId();
         afterCommitExecutor.execute("转账 " + transfer.getNo(), () -> invokeTransfer(transferId));
         return transferId;
+    }
+
+    /**
+     * 钱包转账的收款账号须为会员编号：正整数
+     */
+    private static boolean isPositiveLong(String account) {
+        return NumberUtil.isLong(account) && Long.parseLong(account) > 0;
     }
 
     /**
@@ -172,6 +179,11 @@ public class PayTransferServiceImpl implements PayTransferService {
                 return;
             }
             boolean success = result.getStatus() == PayClientStatus.SUCCESS;
+            // 成功才核对金额（失败结果不带有效金额），在任何写入之前拒绝
+            if (success && result.getPrice() != null && !result.getPrice().equals(transfer.getPrice())) {
+                log.error("[notifyTransfer] 转账 {} 渠道金额 {} 与转账单 {} 不一致，拒绝", transfer.getNo(), result.getPrice(), transfer.getPrice());
+                throw exception(PAY_TRANSFER_NOTIFY_PRICE_MISMATCH);
+            }
             LocalDateTime successTime = success ? ObjectUtil.defaultIfNull(result.getSuccessTime(), LocalDateTime.now()) : null;
             PayTransferDO update = new PayTransferDO()
                     .setStatus((success ? PayTransferStatusEnum.SUCCESS : PayTransferStatusEnum.FAILURE).getStatus())
@@ -197,6 +209,9 @@ public class PayTransferServiceImpl implements PayTransferService {
      */
     @Override
     public int syncTransfer(int limit) {
+        if (limit < 1) {
+            return 0;
+        }
         LocalDateTime before = LocalDateTime.now().minus(payProperties.getJob().getSyncDelay());
         int count = 0;
         long afterId = 0L;
@@ -226,7 +241,7 @@ public class PayTransferServiceImpl implements PayTransferService {
         }
         PayChannelDO channel = channelService.getChannel(transfer.getChannelId());
         if (channel == null) {
-            log.error("[syncTransfer] 转账 {} 的渠道 {} 已删除，无法补查", transfer.getId(), transfer.getChannelId());
+            log.error("[syncTransfer] 转账 {} 的渠道 {} 已删除，无法补查", transfer.getNo(), transfer.getChannelId());
             return;
         }
         notifyTransfer(channel, channelService.getPayClient(channel).getTransfer(transfer.getNo()));

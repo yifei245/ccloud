@@ -257,6 +257,9 @@ public class PayRefundServiceImpl implements PayRefundService {
      */
     @Override
     public int syncRefund(int limit) {
+        if (limit < 1) {
+            return 0;
+        }
         LocalDateTime before = LocalDateTime.now().minus(payProperties.getJob().getSyncDelay());
         int count = 0;
         long afterId = 0L;

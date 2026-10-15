@@ -402,6 +402,16 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
     }
 
     @Test
+    void 补查条数上限小于1时直接返回_不查询() {
+        refundService.createRefund(refundReq("RF38", 100));
+        doThrow(new AssertionError("limit 小于 1 不应查询")).when(refundMapper)
+                .selectListByStatusAndCreateTimeLt(any(), any(), any(), ArgumentMatchers.anyInt());
+
+        assertThat(refundService.syncRefund(0)).isZero();
+        assertThat(refundService.syncRefund(-1)).isZero();
+    }
+
+    @Test
     void 补查_所有退款都失败时每条只尝试一次并结束() {
         Long id = refundService.createRefund(refundReq("RF22", 100));
         jdbcTemplate.update("UPDATE pay_refund SET create_time = ? WHERE id = ?", LocalDateTime.now().minusMinutes(5), id);

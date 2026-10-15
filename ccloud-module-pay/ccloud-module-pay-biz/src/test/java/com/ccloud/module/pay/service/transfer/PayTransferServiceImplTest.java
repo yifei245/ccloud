@@ -55,6 +55,7 @@ import static com.ccloud.module.pay.enums.ErrorCodeConstants.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -168,6 +169,13 @@ class PayTransferServiceImplTest extends BasePayDbAndRedisUnitTest {
     }
 
     @Test
+    void 钱包转账的收款账号须为正整数() {
+        assertServiceException(() -> transferService.createTransfer(req("TF3-0", "wallet", "0")), PAY_TRANSFER_WALLET_ACCOUNT_INVALID);
+        assertServiceException(() -> transferService.createTransfer(req("TF3-1", "wallet", "-5")), PAY_TRANSFER_WALLET_ACCOUNT_INVALID);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM pay_transfer WHERE app_id = ?", Integer.class, app.getId())).isZero();
+    }
+
+    @Test
     void 回调失败后为失败并写消息_终态后再回调不改变() {
         Long id = transferService.createTransfer(req("TF4", "mock", "acc-1"));
         String no = transferMapper.selectById(id).getNo();
@@ -213,6 +221,52 @@ class PayTransferServiceImplTest extends BasePayDbAndRedisUnitTest {
         List<Integer> unfinished = List.of(PayTransferStatusEnum.WAITING.getStatus(), PayTransferStatusEnum.PROCESSING.getStatus());
         assertThat(transferMapper.updateByIdAndStatus(id, unfinished, update)).isEqualTo(1);
         assertThat(transferMapper.updateByIdAndStatus(id, unfinished, update)).isZero();
+    }
+
+    @Test
+    void 回调成功金额与转账单不一致时拒绝且不改状态不写消息() {
+        Long id = transferService.createTransfer(req("TF28", "mock", "acc-1"));
+        String no = transferMapper.selectById(id).getNo();
+
+        assertServiceException(() -> transferService.notifyTransfer(channel,
+                PayTransferResult.success(no, "CT", 1, LocalDateTime.now(), "{}")), PAY_TRANSFER_NOTIFY_PRICE_MISMATCH);
+
+        assertThat(statusOf(id)).isEqualTo(PayTransferStatusEnum.PROCESSING.getStatus());
+        verify(outboxMessageService, never()).saveAndPublish(any(), any());
+    }
+
+    @Test
+    void 回调成功不带金额时不核对金额() {
+        Long id = transferService.createTransfer(req("TF29", "mock", "acc-1"));
+        String no = transferMapper.selectById(id).getNo();
+
+        transferService.notifyTransfer(channel, PayTransferResult.success(no, "CT", null, LocalDateTime.now(), "{}"));
+
+        assertThat(statusOf(id)).isEqualTo(PayTransferStatusEnum.SUCCESS.getStatus());
+    }
+
+    @Test
+    void 渠道同步返回成功后_随后返回的等待不能把转账改回进行中() {
+        // 发起调用返回之前，结果回调已先到并完成了转账：进行中的置位必须是对"仍为等待"的条件更新
+        fakeProvider.client().onUnifiedTransfer = req -> {
+            transferService.notifyTransfer(channel, success(req.getOutTransferNo()));
+            return PayTransferResult.waiting(req.getOutTransferNo());
+        };
+
+        Long id = transferService.createTransfer(req("TF30", "mock", "acc-1"));
+
+        assertThat(statusOf(id)).isEqualTo(PayTransferStatusEnum.SUCCESS.getStatus());
+        verify(outboxMessageService).saveAndPublish(eq(PayTransferMessage.TOPIC_SUCCESS), any());
+    }
+
+    @Test
+    void 补查条数上限小于1时直接返回_不查询() {
+        processingTransfer("TF31");
+        doThrow(new AssertionError("limit 小于 1 不应查询")).when(transferMapper)
+                .selectListByStatusAndCreateTimeLt(any(), any(), any(), anyInt());
+
+        assertThat(transferService.syncTransfer(0)).isZero();
+        assertThat(transferService.syncTransfer(-1)).isZero();
     }
 
     // ---------- 渠道绑定 ----------
@@ -497,6 +551,7 @@ class PayTransferServiceImplTest extends BasePayDbAndRedisUnitTest {
     @Test
     void 补查_渠道已删除时记错误日志并继续() {
         Long orphan = processingTransfer("TF25");
+        String orphanNo = transferMapper.selectById(orphan).getNo();
         channelMapper.deleteById(channel.getId());
         Logger logger = (Logger) LoggerFactory.getLogger(PayTransferServiceImpl.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
@@ -509,7 +564,7 @@ class PayTransferServiceImplTest extends BasePayDbAndRedisUnitTest {
         }
 
         assertThat(appender.list).filteredOn(e -> e.getLevel() == ch.qos.logback.classic.Level.ERROR)
-                .anySatisfy(e -> assertThat(e.getFormattedMessage()).contains(orphan.toString()).contains(channel.getId().toString()));
+                .anySatisfy(e -> assertThat(e.getFormattedMessage()).contains(orphanNo).contains(channel.getId().toString()));
         assertThat(statusOf(orphan)).isEqualTo(PayTransferStatusEnum.PROCESSING.getStatus());
     }
 }

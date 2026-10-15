@@ -48,6 +48,7 @@ public interface ErrorCodeConstants {
     ErrorCode PAY_TRANSFER_NOT_FOUND = new ErrorCode(1_007_004_000, "转账单不存在");
     ErrorCode PAY_TRANSFER_EXISTS_MISMATCH = new ErrorCode(1_007_004_001, "商户转账单号已存在且金额或收款账号不一致");
     ErrorCode PAY_TRANSFER_WALLET_ACCOUNT_INVALID = new ErrorCode(1_007_004_002, "钱包转账的收款账号须为会员编号");
+    ErrorCode PAY_TRANSFER_NOTIFY_PRICE_MISMATCH = new ErrorCode(1_007_004_003, "渠道回调转账金额与转账单不一致");
 
     // ========== 钱包 1-007-005-000 ==========
     ErrorCode WALLET_NOT_FOUND = new ErrorCode(1_007_005_000, "钱包不存在");

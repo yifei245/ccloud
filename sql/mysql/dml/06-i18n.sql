@@ -490,4 +490,6 @@ INSERT INTO `system_i18n_message` (`id`, `locale`, `code`, `content`, `source`, 
   (479, 'zh_CN', 'error.code.1007005007', '只有已支付且未退款的充值可以退款', 1, '1'),
   (480, 'en_US', 'error.code.1007005007', 'Only paid and unrefunded recharges can be refunded', 1, '1'),
   (481, 'zh_CN', 'error.code.1007005008', '请选择充值套餐或填写充值金额', 1, '1'),
-  (482, 'en_US', 'error.code.1007005008', 'Choose a recharge package or enter an amount', 1, '1');
+  (482, 'en_US', 'error.code.1007005008', 'Choose a recharge package or enter an amount', 1, '1'),
+  (483, 'zh_CN', 'error.code.1007004003', '渠道回调转账金额与转账单不一致', 1, '1'),
+  (484, 'en_US', 'error.code.1007004003', 'The notified transfer amount does not match the transfer', 1, '1');

@@ -25,8 +25,6 @@ import com.ccloud.module.pay.framework.pay.core.client.impl.mock.MockPayNotifySi
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import com.ccloud.module.pay.framework.pay.core.client.PayClient;
-import com.ccloud.module.pay.framework.pay.core.client.dto.PayNotifyRequest;
 
 import java.time.LocalDateTime;
 
@@ -281,14 +279,11 @@ class PayNotifyControllerTest extends BasePayWebIntegrationTest {
 
     @Test
     void 入口放行了未支持的类型而处理分支漏加时抛IllegalStateException_由入口应答500() throws Exception {
-        // 入口白名单之外的类型到不了这里（404 在前）；直接调用私有的分派方法，守住 default 分支不会静默应答成功
-        Object target = AopTestUtils.getUltimateTargetObject(notifyController);
-        java.lang.reflect.Method handle = target.getClass().getDeclaredMethod("handle", String.class, PayChannelDO.class,
-                PayClient.class, PayNotifyRequest.class);
-        handle.setAccessible(true);
+        // 入口白名单之外的类型到不了这里（404 在前）；直接调用包级的分派方法，守住 default 分支不会静默应答成功
+        PayNotifyController target = AopTestUtils.getUltimateTargetObject(notifyController);
 
-        assertThatThrownBy(() -> handle.invoke(target, "unknown", channel, null, null))
-                .hasCauseInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> target.handle("unknown", channel, null, null))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test

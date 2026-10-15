@@ -94,7 +94,8 @@ public class PayNotifyController {
      * type 已在入口限定为 order、refund、transfer；default 是防御：以后入口放行了新类型而这里漏加分支时，
      * 抛 IllegalStateException，由 notify 的 catch (Exception) 应答 500，而不是静默应答成功
      */
-    private String handle(String type, PayChannelDO channel, PayClient client, PayNotifyRequest request) {
+    // 包级可见：供同包测试直接守住 default 分支
+    String handle(String type, PayChannelDO channel, PayClient client, PayNotifyRequest request) {
         switch (type) {
             case "order" -> orderService.notifyOrder(channel, client.parseOrderNotify(request));
             case "refund" -> refundService.notifyRefund(channel, client.parseRefundNotify(request));

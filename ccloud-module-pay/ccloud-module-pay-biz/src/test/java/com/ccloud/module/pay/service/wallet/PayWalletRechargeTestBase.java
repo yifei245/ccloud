@@ -56,7 +56,7 @@ import java.util.function.Supplier;
         PayRefundServiceImpl.class, PayOrderServiceImpl.class, PayAppServiceImpl.class, PayChannelServiceImpl.class,
         PayClientFactory.class, FakePayClientProvider.class, PayNoRedisDAO.class, PayProperties.class,
         PayAfterCommitExecutor.class})
-abstract class PayWalletRechargeTestBase extends BasePayDbAndRedisUnitTest {
+public abstract class PayWalletRechargeTestBase extends BasePayDbAndRedisUnitTest {
 
     protected static final long MEMBER = 81001L;
 

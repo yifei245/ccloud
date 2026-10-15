@@ -18,7 +18,10 @@ import com.ccloud.framework.security.core.service.SecurityFrameworkService;
 import com.ccloud.framework.tenant.config.TenantProperties;
 import com.ccloud.framework.tenant.core.service.TenantFrameworkService;
 import com.ccloud.framework.tenant.core.web.TenantSecurityWebFilter;
+import com.ccloud.framework.mq.redis.core.AbstractRedisStreamMessageListener;
+import com.ccloud.framework.mq.redis.core.RedisStreamMessageConsumer;
 import com.ccloud.module.pay.framework.config.PayProperties;
+import com.ccloud.module.pay.mq.consumer.*;
 import com.ccloud.module.pay.framework.contract.*;
 import com.ccloud.module.system.api.permission.PermissionApi;
 import com.ccloud.module.system.api.tenant.TenantApi;
@@ -36,6 +39,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -107,6 +111,22 @@ class PayServerApplicationTest {
         assertThat(ctx.getBeansOfType(FilterRegistrationBean.class).values())
                 .as("租户安全过滤器：请求租户须与登录租户一致").anyMatch(r -> r.getFilter() instanceof TenantSecurityWebFilter);
         assertThat(ctx.getBeansOfType(I18nMessageRefresher.class)).as("数据库文案加载").hasSize(1);
+    }
+
+    /**
+     * Redis Stream 以主题为键订阅，消费组取服务名：两个监听器共用一个主题会争抢同一个流，其中一个永远收不到消息
+     */
+    @Test
+    void 消息监听器恰好五个且主题互不冲突() {
+        @SuppressWarnings("rawtypes")
+        Collection<AbstractRedisStreamMessageListener> listeners = ctx.getBeansOfType(AbstractRedisStreamMessageListener.class).values();
+        assertThat(listeners).extracting(Object::getClass).containsExactlyInAnyOrder(PayOrderPaidListener.class,
+                PayRefundSuccessListener.class, PayRefundFailureListener.class,
+                PayTransferSuccessListener.class, PayTransferFailureListener.class);
+        assertThat(listeners).extracting(AbstractRedisStreamMessageListener::getTopic).doesNotHaveDuplicates()
+                .containsExactlyInAnyOrder("pay.order.paid", "pay.refund.success", "pay.refund.failure",
+                        "pay.transfer.success", "pay.transfer.failure");
+        assertThat(ctx.getBeansOfType(RedisStreamMessageConsumer.class)).as("存在监听器时启动消费者").hasSize(1);
     }
 
     @Test

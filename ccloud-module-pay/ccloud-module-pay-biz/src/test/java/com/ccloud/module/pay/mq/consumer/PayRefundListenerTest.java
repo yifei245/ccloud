@@ -154,23 +154,46 @@ class PayRefundListenerTest extends BaseMockitoUnitTest {
         verify(openNotifyService).forward(any(), any(), anyLong(), any());
     }
 
-    /** 状态不是明确的成功或失败（等待、空、未知值）时既不动余额也不对外宣告结果，只记警告 */
+    /** 状态为空、非终态或未知：发送方有缺陷，抛异常让消息重投直至死信，不静默确认；两件事都不执行 */
     @ParameterizedTest
     @NullSource
     @ValueSource(ints = {0, 99})
-    void 未知退款状态不处理也不转发_记警告(Integer status) {
+    void 空或未知退款状态抛异常_不处理也不转发_记错误(Integer status) {
+        assertRejected(() -> successListener.onMessage("msg-5", message(PayRefundStatusEnum.SUCCESS).setStatus(status)),
+                "msg-5", "pay.refund.success", String.valueOf(status));
+        assertRejected(() -> failureListener.onMessage("msg-5", message(PayRefundStatusEnum.FAILURE).setStatus(status)),
+                "msg-5", "pay.refund.failure", String.valueOf(status));
+    }
+
+    @Test
+    void 状态与主题不符时抛异常_成功消息到了失败主题_不处理也不转发() {
+        assertRejected(() -> failureListener.onMessage("msg-7", message(PayRefundStatusEnum.SUCCESS)),
+                "msg-7", "pay.refund.failure", "10");
+        assertRejected(() -> successListener.onMessage("msg-8", message(PayRefundStatusEnum.FAILURE)),
+                "msg-8", "pay.refund.success", "20");
+    }
+
+    @Test
+    void 消息没有租户时抛异常_任何步骤都不执行() {
+        assertThatThrownBy(() -> successListener.onMessage("msg-9", message(PayRefundStatusEnum.SUCCESS).setTenantId(null)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("msg-9").hasMessageContaining("租户");
+        verifyNoInteractions(rechargeService, openNotifyService, idempotentConsumer);
+    }
+
+    private void assertRejected(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, String messageId, String topic, String status) {
         Logger logger = (Logger) LoggerFactory.getLogger(AbstractPayRefundListener.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
         try {
-            successListener.onMessage("msg-5", message(PayRefundStatusEnum.SUCCESS).setStatus(status));
+            assertThatThrownBy(call).isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining(messageId).hasMessageContaining(topic).hasMessageContaining(status);
         } finally {
             logger.detachAppender(appender);
         }
-        verifyNoInteractions(rechargeService, openNotifyService);
-        assertThat(appender.list).anyMatch(e -> e.getLevel() == Level.WARN
-                && e.getFormattedMessage().contains("msg-5") && e.getFormattedMessage().contains(String.valueOf(status)));
+        verifyNoInteractions(rechargeService, openNotifyService, idempotentConsumer);
+        assertThat(appender.list).anyMatch(e -> e.getLevel() == Level.ERROR && e.getFormattedMessage().contains(messageId)
+                && e.getFormattedMessage().contains(topic));
     }
 
     @Test

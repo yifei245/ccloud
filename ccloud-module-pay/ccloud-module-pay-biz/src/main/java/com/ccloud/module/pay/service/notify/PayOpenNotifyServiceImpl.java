@@ -19,7 +19,7 @@ public class PayOpenNotifyServiceImpl implements PayOpenNotifyService {
 
     /**
      * 以消息编号作为事件编号：消费事务提交失败导致消息重投时，开放平台按事件编号去重，第三方只收到一次。
-     * 应用查询忽略租户：消费线程虽已切到消息的租户，但应用可能已被删除或禁用，转发不应依赖这些
+     * 应用查询忽略租户：转发所需的只是应用编号对应的开放应用绑定，这一查询不应依赖消费线程当前的租户上下文
      */
     @Override
     public void forward(String messageId, String event, Long appId, Map<String, Object> data) {

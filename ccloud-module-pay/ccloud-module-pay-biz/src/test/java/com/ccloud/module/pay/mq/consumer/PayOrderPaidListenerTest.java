@@ -32,6 +32,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class PayOrderPaidListenerTest extends BaseMockitoUnitTest {
@@ -123,6 +124,13 @@ class PayOrderPaidListenerTest extends BaseMockitoUnitTest {
         }).when(openNotifyService).forward(any(), any(), anyLong(), any());
         listener.onMessage("msg-4", new PayOrderMessage().setTenantId(5L).setAppId(3L).setPrice(1));
         verify(openNotifyService).forward(eq("msg-4"), any(), eq(3L), any());
+    }
+
+    @Test
+    void 消息没有租户时抛异常_任何步骤都不执行() {
+        assertThatThrownBy(() -> listener.onMessage("msg-7", new PayOrderMessage().setAppId(2L).setPrice(1)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("msg-7").hasMessageContaining("租户");
+        verifyNoInteractions(rechargeService, openNotifyService, idempotentConsumer);
     }
 
     /** 入账成功而转发抛异常：消息不 ACK 被重投，重投时入账已消费应跳过，只重试转发 */

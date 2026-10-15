@@ -115,23 +115,46 @@ class PayTransferListenerTest extends BaseMockitoUnitTest {
         verify(openNotifyService).forward(any(), any(), anyLong(), any());
     }
 
-    /** 等待、转账进行中、空或未知状态都不是终态，不对外宣告结果，只记警告 */
+    /** 状态为空、非终态（等待、进行中）或未知：发送方有缺陷，抛异常让消息重投直至死信，不静默确认；不转发 */
     @ParameterizedTest
     @NullSource
     @ValueSource(ints = {0, 5, 99})
-    void 未知转账状态不转发_记警告(Integer status) {
+    void 空或未知转账状态抛异常_不转发_记错误(Integer status) {
+        assertRejected(() -> successListener.onMessage("msg-4", message(PayTransferStatusEnum.SUCCESS).setStatus(status)),
+                "msg-4", "pay.transfer.success", String.valueOf(status));
+        assertRejected(() -> failureListener.onMessage("msg-4", message(PayTransferStatusEnum.FAILURE).setStatus(status)),
+                "msg-4", "pay.transfer.failure", String.valueOf(status));
+    }
+
+    @Test
+    void 状态与主题不符时抛异常_成功消息到了失败主题_不转发() {
+        assertRejected(() -> failureListener.onMessage("msg-6", message(PayTransferStatusEnum.SUCCESS)),
+                "msg-6", "pay.transfer.failure", "10");
+        assertRejected(() -> successListener.onMessage("msg-7", message(PayTransferStatusEnum.FAILURE)),
+                "msg-7", "pay.transfer.success", "20");
+    }
+
+    @Test
+    void 消息没有租户时抛异常_不转发() {
+        assertThatThrownBy(() -> successListener.onMessage("msg-8", message(PayTransferStatusEnum.SUCCESS).setTenantId(null)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("msg-8").hasMessageContaining("租户");
+        verifyNoInteractions(openNotifyService, idempotentConsumer);
+    }
+
+    private void assertRejected(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, String messageId, String topic, String status) {
         Logger logger = (Logger) LoggerFactory.getLogger(AbstractPayTransferListener.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
         try {
-            successListener.onMessage("msg-4", message(PayTransferStatusEnum.SUCCESS).setStatus(status));
+            assertThatThrownBy(call).isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining(messageId).hasMessageContaining(topic).hasMessageContaining(status);
         } finally {
             logger.detachAppender(appender);
         }
-        verifyNoInteractions(openNotifyService);
-        assertThat(appender.list).anyMatch(e -> e.getLevel() == Level.WARN
-                && e.getFormattedMessage().contains("msg-4") && e.getFormattedMessage().contains(String.valueOf(status)));
+        verifyNoInteractions(openNotifyService, idempotentConsumer);
+        assertThat(appender.list).anyMatch(e -> e.getLevel() == Level.ERROR && e.getFormattedMessage().contains(messageId)
+                && e.getFormattedMessage().contains(topic));
     }
 
     @Test

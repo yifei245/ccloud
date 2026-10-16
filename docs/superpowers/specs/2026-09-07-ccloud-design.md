@@ -172,6 +172,12 @@ ccloud
 - 定时任务统一在 XXL-Job 控制台管理，infra 不再提供任务管理，删除 `infra_job`、`infra_job_log` 两张表及对应菜单、字典、文案。
 - 超过重试上限的本地消息，以及重投达到上限仍消费失败的 Stream 消息，都写入 `infra_message_dead_letter`，由 infra 管理端查看、标记已处理或重新投递到原主题。
 
+**2026-10-12 调整**（见[支付模块设计](2026-10-12-pay-design.md)）：
+
+- 支付不再自建回调表，删除 `pay_notify_task`、`pay_notify_log` 与所有回调地址字段（应用、订单、退款、转账上的 `*_notify_url`）。
+- 通知内部服务：支付状态变更与 outbox 消息在同一事务提交，经 Redis Stream 投递 `pay.order.paid`、`pay.refund.success`、`pay.refund.failure`、`pay.transfer.success`、`pay.transfer.failure`，消费方用 `IdempotentConsumer` 幂等。
+- 通知外部系统：外部系统只经开放平台接入，支付应用绑定开放应用，pay 消费上述消息后调用 `OpenNotifyApi` 回调，签名与重试由 open 负责；开放平台回调增加调用方事件编号去重（以 outbox 消息编号为事件编号），消息重投时外部系统只收到一次。
+
 ## 7. 国际化
 
 - 基线：`messages_zh_CN.properties` / `messages_en_US.properties`（错误码、校验提示）
@@ -240,7 +246,7 @@ docker/
 |---|---|---|
 | **P1** | 根 POM + BOM + 16 个 framework starter + gateway + monitor + module-system 全量 + module-member 的用户与认证 + **全部 10 模块的完整 DDL 与初始化数据** + Docker 全家桶 + README + MIT LICENSE | `docker compose up` 后：三端（web/App/小程序）均可登录取 token，动态菜单与按钮权限生效，SSO 授权码流程跑通，Swagger 网关聚合可调，链路追踪与监控面板可见 |
 | **P2** | module-infra 全量（文件/配置/代码生成/API 日志/数据源/DB 文档/消息死信） + module-member 运营功能（等级/积分/签到/标签/分组） + module-open 全量（含签名鉴权与限流） | 三端接口齐备，开放 API 可签名调用，代码生成器可用 |
-| **P3** | module-pay（微信/支付宝/钱包/退款/转账/回调重试） + module-bpm（Flowable 模型、表单、审批、抄送） | 可发起支付与审批流 |
+| **P3** | 拆为两个子项目：①module-pay（钱包/Mock 渠道/退款/转账/回调；微信、支付宝渠道待选定聚合或直连后接入，外部系统回调改走开放平台）——**已交付**，设计见[支付模块设计](2026-10-12-pay-design.md)；②module-bpm（Flowable 模型、表单、审批、抄送） | 可发起支付与审批流 |
 | **P4** | mall：product + trade + promotion | 可下单、支付、售后、用券，走通最终一致性链路 |
 | **P5** | module-ai + 全局补齐（单测、i18n 文案齐全、压测配置、文档完善） | 全量交付 |
 

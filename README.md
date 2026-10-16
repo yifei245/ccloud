@@ -8,9 +8,9 @@
 ccloud 是一个基于 Spring Cloud 的微服务中台：多租户、多终端（Web / App / 小程序 / H5）、多用户类型（管理员 / 会员 / 开放平台应用），
 内置自研 OAuth2 与 SSO、按钮级权限、部门数据权限、国际化、本地消息表最终一致性。
 
-当前已交付 P1 基础平台与 P2 的 member 会员运营、infra 基础设施、open 开放平台：框架层 16 个模块、网关、system（系统管理）、member（会员）、
-infra（参数配置、文件、API 日志、代码生成等）、open（开放应用与密钥、接口授权、调用日志、事件回调）、monitor（服务监控），以及 docker 编排与 Nacos 配置包。
-pay、bpm、商城、AI 等模块在后续阶段交付，见[项目结构](#项目结构)。
+当前已交付 P1 基础平台、P2 的 member 会员运营、infra 基础设施、open 开放平台，以及 P3 的 pay 支付：框架层 16 个模块、网关、system（系统管理）、member（会员）、
+infra（参数配置、文件、API 日志、代码生成等）、open（开放应用与密钥、接口授权、调用日志、事件回调）、pay（支付应用与渠道、支付单、退款、转账、钱包与充值）、monitor（服务监控），以及 docker 编排与 Nacos 配置包。
+bpm、商城、AI 等模块在后续阶段交付，见[项目结构](#项目结构)。
 
 环境：JDK 21 · Spring Boot 3.5.16 · Spring Cloud 2025.0.3 · Spring Cloud Alibaba 2025.0.0.0 · Nacos 3.2.4 · MySQL 8.4 · Redis 7
 
@@ -58,13 +58,14 @@ ccloud
 ├── ccloud-module-infra/   (api, biz)     # ★ 参数配置 / 文件（数据库、本地磁盘、S3 兼容）/ API 日志 / 消息死信 /
 │                                         #   数据源 / 数据库文档 / 代码生成
 ├── ccloud-module-open/    (api, biz)     # ★ 开放平台：开放应用与密钥 / 接口目录与授权 / 调用日志 / 事件回调
+├── ccloud-module-pay/     (api, biz)     # ★ 支付：应用与渠道 / 支付单 / 退款 / 转账 / 钱包与充值（渠道实现 Mock 与钱包）
 ├── docker/                               # docker compose 编排、中间件配置、Nacos 配置包
 ├── sql/mysql/                            # 建表与初始化数据
 ├── scripts/                              # 构建、部署与校验脚本
 └── docs/                                 # 使用文档与设计文档
 ```
 
-后续阶段的模块（尚未包含在仓库中）：`ccloud-module-pay`、`ccloud-module-bpm`、商城（product / trade / promotion）、`ccloud-module-ai`。
+后续阶段的模块（尚未包含在仓库中）：`ccloud-module-bpm`、商城（product / trade / promotion）、`ccloud-module-ai`。
 
 `★` 为核心模块，必须保留。**裁剪非核心模块**：删除模块目录，从根 `pom.xml` 的 `<modules>` 中移除，
 再删除 `docker/docker-compose.yml` 中对应的服务即可。模块之间只通过 `-api` 子模块（DTO、Feign 接口、错误码）耦合，
@@ -75,7 +76,7 @@ ccloud
 需要 JDK 21、Maven 3.9+、Docker（含 compose v2），以及本机已有的 MySQL、Redis、Nacos、Zipkin、XXL-Job 调度中心
 （ccloud 直接连接它们，不再自带一套，约定见 [docs/快速开始.md](docs/快速开始.md#本机中间件)）。三种方式：
 
-1. **一键启动全部**（网关 + system + infra + member + open + monitor 共 6 个应用，连接本机中间件）：
+1. **一键启动全部**（网关 + system + infra + member + open + pay + monitor 共 7 个应用，连接本机中间件）：
 
    ```bash
    scripts/docker-up.sh
@@ -90,7 +91,7 @@ ccloud
    scripts/docker-up.sh init
    ```
 
-   然后以 `local` profile 依次运行 `SystemServerApplication`、`InfraServerApplication`、`MemberServerApplication`、`OpenServerApplication`、`GatewayServerApplication`。
+   然后以 `local` profile 依次运行 `SystemServerApplication`、`InfraServerApplication`、`MemberServerApplication`、`OpenServerApplication`、`PayServerApplication`、`GatewayServerApplication`。
 
 3. **从源码构建**：
 
@@ -112,6 +113,7 @@ ccloud
 | 管理端 | `ccloud` | `ccloud123` | 普通管理员，仅查询与导出类权限，演示按钮级权限差异 |
 | C 端 | `13800138000` | `member123` | 会员，租户 1 |
 | 开放 API | AppKey `ccloud-open-demo` | `ccloud-open-demo-secret` | 演示应用，数据见 `sql/mysql/dml/07-demo.sql`，已授权 `GET /open-api/member/user/get`，调用示例见[接口鉴权说明](docs/接口鉴权说明.md#演示应用与完整调用示例)；生产环境必须删除该演示应用（见[快速开始](docs/快速开始.md#方式三从源码构建)的生产部署说明） |
+| 支付应用 | `mall`、`wallet` | | 演示数据：`mall` 绑定演示开放应用并开通 Mock 与钱包渠道，`wallet` 为钱包充值应用（套餐「充 100 送 10」「充 500 送 80」）。**Mock 渠道仅本地可用**：只有 `local`、`dev` profile 开启模拟支付，生产必须关闭并删除演示渠道（见[快速开始](docs/快速开始.md#方式三从源码构建)） |
 | Nacos | 本机 Nacos 的账号 | | 写在 `~/.ccloud/middleware.env`；ccloud 使用 `ccloud` 命名空间 |
 | XXL-Job | `admin` | `ccloud123` | `docker/.env` 的 `XXL_JOB_ADMIN_PASSWORD`（首次登记 ccloud 任务时写入） |
 | 服务监控 | `admin` | `ccloud123` | `docker/.env` 的 `CCLOUD_MONITOR_PASSWORD` |
@@ -126,9 +128,9 @@ ccloud 应用的端口见 `docker/.env`，除网关外只绑定本机 127.0.0.1�
 | 接口文档 | http://127.0.0.1:28080/doc.html | 聚合各服务的管理端、用户端、开放接口三组文档；生产环境关闭 |
 | 服务监控 | http://127.0.0.1:28182 | Spring Boot Admin，从 Nacos 发现全部服务 |
 | Nacos | http://127.0.0.1:8848/nacos | 本机 Nacos，ccloud 的服务与配置在 `ccloud` 命名空间 |
-| XXL-Job 控制台 | http://127.0.0.1:48180/xxl-job-admin | 已登记 system、infra、open 的执行器及其消息重投、日志清理、回调重试任务 |
+| XXL-Job 控制台 | http://127.0.0.1:48180/xxl-job-admin | 已登记 system、infra、open、pay 的执行器及其消息重投、日志清理、回调重试、超时关单与支付补查任务 |
 | Zipkin | http://127.0.0.1:9411 | 链路追踪 |
-| system / infra / member / open | http://127.0.0.1:28081 、 http://127.0.0.1:28082 、 http://127.0.0.1:28083 、 http://127.0.0.1:28084 | 仅供本机调试，前端不要直连 |
+| system / infra / member / open / pay | http://127.0.0.1:28081 、 http://127.0.0.1:28082 、 http://127.0.0.1:28083 、 http://127.0.0.1:28084 、 http://127.0.0.1:28085 | 仅供本机调试，前端不要直连 |
 
 ## 接口与鉴权
 
@@ -192,6 +194,9 @@ X-Open-Sign = Base64(HmacSHA256(appSecret, 签名串))
 **上传的文件存在哪里。** 默认存在数据库（`infra_file_content` 表），开箱即用，适合开发与小文件。生产环境建议在管理端「文件配置」里新增一个
 S3 兼容存储（AWS S3 或阿里云 OSS）并设为主配置，文件由存储桶（或前置 CDN）直接对外提供读取；配置示例见 [docs/模块说明.md](docs/模块说明.md#文件存储)。
 也可以选择本地磁盘存储，容器部署时目录挂载在名为 `infra-files` 的数据卷上，`scripts/docker-down.sh` 不会删除它。
+
+**支付页面点"确认支付"的是什么。** 本地与 docker 联调时 pay 开启了模拟支付（`ccloud.pay.mock-enabled`）：提交 Mock 渠道后返回确认页地址 `/app-api/pay/mock/confirm?no=...`，
+打开并点击"确认支付"即模拟付款，渠道回调随即到达。docker 编排固定使用 `dev` profile，所以编排里的 pay 也开启了模拟支付，仅用于本机联调；生产环境必须关闭，见[快速开始](docs/快速开始.md#方式三从源码构建)。
 
 **修改了代码，镜像里还是旧逻辑。** 打包必须带 `clean`：只有依赖（如 framework）变化时，Maven 会认为应用 jar 未过期而跳过重新打包。`scripts/docker-up.sh` 已经这样做。
 

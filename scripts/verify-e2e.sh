@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 端到端验收（P1 基础平台 + P2 会员运营 + P2 基础设施 + P2 开放平台）：除会员内部接口外全部经网关调用。
+# 端到端验收（P1 基础平台 + P2 会员运营 + P2 基础设施 + P2 开放平台 + P3 支付）：除会员内部接口外全部经网关调用。
 # 前置：scripts/docker-up.sh 已启动全部服务。端口取自 docker/.env，可用同名环境变量覆盖。
 set -euo pipefail
 
@@ -303,8 +303,12 @@ d = sys.argv[1]
 class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        rec = {"headers": dict(self.headers), "body": body.decode()}
         with open(os.path.join(d, "last.json"), "w") as f:
-            json.dump({"headers": dict(self.headers), "body": body.decode()}, f)
+            json.dump(rec, f)
+        # 逐条追加：last.json 只留最后一次，会被重试中的旧回调覆盖，支付一段按 all.jsonl 查找事件
+        with open(os.path.join(d, "all.jsonl"), "a") as f:
+            f.write(json.dumps(rec) + "\n")
         code = int(open(os.path.join(d, "status")).read().strip() or 200) if os.path.exists(os.path.join(d, "status")) else 200
         self.send_response(code); self.end_headers(); self.wfile.write(b"success")
     def log_message(self, *a): pass
@@ -416,6 +420,259 @@ until [ "$(curl -s "$GW/admin-api/open/notify-log/get?id=$NID" -H "$AUTH" | jq -
   sleep 2
 done
 ok "测试回调成功且可验签，对方失败时记为待重试"
+
+echo "==> 支付"
+# 开放平台一段把回调接收方的应答改成了 500，这里恢复；支付一段按 all.jsonl 查找回调
+rm -f "$OTMP/status"
+PAY_TS=$(date +%s)
+PS="http://127.0.0.1:${PAY_PORT}"   # 内部接口不经网关，直连 pay 服务
+PAY_APP_ID=""
+PAY_CH_ID=""
+PAY_STARTED=""
+WID=""; WALLET_NEW=""; BAL0=0; TE0=0; TR0=0; RECHARGE0=0; TX0=0
+# 无论本节在哪一步失败，都删除本节创建的支付应用、订单、退款、充值与流水，并把演示会员的钱包恢复原样。
+# 只删本节创建的数据：支付应用按标识前缀 e2e-pay-，演示 mall 应用下按商户订单号前缀 E2E-，
+# 充值记录与钱包流水按本节开始前记下的最大编号（时区不影响）
+pay_cleanup() {
+  set +e
+  local e2e_apps="SELECT id FROM ccloud.pay_app WHERE app_key LIKE 'e2e-pay-%'"
+  local mall_app="SELECT id FROM ccloud.pay_app WHERE app_key='mall' AND deleted=0"
+  lq "DELETE FROM ccloud.pay_order_extension WHERE order_id IN (SELECT id FROM ccloud.pay_order WHERE app_id IN ($e2e_apps));
+      DELETE FROM ccloud.pay_refund WHERE app_id IN ($e2e_apps);
+      DELETE FROM ccloud.pay_order WHERE app_id IN ($e2e_apps);
+      DELETE FROM ccloud.pay_channel WHERE app_id IN ($e2e_apps);
+      DELETE FROM ccloud.pay_app WHERE app_key LIKE 'e2e-pay-%';
+      DELETE FROM ccloud.pay_order_extension WHERE order_id IN
+        (SELECT id FROM ccloud.pay_order WHERE app_id IN ($mall_app) AND merchant_order_id LIKE 'E2E-%');
+      DELETE FROM ccloud.pay_refund WHERE app_id IN ($mall_app) AND merchant_order_id LIKE 'E2E-%';
+      DELETE FROM ccloud.pay_order WHERE app_id IN ($mall_app) AND merchant_order_id LIKE 'E2E-%';
+      DELETE FROM ccloud.open_notify_log WHERE payload LIKE '%\"merchantOrderId\":\"E2E-%'
+        AND app_id IN (SELECT open_app_id FROM ccloud.pay_app WHERE app_key='mall' AND deleted=0);" >/dev/null
+  if [ -n "$PAY_STARTED" ]; then
+    local w="${WID:-$(lq "SELECT id FROM ccloud.pay_wallet WHERE user_id=$MEMBER_ID AND user_type=1 AND deleted=0")}"
+    if [ -n "$w" ]; then
+      local recharge_orders="SELECT pay_order_id FROM ccloud.pay_wallet_recharge WHERE id>$RECHARGE0 AND wallet_id=$w"
+      lq "DELETE FROM ccloud.pay_order_extension WHERE order_id IN ($recharge_orders);
+          DELETE FROM ccloud.pay_refund WHERE order_id IN ($recharge_orders);
+          DELETE FROM ccloud.pay_order WHERE id IN ($recharge_orders);
+          DELETE FROM ccloud.pay_wallet_recharge WHERE id>$RECHARGE0 AND wallet_id=$w;
+          DELETE FROM ccloud.pay_wallet_transaction WHERE id>$TX0 AND wallet_id=$w;" >/dev/null
+      if [ -n "$WALLET_NEW" ]; then
+        lq "DELETE FROM ccloud.pay_wallet WHERE id=$w;" >/dev/null
+      else
+        lq "UPDATE ccloud.pay_wallet SET balance=$BAL0, total_expense=$TE0, total_recharge=$TR0 WHERE id=$w;" >/dev/null
+      fi
+    fi
+  fi
+}
+trap 'pay_cleanup; open_cleanup; infra_cleanup' EXIT
+
+# 记下演示会员的钱包与本节之前的最大编号，供清理时恢复
+WID=$(lq "SELECT id FROM ccloud.pay_wallet WHERE user_id=$MEMBER_ID AND user_type=1 AND deleted=0")
+if [ -n "$WID" ]; then
+  read -r BAL0 TE0 TR0 <<<"$(lq "SELECT balance, total_expense, total_recharge FROM ccloud.pay_wallet WHERE id=$WID")"
+else
+  WALLET_NEW=1
+fi
+RECHARGE0=$(lq "SELECT COALESCE(MAX(id),0) FROM ccloud.pay_wallet_recharge")
+TX0=$(lq "SELECT COALESCE(MAX(id),0) FROM ccloud.pay_wallet_transaction")
+PAY_STARTED=1
+
+# 带请求体的签名调用：$1=路径 $2=请求体 $3=appKey $4=密钥。签名串与 open_call 相同，最后一段为请求体的 SHA-256。
+# 输出第一行为状态码，其后为响应体
+open_post() {
+  python3 - "$@" <<'PY'
+import base64, hashlib, hmac, sys, time, uuid, urllib.request, urllib.error, os
+path, body, key, secret = sys.argv[1:5]
+data = body.encode()
+nonce = uuid.uuid4().hex
+ts = str(int(time.time() * 1000))
+s = "\n".join(["POST", path, "", ts, nonce, hashlib.sha256(data).hexdigest()])
+sign = base64.b64encode(hmac.new(secret.encode(), s.encode(), hashlib.sha256).digest()).decode()
+req = urllib.request.Request(os.environ["GW"] + path, data=data, method="POST", headers={
+    "Content-Type": "application/json", "X-Open-App-Id": key, "X-Open-Timestamp": ts, "X-Open-Nonce": nonce, "X-Open-Sign": sign})
+try:
+    r = urllib.request.urlopen(req); print(r.status); print(r.read().decode())
+except urllib.error.HTTPError as e:
+    print(e.code); print(e.read().decode())
+PY
+}
+# 开放接口响应（open_call、open_post 的输出）：状态码为 200 且响应体满足 jq 条件
+open_expect() {  # $1=响应 $2=jq 条件
+  [ "$(echo "$1" | head -1)" = "200" ] && echo "$1" | tail -1 | jq -e "$2" >/dev/null 2>&1
+}
+# 轮询开放接口直到响应体满足 jq 条件：$1=路径 $2=查询串 $3=jq 条件 $4=超时秒数。最后一次响应留在 LAST_R
+LAST_R=""
+open_get_until() {
+  local deadline=$((SECONDS + $4))
+  until LAST_R=$(open_call GET "$1" "$2" "$APP_KEY" "$NEW_SECRET") && open_expect "$LAST_R" "$3"; do
+    [ $SECONDS -lt $deadline ] || return 1
+    sleep 2
+  done
+}
+# 在回调接收方的记录里等待一条事件，并用开放应用的密钥验签：$1=事件 $2=data 中的键 $3=期望值 $4=超时秒数
+await_notify() {
+  python3 - "$OTMP/all.jsonl" "$NEW_SECRET" "$@" <<'PY'
+import base64, hashlib, hmac, json, os, sys, time
+path, secret, event, key, value, timeout = sys.argv[1:7]
+deadline = time.time() + int(timeout)
+while True:
+    if os.path.exists(path):
+        for line in open(path):
+            try:
+                d = json.loads(line); body = json.loads(d["body"])
+            except ValueError:
+                continue  # 接收方正在写这一行
+            if body.get("event") != event or str((body.get("data") or {}).get(key)) != value:
+                continue
+            h = {k.lower(): v for k, v in d["headers"].items()}
+            s = h["x-open-timestamp"] + "\n" + h["x-open-event-id"] + "\n" + hashlib.sha256(d["body"].encode()).hexdigest()
+            good = base64.b64encode(hmac.new(secret.encode(), s.encode(), hashlib.sha256).digest()).decode()
+            if good != h["x-open-sign"] or body.get("eventId") != h["x-open-event-id"]:
+                print("回调验签失败或事件编号与请求头不符：" + d["body"]); sys.exit(2)
+            sys.exit(0)
+    if time.time() > deadline:
+        print("超时未收到回调 %s %s=%s" % (event, key, value)); sys.exit(1)
+    time.sleep(1)
+PY
+}
+
+# ---- 外部系统：支付应用绑定开放应用，经开放平台下单、Mock 支付、收到回调 ----
+PAY_KEY="e2e-pay-$PAY_TS"
+R=$(curl -s -X POST "$GW/admin-api/pay/app/create" -H "$AUTH" -H "$JSON" \
+  -d "{\"appKey\":\"$PAY_KEY\",\"name\":\"E2E支付应用\",\"status\":0,\"openAppKey\":\"$APP_KEY\"}")
+PAY_APP_ID=$(echo "$R" | jq -r '.data // empty')
+[ -n "$PAY_APP_ID" ] || die "新建支付应用失败：$R"
+MOCK_CFG='{"notifySecret":"e2e-mock-notify-secret-01","behavior":"SUCCESS","delaySeconds":2}'
+CH_BODY=$(jq -nc --argjson app "$PAY_APP_ID" --arg cfg "$MOCK_CFG" \
+  '{appId:$app,code:"mock",status:0,feeRate:0,remark:"e2e",config:$cfg}')
+R=$(curl -s -X POST "$GW/admin-api/pay/channel/create" -H "$AUTH" -H "$JSON" -d "$CH_BODY")
+PAY_CH_ID=$(echo "$R" | jq -r '.data // empty')
+[ -n "$PAY_CH_ID" ] || die "新建 Mock 渠道失败（pay 服务须开启 ccloud.pay.mock-enabled，docker 编排使用 dev 环境）：$R"
+# 授权是整体替换：member.user.get 与 5 个 pay.* 接口一起提交
+API_IDS=$(curl -s "$GW/admin-api/open/api/list-all-simple" -H "$AUTH" | jq -c \
+  '[.data[] | select(.code | IN("member.user.get","pay.order.create","pay.order.get","pay.order.submit","pay.refund.create","pay.refund.get")) | .id]')
+[ "$(echo "$API_IDS" | jq 'length')" = "6" ] || die "接口目录中缺少 member.user.get 或 pay.* 接口：$API_IDS"
+ASSIGN_BODY="{\"appId\":$OPEN_APP_ID,\"apiIds\":$API_IDS}"
+[ "$(curl -s -X PUT "$GW/admin-api/open/app/assign-api" -H "$AUTH" -H "$JSON" -d "$ASSIGN_BODY" | jq -r '.code')" = "0" ] \
+  || die "授权支付接口失败"
+# 授权变更经 Redis 广播使网关缓存失效，最多等 5 秒：查询一个不存在的订单，不再是 403 即已生效
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  [ "$(open_call GET /open-api/pay/order/get "merchantOrderId=E2E-none" "$APP_KEY" "$NEW_SECRET" | head -1)" != "403" ] && break
+  sleep 0.5
+done
+
+OEXP=$(( ($(date +%s) + 3600) * 1000 ))   # 开放接口的时间是毫秒时间戳
+P_ID="E2E-P$PAY_TS"
+R=$(open_post /open-api/pay/order/create \
+  "{\"merchantOrderId\":\"$P_ID\",\"subject\":\"E2E订单\",\"price\":100,\"expireTime\":$OEXP}" "$APP_KEY" "$NEW_SECRET")
+open_expect "$R" ".code == 0 and .data.status == 0 and .data.merchantOrderId == \"$P_ID\" and .data.price == 100 and (.data.expireTime | type) == \"number\"" \
+  || die "开放接口创建支付单失败：$R"
+# 外部系统的订单没有付款会员，不能选钱包（先于订单与渠道校验）
+R=$(open_post /open-api/pay/order/submit "{\"merchantOrderId\":\"$P_ID\",\"channelCode\":\"wallet\"}" "$APP_KEY" "$NEW_SECRET")
+open_expect "$R" '.code == 1007002005' || die "开放接口选择钱包支付未被拒绝：$R"
+R=$(open_post /open-api/pay/order/submit "{\"merchantOrderId\":\"$P_ID\",\"channelCode\":\"mock\"}" "$APP_KEY" "$NEW_SECRET")
+open_expect "$R" '.code == 0 and .data.displayMode == "URL" and (.data.displayContent | startswith("/app-api/pay/mock/confirm?no="))' \
+  || die "开放接口提交 Mock 支付失败：$R"
+CONFIRM=$(echo "$R" | tail -1 | jq -r '.data.displayContent')
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW$CONFIRM")
+[ "$CODE" = "200" ] || die "Mock 确认页确认支付返回 $CODE"
+open_get_until /open-api/pay/order/get "merchantOrderId=$P_ID" '.data.status == 10 and .data.channelCode == "mock"' 30 \
+  || die "30 秒内支付单未变为支付成功：$LAST_R"
+NOTE=$(await_notify pay.order.paid merchantOrderId "$P_ID" 30) || die "未收到支付成功回调，或回调验签失败：$NOTE"
+ok "外部系统经开放平台下单、Mock 支付、收到支付成功回调"
+
+# ---- 退款 ----
+RF_ID="E2E-R$PAY_TS"
+R=$(open_post /open-api/pay/refund/create \
+  "{\"merchantOrderId\":\"$P_ID\",\"merchantRefundId\":\"$RF_ID\",\"price\":30,\"reason\":\"e2e\"}" "$APP_KEY" "$NEW_SECRET")
+open_expect "$R" ".code == 0 and .data.merchantRefundId == \"$RF_ID\" and .data.refundPrice == 30" || die "开放接口发起退款失败：$R"
+open_get_until /open-api/pay/refund/get "merchantRefundId=$RF_ID" '.data.status == 10' 30 \
+  || die "30 秒内退款未成功：$LAST_R"
+NOTE=$(await_notify pay.refund.success merchantRefundId "$RF_ID" 30) || die "未收到退款成功回调，或回调验签失败：$NOTE"
+open_get_until /open-api/pay/order/get "merchantOrderId=$P_ID" '.data.refundPrice == 30' 10 \
+  || die "退款后支付单的已退款金额不是 30：$LAST_R"
+ok "外部系统经开放平台退款并收到回调"
+
+# ---- 会员充值：套餐 1 为"充 100 送 10"，到账 10000 + 1000 ----
+MEMBER_AUTH="Authorization: Bearer $MT"
+wallet_balance() { curl -s "$GW/app-api/pay/wallet/get" -H "$MEMBER_AUTH" | jq -r '.data.balance // empty'; }
+R=$(curl -s -X POST "$GW/app-api/pay/wallet-recharge/create" -H "$MEMBER_AUTH" -H "$JSON" -d '{"packageId":1}')
+RECHARGE_ORDER=$(echo "$R" | jq -r '.data.payOrderId // empty')
+[ -n "$RECHARGE_ORDER" ] || die "创建充值失败：$R"
+R=$(curl -s -X POST "$GW/app-api/pay/order/submit" -H "$MEMBER_AUTH" -H "$JSON" \
+  -d "{\"id\":$RECHARGE_ORDER,\"channelCode\":\"mock\"}")
+CONFIRM=$(echo "$R" | jq -r '.data.displayContent // empty')
+[ -n "$CONFIRM" ] || die "充值订单提交 Mock 支付失败：$R"
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW$CONFIRM")
+[ "$CODE" = "200" ] || die "Mock 确认页确认充值返回 $CODE"
+deadline=$((SECONDS + 60))
+until [ "$(wallet_balance)" = "$((BAL0 + 11000))" ]; do
+  [ $SECONDS -lt $deadline ] || die "60 秒内钱包余额未到 $((BAL0 + 11000))，当前 $(wallet_balance)"
+  sleep 2
+done
+ok "会员充值经 Mock 付款后到账（含赠送）"
+
+# ---- 钱包支付与退款：内部接口直连 pay 服务，会员以钱包付款 ----
+W_ID="E2E-W$PAY_TS"
+R=$(curl -s -X POST "$PS/rpc-api/pay/order/create" -H "$TENANT" -H "$JSON" \
+  -d "{\"appKey\":\"mall\",\"merchantOrderId\":\"$W_ID\",\"subject\":\"E2E钱包支付\",\"price\":500,\"expireTime\":\"2099-01-01T00:00:00\",\"userIp\":\"127.0.0.1\",\"userId\":$MEMBER_ID,\"userType\":1}")
+W_ORDER=$(echo "$R" | jq -r '.data // empty')
+[ -n "$W_ORDER" ] || die "内部接口创建钱包订单失败：$R"
+R=$(curl -s -X POST "$GW/app-api/pay/order/submit" -H "$MEMBER_AUTH" -H "$JSON" \
+  -d "{\"id\":$W_ORDER,\"channelCode\":\"wallet\"}")
+echo "$R" | jq -e '.code == 0 and .data.status == 10 and .data.displayMode == "NONE"' >/dev/null || die "钱包支付未即时成功：$R"
+[ "$(wallet_balance)" = "$((BAL0 + 11000 - 500))" ] || die "钱包支付后余额为 $(wallet_balance)，期望 $((BAL0 + 11000 - 500))"
+R=$(curl -s -X POST "$PS/rpc-api/pay/refund/create" -H "$TENANT" -H "$JSON" \
+  -d "{\"appKey\":\"mall\",\"merchantOrderId\":\"$W_ID\",\"merchantRefundId\":\"${W_ID}-R\",\"price\":500,\"reason\":\"e2e\",\"userIp\":\"127.0.0.1\"}")
+W_REFUND=$(echo "$R" | jq -r '.data // empty')
+[ -n "$W_REFUND" ] || die "内部接口发起钱包退款失败：$R"
+deadline=$((SECONDS + 30))
+until [ "$(wallet_balance)" = "$((BAL0 + 11000))" ]; do
+  [ $SECONDS -lt $deadline ] || die "30 秒内钱包退款未退回余额，当前 $(wallet_balance)"
+  sleep 2
+done
+[ "$(curl -s "$PS/rpc-api/pay/refund/get?id=$W_REFUND" -H "$TENANT" | jq -r '.data.status')" = "10" ] || die "钱包退款单不是退款成功"
+ok "钱包余额支付即时成功，退款退回余额"
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/rpc-api/pay/order/create" -H "$JSON" -d '{}')
+[ "$CODE" = "403" ] || die "经网关可访问支付内部接口，返回 $CODE"; ok "支付内部接口经网关已阻断"
+
+# ---- 丢失回调由补查补回：渠道改为成功但不回调，补查任务每分钟执行，支付尝试创建 1 分钟后才查单 ----
+UPD_BODY=$(jq -nc --argjson id "$PAY_CH_ID" --argjson app "$PAY_APP_ID" \
+  --arg cfg '{"notifySecret":"***","behavior":"DROP_NOTIFY","delaySeconds":2}' \
+  '{id:$id,appId:$app,code:"mock",status:0,feeRate:0,remark:"e2e",config:$cfg}')
+R=$(curl -s -X PUT "$GW/admin-api/pay/channel/update" -H "$AUTH" -H "$JSON" -d "$UPD_BODY")
+[ "$(echo "$R" | jq -r '.code')" = "0" ] || die "修改 Mock 渠道失败：$R"
+CFG=$(curl -s "$GW/admin-api/pay/channel/get?id=$PAY_CH_ID" -H "$AUTH" | jq -r '.data.config')
+echo "$CFG" | grep -q 'DROP_NOTIFY' && echo "$CFG" | grep -q '\*\*\*' && ! echo "$CFG" | grep -q 'e2e-mock-notify-secret-01' \
+  || die "渠道配置未更新为 DROP_NOTIFY，或回显了明文密钥：$CFG"
+D_ID="E2E-D$PAY_TS"
+R=$(open_post /open-api/pay/order/create \
+  "{\"merchantOrderId\":\"$D_ID\",\"subject\":\"E2E补查\",\"price\":100,\"expireTime\":$OEXP}" "$APP_KEY" "$NEW_SECRET")
+open_expect "$R" '.code == 0 and .data.status == 0' || die "创建补查用支付单失败：$R"
+R=$(open_post /open-api/pay/order/submit "{\"merchantOrderId\":\"$D_ID\",\"channelCode\":\"mock\"}" "$APP_KEY" "$NEW_SECRET")
+open_expect "$R" '.code == 0 and .data.displayMode == "URL"' || die "补查用支付单提交失败：$R"
+CONFIRM=$(echo "$R" | tail -1 | jq -r '.data.displayContent')
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW$CONFIRM")
+[ "$CODE" = "200" ] || die "Mock 确认页确认补查用支付单返回 $CODE"
+sleep 5
+open_get_until /open-api/pay/order/get "merchantOrderId=$D_ID" '.data.status == 0' 1 \
+  || die "渠道丢弃回调后支付单不应立即成功：$LAST_R"
+open_get_until /open-api/pay/order/get "merchantOrderId=$D_ID" '.data.status == 10' 180 \
+  || die "180 秒内补查任务未补回支付结果：$LAST_R"
+NOTE=$(await_notify pay.order.paid merchantOrderId "$D_ID" 30) || die "补查补回支付结果后未收到支付成功回调，或回调验签失败：$NOTE"
+ok "Mock 丢弃回调时由补查任务补回支付结果"
+
+# ---- 生产保护：渠道回调入口免登录，靠渠道验签；不存在的渠道、错误签名都被拒绝 ----
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/app-api/pay/notify/order/999999999")
+[ "$CODE" = "404" ] || die "不存在的渠道回调返回 $CODE，期望 404"
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/app-api/pay/notify/order/$PAY_CH_ID" -H "$JSON" \
+  -H "X-Mock-Timestamp: $(date +%s)000" -H "X-Mock-Sign: invalid" \
+  -d '{"type":"order","no":"P0","status":"SUCCESS","price":100}')
+[ "$CODE" = "400" ] || die "错误签名的渠道回调返回 $CODE，期望 400"
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/app-api/pay/mock/confirm?no=P0")
+[ "$CODE" = "404" ] || die "不存在的支付尝试确认返回 $CODE，期望 404"
+ok "渠道回调：不存在的渠道 404，错误签名 400；Mock 确认页对不存在的支付 404"
 
 echo "==> 文档、链路追踪、监控、定时任务"
 curl -sf -o /dev/null "$GW/doc.html" || die "接口文档聚合页不可访问"

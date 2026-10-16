@@ -26,6 +26,10 @@ echo "==> 校验配置包不含连接地址与密钥"
 open_ssrf=$(grep -HnEi '^[[:space:]]*allow-private-address[[:space:]]*:[[:space:]]*true([[:space:]]|#|$)' "$CONFIG_DIR"/*.yaml || true)
 [ -z "$open_ssrf" ] || fail "配置包不得出现 allow-private-address: true（该开关只在 profile 中设置）：
 $open_ssrf"
+# 模拟支付开关同理：只能由 local / dev 的 profile 打开，包里写 true 会让生产也能用模拟支付让订单"支付成功"
+mock_on=$(grep -HnEi '^[[:space:]]*mock-enabled[[:space:]]*:[[:space:]]*true([[:space:]]|#|$)' "$CONFIG_DIR"/*.yaml || true)
+[ -z "$mock_on" ] || fail "配置包不得出现 mock-enabled: true（模拟支付开关只在 profile 中设置）：
+$mock_on"
 # 只看非注释行、以这些词结尾的键名（如 password、app-secret、access-token、server-addr、url）
 leaks=$(grep -HnEi '^[[:space:]]*-?[[:space:]]*[a-z0-9_.-]*(password|secret|token|url|uri|host|addr|address|addresses|username)[[:space:]]*:' \
   "$CONFIG_DIR"/*.yaml || true)

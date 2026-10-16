@@ -437,14 +437,14 @@ deadline=$((SECONDS + 60))
 while true; do
   APPS=$(curl -s -u "admin:${CCLOUD_MONITOR_PASSWORD}" -H 'Accept: application/json' "http://127.0.0.1:${MONITOR_PORT}/applications")
   down=""
-  for app in ccloud-gateway ccloud-system-server ccloud-infra-server ccloud-member-server ccloud-open-server; do
+  for app in ccloud-gateway ccloud-system-server ccloud-infra-server ccloud-member-server ccloud-open-server ccloud-pay-server; do
     echo "$APPS" | jq -e --arg n "$app" 'map(select(.name == $n and .status == "UP")) | length == 1' >/dev/null || down="$down $app"
   done
   [ -z "$down" ] && break
   [ $SECONDS -lt $deadline ] || die "监控面板中$down 不是 UP"
   sleep 5
 done
-ok "监控面板显示 gateway、system、infra、member、open 均为 UP"
+ok "监控面板显示 gateway、system、infra、member、open、pay 均为 UP"
 JOBS=$(lq "SELECT COUNT(DISTINCT executor_handler) FROM xxl_job.xxl_job_log l JOIN xxl_job.xxl_job_group g ON l.job_group = g.id
   WHERE g.app_name = 'ccloud-system-server' AND l.handle_code = 200")
 [ "${JOBS:-0}" -ge 2 ] || die "XXL-Job 两个重投任务尚未成功执行（成功的任务数 ${JOBS:-0}），任务每分钟调度一次，可稍后重试"

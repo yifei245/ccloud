@@ -41,7 +41,7 @@ fi
 echo "==> 打包应用"
 # 必须 clean：只有依赖（如 framework）变化时，jar 插件认为模块 jar 未过期，repackage 又跳过已打包的 jar，镜像里会是旧依赖
 (cd "$ROOT" && mvn -q -DskipTests clean package \
-  -pl ccloud-gateway,ccloud-monitor,ccloud-module-system/ccloud-module-system-biz,ccloud-module-infra/ccloud-module-infra-biz,ccloud-module-member/ccloud-module-member-biz,ccloud-module-open/ccloud-module-open-biz -am)
+  -pl ccloud-gateway,ccloud-monitor,ccloud-module-system/ccloud-module-system-biz,ccloud-module-infra/ccloud-module-infra-biz,ccloud-module-member/ccloud-module-member-biz,ccloud-module-open/ccloud-module-open-biz,ccloud-module-pay/ccloud-module-pay-biz -am)
 
 # 每次重建镜像，旧镜像会失去标签成为悬空镜像，反复构建会累积几十 GB。
 # 只清理本项目（compose 标签 ccloud）的悬空镜像，不影响其他项目；构建失败退出时也要清理

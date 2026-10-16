@@ -1,4 +1,4 @@
-# ccloud 应用编排：gateway / system / infra / member / open / monitor。中间件使用本机已有的实例（见 scripts/lib/local-middleware.sh），
+# ccloud 应用编排：gateway / system / infra / member / open / pay / monitor。中间件使用本机已有的实例（见 scripts/lib/local-middleware.sh），
 # 经 host.docker.internal 访问；本机没有中间件时可先用 docker-compose.middleware.yml 自带一套，并相应调整 .env。
 # 启动：scripts/docker-up.sh（检查本机中间件、初始化 ccloud 库与 Nacos 配置、打包、构建镜像并启动）
 name: ccloud
@@ -86,6 +86,26 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:28084/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
+  ccloud-pay:
+    build: ../ccloud-module-pay/ccloud-module-pay-biz
+    image: ccloud/ccloud-pay-server:1.0.0
+    container_name: ccloud-pay
+    restart: unless-stopped
+    environment: *app-env
+    extra_hosts: *app-hosts
+    ports:
+      - "127.0.0.1:${PAY_PORT}:28085"
+    depends_on:
+      # 启动时经 RPC 从 system 加载文案等数据
+      ccloud-system:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:28085/actuator/health | grep -q UP"]
       interval: 10s
       timeout: 5s
       retries: 30

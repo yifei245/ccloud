@@ -12,7 +12,9 @@ import com.ccloud.module.pay.framework.config.PayProperties;
 import com.ccloud.module.pay.test.BasePayDbUnitTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static com.ccloud.module.pay.enums.ErrorCodeConstants.*;
@@ -145,5 +147,29 @@ class PayAppServiceImplTest extends BasePayDbUnitTest {
         // 不绑定的普通更新不受影响
         payAppService.updateApp(req("wallet", null).setId(id).setName("改名"));
         assertThat(payAppMapper.selectById(id).getName()).isEqualTo("改名");
+    }
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Test
+    void 应用下有未完成的转账或退款时不能删除_了结后可以删除() {
+        Long id = payAppService.createApp(req("a-del", null));
+        payChannelMapper.insert(new PayChannelDO().setAppId(id).setCode("mock").setStatus(0).setFeeRate(0D).setConfig("{}"));
+        jdbcTemplate.update("INSERT INTO pay_transfer (no, app_id, channel_id, channel_code, merchant_transfer_id, subject, price, "
+                + "user_account, status, user_ip, tenant_id) VALUES ('UT-APPDEL-T', ?, 1, 'mock', 'UT-APPDEL-T', 's', 100, 'acc', 5, '1.1.1.1', ?)", id, TENANT_ID);
+        assertServiceException(() -> payAppService.deleteApp(id), CHANNEL_HAS_UNFINISHED);
+        assertThat(payAppMapper.selectById(id)).isNotNull();
+        assertThat(payChannelMapper.selectListByAppId(id)).hasSize(1);
+
+        jdbcTemplate.update("UPDATE pay_transfer SET status = 10 WHERE no = 'UT-APPDEL-T'");
+        jdbcTemplate.update("INSERT INTO pay_refund (no, app_id, channel_id, channel_code, order_id, order_no, merchant_order_id, "
+                + "merchant_refund_id, status, pay_price, refund_price, reason, channel_order_no, tenant_id) "
+                + "VALUES ('UT-APPDEL-R', ?, 1, 'mock', 1, 'o', 'mo', 'UT-APPDEL-R', 0, 100, 100, 'r', '', ?)", id, TENANT_ID);
+        assertServiceException(() -> payAppService.deleteApp(id), CHANNEL_HAS_UNFINISHED);
+
+        jdbcTemplate.update("UPDATE pay_refund SET status = 10 WHERE no = 'UT-APPDEL-R'");
+        payAppService.deleteApp(id);
+        assertThat(payAppMapper.selectById(id)).isNull();
     }
 }

@@ -35,7 +35,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.data.redis.RedisSystemException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,7 +61,10 @@ import static com.ccloud.module.pay.enums.ErrorCodeConstants.PAY_ORDER_SUBMIT_IN
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.reset;
 
 /**
  * 经渠道层使用真实的钱包渠道（WalletPayClient），不用 Fake：钱包渠道自带本地事务，必须在外层事务提交之后、
@@ -88,6 +95,8 @@ class WalletChannelEndToEndTest extends BasePayDbAndRedisUnitTest {
     private JdbcTemplate jdbcTemplate;
     @Resource
     private PlatformTransactionManager transactionManager;
+    @MockitoSpyBean
+    private StringRedisTemplate stringRedisTemplate;
     @MockitoBean
     private OutboxMessageService outboxMessageService;
     @MockitoBean
@@ -228,5 +237,25 @@ class WalletChannelEndToEndTest extends BasePayDbAndRedisUnitTest {
         assertThat(queryInt("SELECT COUNT(*) FROM pay_order_extension WHERE order_id = ? AND status = ?", orderId,
                 PayOrderStatusEnum.SUCCESS.getStatus())).isEqualTo(1);
         assertThat(queryInt("SELECT status FROM pay_order WHERE id = ?", orderId)).isEqualTo(PayOrderStatusEnum.SUCCESS.getStatus());
+    }
+
+    @Test
+    void 释放发起支付锁失败时不影响钱包支付的结果() {
+        Long walletId = walletService.getOrCreateWallet(PAYER, UserTypeEnum.MEMBER.getValue()).getId();
+        walletService.addBalance(walletId, PayWalletBizTypeEnum.ADJUST, "e2e-rel-init", "初始", 5000);
+        Long orderId = orderService.createOrder(new PayOrderCreateReqDTO().setAppKey("ut-e2e").setMerchantOrderId("E2E-REL")
+                .setSubject("释放锁失败").setPrice(1000).setExpireTime(LocalDateTime.now().plusHours(1)).setUserIp("1.1.1.1")
+                .setUserId(PAYER).setUserType(UserTypeEnum.MEMBER.getValue()));
+        doThrow(new RedisSystemException("release failed", new RuntimeException("redis down")))
+                .when(stringRedisTemplate).execute(any(RedisScript.class), anyList(), any(Object.class));
+        try {
+            var resp = orderService.submitOrder(orderId, new PayOrderSubmitReqVO().setChannelCode("wallet"), "1.1.1.1");
+
+            assertThat(resp.getStatus()).as("支付结果照常返回").isEqualTo(PayOrderStatusEnum.SUCCESS.getStatus());
+            assertThat(balanceOf(PAYER)).isEqualTo(4000);
+        } finally {
+            reset(stringRedisTemplate);
+            stringRedisTemplate.delete("pay:order:submit:" + orderId);
+        }
     }
 }

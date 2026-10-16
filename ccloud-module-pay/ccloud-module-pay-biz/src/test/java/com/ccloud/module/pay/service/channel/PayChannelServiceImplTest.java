@@ -115,9 +115,16 @@ class PayChannelServiceImplTest extends BasePayDbUnitTest {
         assertServiceException(() -> payChannelService.deleteChannel(id), CHANNEL_NOT_FOUND);
     }
 
-    private void insertExtension(long channelId, int status) {
+    private long insertOrder(int status) {
+        String merchantOrderId = "UT-DEL-O" + System.nanoTime();
+        jdbcTemplate.update("INSERT INTO pay_order (app_id, merchant_order_id, subject, price, status, user_ip, expire_time, tenant_id) "
+                + "VALUES (1, ?, 's', 100, ?, '1.1.1.1', DATE_ADD(NOW(), INTERVAL 1 HOUR), ?)", merchantOrderId, status, TENANT_ID);
+        return jdbcTemplate.queryForObject("SELECT id FROM pay_order WHERE merchant_order_id = ?", Long.class, merchantOrderId);
+    }
+
+    private void insertExtension(long channelId, long orderId, int status) {
         jdbcTemplate.update("INSERT INTO pay_order_extension (no, order_id, channel_id, channel_code, user_ip, status, tenant_id) "
-                + "VALUES (?, 1, ?, 'mock', '1.1.1.1', ?, ?)", "UT-DEL-" + System.nanoTime(), channelId, status, TENANT_ID);
+                + "VALUES (?, ?, ?, 'mock', '1.1.1.1', ?, ?)", "UT-DEL-" + System.nanoTime(), orderId, channelId, status, TENANT_ID);
     }
 
     private void insertRefund(long channelId, int status) {
@@ -137,13 +144,32 @@ class PayChannelServiceImplTest extends BasePayDbUnitTest {
     @Test
     void 渠道下有等待中的支付尝试时不能删除_了结后可以删除() {
         Long id = payChannelService.createChannel(req("mock", "{}"));
-        insertExtension(id, 0);
+        insertExtension(id, insertOrder(0), 0);
         assertServiceException(() -> payChannelService.deleteChannel(id), CHANNEL_HAS_UNFINISHED);
         assertThat(payChannelService.getChannel(id)).isNotNull();
 
         jdbcTemplate.update("UPDATE pay_order_extension SET status = 10 WHERE channel_id = ?", id);
         payChannelService.deleteChannel(id);
         assertThat(payChannelService.getChannel(id)).isNull();
+    }
+
+    @Test
+    void 订单已支付或已关闭后遗留的兄弟等待尝试不拦删除渠道() {
+        Long id = payChannelService.createChannel(req("mock", "{}"));
+        // 订单已支付成功（10）、已关闭（30），名下被放弃的等待尝试永远不会再有结果
+        insertExtension(id, insertOrder(10), 0);
+        insertExtension(id, insertOrder(30), 0);
+        payChannelService.deleteChannel(id);
+        assertThat(payChannelService.getChannel(id)).isNull();
+    }
+
+    @Test
+    void 订单仍待支付的等待尝试拦删除渠道_即使同渠道还有已支付订单的遗留尝试() {
+        Long id = payChannelService.createChannel(req("mock", "{}"));
+        insertExtension(id, insertOrder(10), 0);
+        insertExtension(id, insertOrder(0), 0);
+        assertServiceException(() -> payChannelService.deleteChannel(id), CHANNEL_HAS_UNFINISHED);
+        assertThat(payChannelService.getChannel(id)).isNotNull();
     }
 
     @Test
@@ -176,7 +202,7 @@ class PayChannelServiceImplTest extends BasePayDbUnitTest {
     @Test
     void 其他渠道的未完成单据不影响本渠道删除() {
         Long id = payChannelService.createChannel(req("mock", "{}"));
-        insertExtension(id + 1000, 0);
+        insertExtension(id + 1000, insertOrder(0), 0);
         insertRefund(id + 1000, 0);
         insertTransfer(id + 1000, 0);
         payChannelService.deleteChannel(id);

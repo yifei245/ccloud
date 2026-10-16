@@ -28,6 +28,11 @@ public interface PayTransferMapper extends BaseMapperX<PayTransferDO> {
                 .in(PayTransferDO::getStatus, statuses));
     }
 
+    default Long selectCountByAppIdAndStatuses(Long appId, Collection<Integer> statuses) {
+        return selectCount(new LambdaQueryWrapperX<PayTransferDO>().eq(PayTransferDO::getAppId, appId)
+                .in(PayTransferDO::getStatus, statuses));
+    }
+
     default int updateByIdAndStatus(Long id, Collection<Integer> whereStatuses, PayTransferDO update) {
         return update(update, new LambdaUpdateWrapper<PayTransferDO>().eq(PayTransferDO::getId, id)
                 .in(PayTransferDO::getStatus, whereStatuses));

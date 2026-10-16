@@ -140,8 +140,19 @@ public class PayOrderServiceImpl implements PayOrderService {
         try {
             return doSubmitOrder(orderId, reqVO, userIp);
         } finally {
-            // 仅释放自己持有的锁：超过有效期被他人接手后，不能误删对方的锁
+            releaseSubmitLock(lockKey, lockToken);
+        }
+    }
+
+    /**
+     * 仅释放自己持有的锁：超过有效期被他人接手后，不能误删对方的锁。
+     * 释放失败（如 Redis 故障）只记警告：不能让 finally 里的异常盖掉发起支付的结果，锁会在有效期后自行过期
+     */
+    private void releaseSubmitLock(String lockKey, String lockToken) {
+        try {
             stringRedisTemplate.execute(RELEASE_LOCK_SCRIPT, List.of(lockKey), lockToken);
+        } catch (RuntimeException e) {
+            log.warn("[submitOrder] 释放发起支付锁 {} 失败，等待其过期", lockKey, e);
         }
     }
 

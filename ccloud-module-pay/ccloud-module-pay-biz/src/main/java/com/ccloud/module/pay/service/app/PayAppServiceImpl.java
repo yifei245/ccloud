@@ -15,6 +15,10 @@ import com.ccloud.module.pay.dal.dataobject.channel.PayChannelDO;
 import com.ccloud.module.pay.dal.mysql.app.PayAppMapper;
 import com.ccloud.module.pay.dal.mysql.channel.PayChannelMapper;
 import com.ccloud.module.pay.dal.mysql.order.PayOrderMapper;
+import com.ccloud.module.pay.dal.mysql.refund.PayRefundMapper;
+import com.ccloud.module.pay.dal.mysql.transfer.PayTransferMapper;
+import com.ccloud.module.pay.enums.refund.PayRefundStatusEnum;
+import com.ccloud.module.pay.enums.transfer.PayTransferStatusEnum;
 import com.ccloud.module.pay.framework.config.PayProperties;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -37,6 +41,10 @@ public class PayAppServiceImpl implements PayAppService {
     private PayChannelMapper payChannelMapper;
     @Resource
     private PayOrderMapper payOrderMapper;
+    @Resource
+    private PayTransferMapper payTransferMapper;
+    @Resource
+    private PayRefundMapper payRefundMapper;
     @Resource
     private OpenAppApi openAppApi;
     @Resource
@@ -100,6 +108,12 @@ public class PayAppServiceImpl implements PayAppService {
         validateAppExists(id);
         if (payOrderMapper.selectCountByAppId(id) > 0) {
             throw exception(PAY_APP_EXIST_ORDER);
+        }
+        // 下面删除渠道绕过了渠道删除的校验：未了结的转账（不依赖订单）与退款，删了渠道就无处补查
+        if (payTransferMapper.selectCountByAppIdAndStatuses(id, List.of(PayTransferStatusEnum.WAITING.getStatus(),
+                PayTransferStatusEnum.PROCESSING.getStatus())) > 0
+                || payRefundMapper.selectCountByAppIdAndStatus(id, PayRefundStatusEnum.WAITING.getStatus()) > 0) {
+            throw exception(CHANNEL_HAS_UNFINISHED);
         }
         // 渠道客户端缓存不必主动清理：取用时带着库中的配置，已删除渠道的缓存项不会再被访问
         payChannelMapper.delete(PayChannelDO::getAppId, id);

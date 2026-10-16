@@ -8,6 +8,8 @@ import java.time.Duration;
  */
 public final class PayJobBudget {
 
+    private static final int MAX_CAUSE_DEPTH = 10;
+
     private final long deadlineNanos;
 
     private PayJobBudget(Duration budget) {
@@ -30,7 +32,9 @@ public final class PayJobBudget {
      * 是的话调用方须重新置位中断标记并停止本轮，不能当作普通失败继续处理下一条
      */
     public static boolean isInterruption(Throwable e) {
-        for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+        // 限定深度：异常链可能成环（A 的 cause 是 B，B 的 cause 又是 A）
+        Throwable t = e;
+        for (int depth = 0; t != null && depth < MAX_CAUSE_DEPTH; depth++, t = t.getCause()) {
             if (t instanceof InterruptedException || t instanceof java.io.InterruptedIOException
                     || t instanceof java.nio.channels.ClosedByInterruptException) {
                 return true;

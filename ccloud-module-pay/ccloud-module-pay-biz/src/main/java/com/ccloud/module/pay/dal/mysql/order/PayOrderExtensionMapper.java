@@ -28,9 +28,14 @@ public interface PayOrderExtensionMapper extends BaseMapperX<PayOrderExtensionDO
                 .eq(PayOrderExtensionDO::getStatus, status));
     }
 
-    default Long selectCountByChannelIdAndStatus(Long channelId, Integer status) {
+    /**
+     * 渠道名下仍有结果可期的等待中的支付尝试：订单也还在待支付。订单已支付或已关闭后遗留的兄弟尝试永远不会再有结果，不计入
+     */
+    default Long selectCountWaitingByChannelIdOfWaitingOrder(Long channelId) {
         return selectCount(new LambdaQueryWrapperX<PayOrderExtensionDO>().eq(PayOrderExtensionDO::getChannelId, channelId)
-                .eq(PayOrderExtensionDO::getStatus, status));
+                .eq(PayOrderExtensionDO::getStatus, PayOrderStatusEnum.WAITING.getStatus())
+                .apply("EXISTS (SELECT 1 FROM pay_order o WHERE o.id = pay_order_extension.order_id AND o.status = {0} AND o.deleted = 0)",
+                        PayOrderStatusEnum.WAITING.getStatus()));
     }
 
     default int updateByIdAndStatus(Long id, Integer whereStatus, PayOrderExtensionDO update) {

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class PayJobBudgetTest {
 
@@ -30,6 +31,27 @@ class PayJobBudgetTest {
         Thread.currentThread().interrupt();
         assertThat(budget.exhausted()).isTrue();
         assertThat(Thread.currentThread().isInterrupted()).as("检查不得吞掉中断标记").isTrue();
+    }
+
+    @Test
+    @DisplayName("异常链成环时有限步内结束，不死循环；链很深时也只看前若干层")
+    void isInterruptionBoundedOnCycle() {
+        RuntimeException a = new RuntimeException("a");
+        RuntimeException b = new RuntimeException("b");
+        a.initCause(b);
+        b.initCause(a);
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () ->
+                assertThat(PayJobBudget.isInterruption(a)).isFalse());
+
+        // 环上挂着中断：能在深度上限内找到
+        RuntimeException c = new RuntimeException("c", new InterruptedException());
+        assertThat(PayJobBudget.isInterruption(new RuntimeException(new RuntimeException(c)))).isTrue();
+
+        Throwable deep = new InterruptedException();
+        for (int i = 0; i < 30; i++) {
+            deep = new RuntimeException(deep);
+        }
+        assertThat(PayJobBudget.isInterruption(deep)).as("超过深度上限不再追").isFalse();
     }
 
     @Test

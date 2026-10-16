@@ -10,7 +10,6 @@ import com.ccloud.module.pay.dal.mysql.order.PayOrderExtensionMapper;
 import com.ccloud.module.pay.dal.mysql.refund.PayRefundMapper;
 import com.ccloud.module.pay.dal.mysql.transfer.PayTransferMapper;
 import com.ccloud.module.pay.enums.PayChannelEnum;
-import com.ccloud.module.pay.enums.order.PayOrderStatusEnum;
 import com.ccloud.module.pay.enums.refund.PayRefundStatusEnum;
 import com.ccloud.module.pay.enums.transfer.PayTransferStatusEnum;
 import com.ccloud.module.pay.framework.config.PayProperties;
@@ -85,7 +84,7 @@ public class PayChannelServiceImpl implements PayChannelService {
     public void deleteChannel(Long id) {
         validateChannelExists(id);
         // 渠道删除后，未完成的单据无处补查、回调也找不到渠道：卡在等待中的钱无法了结
-        if (extensionMapper.selectCountByChannelIdAndStatus(id, PayOrderStatusEnum.WAITING.getStatus()) > 0
+        if (extensionMapper.selectCountWaitingByChannelIdOfWaitingOrder(id) > 0
                 || refundMapper.selectCountByChannelIdAndStatus(id, PayRefundStatusEnum.WAITING.getStatus()) > 0
                 || transferMapper.selectCountByChannelIdAndStatuses(id, List.of(PayTransferStatusEnum.WAITING.getStatus(),
                 PayTransferStatusEnum.PROCESSING.getStatus())) > 0) {

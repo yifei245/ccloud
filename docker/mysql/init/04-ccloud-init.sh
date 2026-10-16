@@ -2,7 +2,7 @@
 # 登记 ccloud 的 XXL-Job 执行器与任务（可重复执行，已登记的跳过）：
 #   - 删除上游示例执行器与任务，登记 system、infra、open、pay 四个执行器及其任务，并把默认管理员密码 123456 替换为 .env 中的密码
 # MySQL 容器首次初始化时执行（位于 01 ccloud 库、02 Nacos 库、03 XXL-Job 库之后），scripts/docker-up.sh 每次也会执行
-# 任务处理器名须与代码中的 @XxlJob 一致（system 的 MqJobHandler，infra 的 MqJobHandler 与 ApiLogCleanJob，open 的 MqJobHandler、回调重试与日志清理任务，pay 的超时关单、支付与退款与转账补查任务和 MqJobHandler）
+# 任务处理器名须与代码中的 @XxlJob 一致（system 的 MqJobHandler，infra 的 MqJobHandler 与 ApiLogCleanJob，open 的 MqJobHandler、回调重试与日志清理任务，pay 的超时关单，支付、退款、转账补查任务和 MqJobHandler）
 set -euo pipefail
 
 : "${XXL_JOB_ADMIN_PASSWORD:?必须设置 XXL_JOB_ADMIN_PASSWORD}"

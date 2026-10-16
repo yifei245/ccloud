@@ -1,5 +1,6 @@
 package com.ccloud.module.pay.controller.admin.channel;
 
+import com.ccloud.framework.apilog.core.annotation.ApiAccessLog;
 import com.ccloud.framework.common.pojo.CommonResult;
 import com.ccloud.framework.common.util.object.BeanUtils;
 import com.ccloud.module.pay.controller.admin.channel.vo.PayChannelRespVO;
@@ -21,6 +22,8 @@ import java.util.List;
 import static com.ccloud.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "管理后台 - 支付渠道")
+// 渠道配置是 JSON 字符串，内部的密钥名脱敏器看不到：整段屏蔽 config。访问日志与异常日志共用这套规则
+@ApiAccessLog(sanitizeKeys = "config")
 @RestController
 @RequestMapping("/admin-api/pay/channel")
 @Validated

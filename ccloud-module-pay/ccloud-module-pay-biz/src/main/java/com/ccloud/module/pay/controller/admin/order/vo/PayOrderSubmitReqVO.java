@@ -1,6 +1,9 @@
 package com.ccloud.module.pay.controller.admin.order.vo;
 
+import com.ccloud.framework.common.util.json.JsonUtils;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -21,6 +24,17 @@ public class PayOrderSubmitReqVO {
     @Size(max = 32, message = "支付方式长度不能超过 32 个字符")
     private String payMethod;
 
-    @Schema(description = "渠道额外参数，如微信的 openid")
+    @Schema(description = "渠道额外参数，如微信的 openid；序列化后不超过 " + MAX_CHANNEL_EXTRAS_JSON_LENGTH + " 个字符")
     private Map<String, String> channelExtras;
+
+    /**
+     * 渠道额外参数以 JSON 存入 varchar(1024) 列：超长在校验处拦下返回 400，而不是落库时报 500
+     */
+    public static final int MAX_CHANNEL_EXTRAS_JSON_LENGTH = 1000;
+
+    @JsonIgnore
+    @AssertTrue(message = "渠道额外参数过长，序列化后不能超过 " + MAX_CHANNEL_EXTRAS_JSON_LENGTH + " 个字符")
+    public boolean isChannelExtrasSizeValid() {
+        return channelExtras == null || JsonUtils.toJsonString(channelExtras).length() <= MAX_CHANNEL_EXTRAS_JSON_LENGTH;
+    }
 }

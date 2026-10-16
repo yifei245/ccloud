@@ -64,5 +64,10 @@ public class PayProperties {
          */
         @NotNull
         private Duration syncWindow = Duration.ofDays(1);
+        /**
+         * 补查、关单任务单次运行的时间预算，用完即结束、余下留给下一轮。须小于调度中心给任务设的执行超时（XXL-Job 登记为 60 秒）
+         */
+        @NotNull
+        private Duration timeBudget = Duration.ofSeconds(50);
     }
 }

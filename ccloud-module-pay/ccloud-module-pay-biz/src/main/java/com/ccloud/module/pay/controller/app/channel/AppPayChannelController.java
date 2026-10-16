@@ -3,6 +3,7 @@ package com.ccloud.module.pay.controller.app.channel;
 import com.ccloud.module.pay.controller.app.channel.vo.AppPayChannelRespVO;
 import com.ccloud.module.pay.dal.dataobject.channel.PayChannelDO;
 import com.ccloud.module.pay.enums.PayChannelEnum;
+import com.ccloud.module.pay.framework.pay.core.client.PayClientFactory;
 import com.ccloud.module.pay.service.channel.PayChannelService;
 import com.ccloud.module.pay.service.wallet.PayWalletRechargeService;
 import com.ccloud.framework.common.pojo.CommonResult;
@@ -30,13 +31,17 @@ public class AppPayChannelController {
     private PayChannelService channelService;
     @Resource
     private PayWalletRechargeService rechargeService;
+    @Resource
+    private PayClientFactory payClientFactory;
 
     @GetMapping("/list")
-    @Operation(summary = "获得应用下可用的支付渠道列表", description = "只含已开启的渠道；钱包充值应用不含钱包渠道（充值不能用钱包余额支付）")
+    @Operation(summary = "获得应用下可用的支付渠道列表", description = "只含已开启且本环境有实现的渠道；钱包充值应用不含钱包渠道（充值不能用钱包余额支付）")
     @Parameter(name = "appId", description = "支付应用编号", required = true, example = "1")
     public CommonResult<List<AppPayChannelRespVO>> getChannelList(@RequestParam("appId") Long appId) {
         boolean rechargeApp = rechargeService.isRechargeApp(appId);
         return success(channelService.getEnableChannelList(appId).stream()
+                // 编码已不受支持（如关闭模拟支付后遗留的 mock 渠道）的渠道发起不了支付，不给用户选
+                .filter(channel -> payClientFactory.isSupported(channel.getCode()))
                 .filter(channel -> !(rechargeApp && PayChannelEnum.WALLET.getCode().equals(channel.getCode())))
                 .map(AppPayChannelController::toResp)
                 .toList());

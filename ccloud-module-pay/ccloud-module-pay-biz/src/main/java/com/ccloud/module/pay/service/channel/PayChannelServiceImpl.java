@@ -6,7 +6,13 @@ import com.ccloud.framework.tenant.core.util.TenantUtils;
 import com.ccloud.module.pay.controller.admin.channel.vo.PayChannelSaveReqVO;
 import com.ccloud.module.pay.dal.dataobject.channel.PayChannelDO;
 import com.ccloud.module.pay.dal.mysql.channel.PayChannelMapper;
+import com.ccloud.module.pay.dal.mysql.order.PayOrderExtensionMapper;
+import com.ccloud.module.pay.dal.mysql.refund.PayRefundMapper;
+import com.ccloud.module.pay.dal.mysql.transfer.PayTransferMapper;
 import com.ccloud.module.pay.enums.PayChannelEnum;
+import com.ccloud.module.pay.enums.order.PayOrderStatusEnum;
+import com.ccloud.module.pay.enums.refund.PayRefundStatusEnum;
+import com.ccloud.module.pay.enums.transfer.PayTransferStatusEnum;
 import com.ccloud.module.pay.framework.config.PayProperties;
 import com.ccloud.module.pay.framework.pay.core.client.PayClient;
 import com.ccloud.module.pay.framework.pay.core.client.PayClientFactory;
@@ -26,6 +32,12 @@ public class PayChannelServiceImpl implements PayChannelService {
 
     @Resource
     private PayChannelMapper payChannelMapper;
+    @Resource
+    private PayOrderExtensionMapper extensionMapper;
+    @Resource
+    private PayRefundMapper refundMapper;
+    @Resource
+    private PayTransferMapper transferMapper;
     @Resource
     private PayAppService payAppService;
     @Resource
@@ -72,6 +84,13 @@ public class PayChannelServiceImpl implements PayChannelService {
     @Override
     public void deleteChannel(Long id) {
         validateChannelExists(id);
+        // 渠道删除后，未完成的单据无处补查、回调也找不到渠道：卡在等待中的钱无法了结
+        if (extensionMapper.selectCountByChannelIdAndStatus(id, PayOrderStatusEnum.WAITING.getStatus()) > 0
+                || refundMapper.selectCountByChannelIdAndStatus(id, PayRefundStatusEnum.WAITING.getStatus()) > 0
+                || transferMapper.selectCountByChannelIdAndStatuses(id, List.of(PayTransferStatusEnum.WAITING.getStatus(),
+                PayTransferStatusEnum.PROCESSING.getStatus())) > 0) {
+            throw exception(CHANNEL_HAS_UNFINISHED);
+        }
         payChannelMapper.deleteById(id);
         payClientFactory.invalidate(id);
     }

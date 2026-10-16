@@ -28,6 +28,11 @@ public interface PayOrderExtensionMapper extends BaseMapperX<PayOrderExtensionDO
                 .eq(PayOrderExtensionDO::getStatus, status));
     }
 
+    default Long selectCountByChannelIdAndStatus(Long channelId, Integer status) {
+        return selectCount(new LambdaQueryWrapperX<PayOrderExtensionDO>().eq(PayOrderExtensionDO::getChannelId, channelId)
+                .eq(PayOrderExtensionDO::getStatus, status));
+    }
+
     default int updateByIdAndStatus(Long id, Integer whereStatus, PayOrderExtensionDO update) {
         return update(update, new LambdaUpdateWrapper<PayOrderExtensionDO>().eq(PayOrderExtensionDO::getId, id)
                 .eq(PayOrderExtensionDO::getStatus, whereStatus));

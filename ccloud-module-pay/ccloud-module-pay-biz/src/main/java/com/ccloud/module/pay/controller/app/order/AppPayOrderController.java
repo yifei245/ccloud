@@ -8,6 +8,7 @@ import com.ccloud.module.pay.controller.admin.order.vo.PayOrderSubmitRespVO;
 import com.ccloud.module.pay.controller.app.order.vo.AppPayOrderRespVO;
 import com.ccloud.module.pay.controller.app.order.vo.AppPayOrderSubmitReqVO;
 import com.ccloud.module.pay.dal.dataobject.order.PayOrderDO;
+import com.ccloud.module.pay.service.app.PayAppService;
 import com.ccloud.module.pay.service.order.PayOrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,6 +39,8 @@ public class AppPayOrderController {
 
     @Resource
     private PayOrderService orderService;
+    @Resource
+    private PayAppService appService;
 
     @GetMapping("/get")
     @Operation(summary = "获得本人的支付单")
@@ -50,7 +53,9 @@ public class AppPayOrderController {
     @Operation(summary = "提交支付", description = "选择渠道发起支付，返回二维码、跳转链接等展示信息；钱包支付直接返回结果")
     public CommonResult<PayOrderSubmitRespVO> submitOrder(@Valid @RequestBody AppPayOrderSubmitReqVO reqVO,
                                                           HttpServletRequest request) {
-        validateOwnOrder(reqVO.getId());
+        PayOrderDO order = validateOwnOrder(reqVO.getId());
+        // 应用被禁用后不再接受新的支付（开放接口一侧的校验在解析应用时已完成）
+        appService.validPayApp(order.getAppId());
         return success(orderService.submitOrder(reqVO.getId(), reqVO, ServletUtils.getClientIP(request)));
     }
 

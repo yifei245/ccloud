@@ -24,6 +24,7 @@ import com.ccloud.module.pay.mq.message.PayRefundMessage;
 import com.ccloud.module.pay.service.app.PayAppService;
 import com.ccloud.module.pay.service.channel.PayChannelService;
 import com.ccloud.module.pay.service.common.PayAfterCommitExecutor;
+import com.ccloud.module.pay.service.common.PayJobBudget;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import com.ccloud.framework.common.exception.ServiceException;
@@ -69,7 +70,13 @@ public class PayRefundServiceImpl implements PayRefundService {
 
     @Override
     public Long createRefund(PayRefundCreateReqDTO reqDTO) {
-        return createRefund(appService.validPayApp(reqDTO.getAppKey()), reqDTO);
+        PayAppDO app = appService.validPayApp(reqDTO.getAppKey());
+        // 充值支付单的退款只由钱包充值服务经带应用的重载发起（同时扣回已入账的余额）；
+        // 外部 RPC 另用商户退款单号退款会绕过扣回，钱包白白多出一笔钱
+        if (appService.isRechargeApp(app)) {
+            throw exception(PAY_APP_RECHARGE_NOT_ALLOWED);
+        }
+        return createRefund(app, reqDTO);
     }
 
     @Override
@@ -261,20 +268,34 @@ public class PayRefundServiceImpl implements PayRefundService {
             return 0;
         }
         LocalDateTime before = LocalDateTime.now().minus(payProperties.getJob().getSyncDelay());
+        PayJobBudget budget = PayJobBudget.start(payProperties.getJob().getTimeBudget());
         int count = 0;
         long afterId = 0L;
         List<PayRefundDO> page;
         do {
+            if (budget.exhausted()) {
+                log.warn("[syncRefund] 时间预算用完或线程被中断，本轮已补查 {} 笔，余下留给下一轮", count);
+                break;
+            }
             long cursor = afterId;
             page = TenantUtils.executeIgnore(() -> refundMapper.selectListByStatusAndCreateTimeLt(
                     PayRefundStatusEnum.WAITING.getStatus(), before, cursor, limit));
             for (PayRefundDO refund : page) {
+                if (budget.exhausted()) {
+                    log.warn("[syncRefund] 时间预算用完或线程被中断，本轮已补查 {} 笔，余下留给下一轮", count);
+                    return count;
+                }
                 // 先推进游标再处理：失败的退款不会让本轮循环停住或原地打转
                 afterId = refund.getId();
                 try {
                     TenantUtils.execute(refund.getTenantId(), () -> syncOne(refund));
                     count++;
                 } catch (Exception e) {
+                    if (PayJobBudget.isInterruption(e)) {
+                        Thread.currentThread().interrupt();
+                        log.warn("[syncRefund] 退款 {} 补查时线程被中断，结束本轮", refund.getNo());
+                        return count;
+                    }
                     log.warn("[syncRefund] 退款 {} 补查失败", refund.getNo(), e);
                 }
             }

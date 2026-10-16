@@ -114,4 +114,72 @@ class PayChannelServiceImplTest extends BasePayDbUnitTest {
         assertThat(payChannelService.getChannel(id)).isNull();
         assertServiceException(() -> payChannelService.deleteChannel(id), CHANNEL_NOT_FOUND);
     }
+
+    private void insertExtension(long channelId, int status) {
+        jdbcTemplate.update("INSERT INTO pay_order_extension (no, order_id, channel_id, channel_code, user_ip, status, tenant_id) "
+                + "VALUES (?, 1, ?, 'mock', '1.1.1.1', ?, ?)", "UT-DEL-" + System.nanoTime(), channelId, status, TENANT_ID);
+    }
+
+    private void insertRefund(long channelId, int status) {
+        long n = System.nanoTime();
+        jdbcTemplate.update("INSERT INTO pay_refund (no, app_id, channel_id, channel_code, order_id, order_no, merchant_order_id, "
+                + "merchant_refund_id, status, pay_price, refund_price, reason, channel_order_no, tenant_id) "
+                + "VALUES (?, 1, ?, 'mock', 1, 'o', 'mo', ?, ?, 100, 100, 'r', '', ?)", "UT-DEL-R" + n, channelId, "UT-DEL-R" + n, status, TENANT_ID);
+    }
+
+    private void insertTransfer(long channelId, int status) {
+        long n = System.nanoTime();
+        jdbcTemplate.update("INSERT INTO pay_transfer (no, app_id, channel_id, channel_code, merchant_transfer_id, subject, price, "
+                + "user_account, status, user_ip, tenant_id) VALUES (?, 1, ?, 'mock', ?, 's', 100, 'acc', ?, '1.1.1.1', ?)",
+                "UT-DEL-T" + n, channelId, "UT-DEL-T" + n, status, TENANT_ID);
+    }
+
+    @Test
+    void 渠道下有等待中的支付尝试时不能删除_了结后可以删除() {
+        Long id = payChannelService.createChannel(req("mock", "{}"));
+        insertExtension(id, 0);
+        assertServiceException(() -> payChannelService.deleteChannel(id), CHANNEL_HAS_UNFINISHED);
+        assertThat(payChannelService.getChannel(id)).isNotNull();
+
+        jdbcTemplate.update("UPDATE pay_order_extension SET status = 10 WHERE channel_id = ?", id);
+        payChannelService.deleteChannel(id);
+        assertThat(payChannelService.getChannel(id)).isNull();
+    }
+
+    @Test
+    void 渠道下有未完成的退款时不能删除_已完成的不拦() {
+        Long id = payChannelService.createChannel(req("mock", "{}"));
+        insertRefund(id, 10);
+        insertRefund(id, 20);
+        insertRefund(id, 0);
+        assertServiceException(() -> payChannelService.deleteChannel(id), CHANNEL_HAS_UNFINISHED);
+
+        jdbcTemplate.update("UPDATE pay_refund SET status = 10 WHERE channel_id = ?", id);
+        payChannelService.deleteChannel(id);
+        assertThat(payChannelService.getChannel(id)).isNull();
+    }
+
+    @Test
+    void 渠道下有未完成的转账时不能删除_等待与进行中都算_已完成的不拦() {
+        Long waiting = payChannelService.createChannel(req("mock", "{}"));
+        insertTransfer(waiting, 0);
+        assertServiceException(() -> payChannelService.deleteChannel(waiting), CHANNEL_HAS_UNFINISHED);
+        jdbcTemplate.update("UPDATE pay_transfer SET status = 5 WHERE channel_id = ?", waiting);
+        assertServiceException(() -> payChannelService.deleteChannel(waiting), CHANNEL_HAS_UNFINISHED);
+
+        jdbcTemplate.update("UPDATE pay_transfer SET status = 20 WHERE channel_id = ?", waiting);
+        insertTransfer(waiting, 10);
+        payChannelService.deleteChannel(waiting);
+        assertThat(payChannelService.getChannel(waiting)).isNull();
+    }
+
+    @Test
+    void 其他渠道的未完成单据不影响本渠道删除() {
+        Long id = payChannelService.createChannel(req("mock", "{}"));
+        insertExtension(id + 1000, 0);
+        insertRefund(id + 1000, 0);
+        insertTransfer(id + 1000, 0);
+        payChannelService.deleteChannel(id);
+        assertThat(payChannelService.getChannel(id)).isNull();
+    }
 }

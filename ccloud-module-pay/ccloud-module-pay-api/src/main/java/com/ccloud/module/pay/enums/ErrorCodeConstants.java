@@ -15,6 +15,7 @@ public interface ErrorCodeConstants {
     ErrorCode PAY_APP_OPEN_APP_INVALID = new ErrorCode(1_007_000_004, "开放应用不存在或不属于当前租户");
     ErrorCode PAY_APP_OPEN_APP_BOUND = new ErrorCode(1_007_000_005, "该开放应用已绑定其他支付应用");
     ErrorCode PAY_APP_NOT_OPENED_FOR_OPEN_APP = new ErrorCode(1_007_000_006, "开放应用未开通支付");
+    ErrorCode PAY_APP_RECHARGE_NOT_ALLOWED = new ErrorCode(1_007_000_007, "钱包充值应用不允许此操作：不能由外部下单、退款，也不能绑定开放应用");
 
     // ========== 支付渠道 1-007-001-000 ==========
     ErrorCode CHANNEL_NOT_FOUND = new ErrorCode(1_007_001_000, "支付渠道不存在");
@@ -24,6 +25,7 @@ public interface ErrorCodeConstants {
     ErrorCode CHANNEL_CONFIG_INVALID = new ErrorCode(1_007_001_004, "渠道配置不正确：{}");
     ErrorCode CHANNEL_MOCK_DISABLED = new ErrorCode(1_007_001_005, "当前环境未开启模拟支付");
     ErrorCode CHANNEL_OPERATION_NOT_SUPPORTED = new ErrorCode(1_007_001_006, "渠道({})不支持该操作");
+    ErrorCode CHANNEL_HAS_UNFINISHED = new ErrorCode(1_007_001_007, "渠道下存在未完成的支付、退款或转账，无法删除");
 
     // ========== 支付单 1-007-002-000 ==========
     ErrorCode PAY_ORDER_NOT_FOUND = new ErrorCode(1_007_002_000, "支付单不存在");
@@ -35,6 +37,7 @@ public interface ErrorCodeConstants {
     ErrorCode PAY_ORDER_EXTENSION_NOT_FOUND = new ErrorCode(1_007_002_006, "支付记录不存在");
     ErrorCode PAY_ORDER_NOTIFY_PRICE_MISMATCH = new ErrorCode(1_007_002_007, "渠道回调金额与订单金额不一致");
     ErrorCode PAY_ORDER_RECHARGE_NOT_ALLOW_WALLET = new ErrorCode(1_007_002_008, "钱包充值不能使用钱包余额支付");
+    ErrorCode PAY_ORDER_SUBMIT_IN_PROGRESS = new ErrorCode(1_007_002_009, "支付单正在处理中，请稍后重试");
 
     // ========== 退款单 1-007-003-000 ==========
     ErrorCode PAY_REFUND_NOT_FOUND = new ErrorCode(1_007_003_000, "退款单不存在");

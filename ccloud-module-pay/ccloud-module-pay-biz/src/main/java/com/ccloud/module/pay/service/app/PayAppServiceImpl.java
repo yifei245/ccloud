@@ -47,6 +47,9 @@ public class PayAppServiceImpl implements PayAppService {
         if (payAppMapper.selectByAppKey(reqVO.getAppKey()) != null) {
             throw exception(PAY_APP_KEY_EXISTS);
         }
+        if (StrUtil.isNotBlank(reqVO.getOpenAppKey()) && payProperties.getWallet().getRechargeAppKey().equals(reqVO.getAppKey())) {
+            throw exception(PAY_APP_RECHARGE_NOT_ALLOWED);
+        }
         PayAppDO app = new PayAppDO().setAppKey(reqVO.getAppKey()).setName(reqVO.getName())
                 .setStatus(reqVO.getStatus()).setRemark(reqVO.getRemark())
                 .setOpenAppId(resolveOpenAppId(reqVO.getOpenAppKey(), null));
@@ -58,6 +61,10 @@ public class PayAppServiceImpl implements PayAppService {
     @Transactional(rollbackFor = Exception.class)
     public void updateApp(PayAppSaveReqVO reqVO) {
         PayAppDO app = validateAppExists(reqVO.getId());
+        // 钱包充值应用不对外开放：绑定开放应用会让外部调用方经开放接口触达充值订单
+        if (StrUtil.isNotBlank(reqVO.getOpenAppKey()) && isRechargeApp(app)) {
+            throw exception(PAY_APP_RECHARGE_NOT_ALLOWED);
+        }
         // 应用标识被内部服务与钱包充值引用，创建后不可修改
         payAppMapper.updateById(new PayAppDO().setId(app.getId()).setName(reqVO.getName()).setStatus(reqVO.getStatus())
                 .setRemark(reqVO.getRemark()).setOpenAppId(resolveOpenAppId(reqVO.getOpenAppKey(), app.getId())));

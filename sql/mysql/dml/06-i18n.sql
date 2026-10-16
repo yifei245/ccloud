@@ -492,4 +492,10 @@ INSERT INTO `system_i18n_message` (`id`, `locale`, `code`, `content`, `source`, 
   (481, 'zh_CN', 'error.code.1007005008', '请选择充值套餐或填写充值金额', 1, '1'),
   (482, 'en_US', 'error.code.1007005008', 'Choose a recharge package or enter an amount', 1, '1'),
   (483, 'zh_CN', 'error.code.1007004003', '渠道回调转账金额与转账单不一致', 1, '1'),
-  (484, 'en_US', 'error.code.1007004003', 'The notified transfer amount does not match the transfer', 1, '1');
+  (484, 'en_US', 'error.code.1007004003', 'The notified transfer amount does not match the transfer', 1, '1'),
+  (485, 'zh_CN', 'error.code.1007000007', '钱包充值应用不允许此操作：不能由外部下单、退款，也不能绑定开放应用', 1, '1'),
+  (486, 'en_US', 'error.code.1007000007', 'The wallet recharge app does not allow this: it cannot be used for external orders or refunds, or bound to an open app', 1, '1'),
+  (487, 'zh_CN', 'error.code.1007001007', '渠道下存在未完成的支付、退款或转账，无法删除', 1, '1'),
+  (488, 'en_US', 'error.code.1007001007', 'The channel has unfinished payments, refunds or transfers and cannot be deleted', 1, '1'),
+  (489, 'zh_CN', 'error.code.1007002009', '支付单正在处理中，请稍后重试', 1, '1'),
+  (490, 'en_US', 'error.code.1007002009', 'The payment order is being processed, please try again later', 1, '1');

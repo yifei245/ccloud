@@ -26,6 +26,10 @@ public interface PayRefundMapper extends BaseMapperX<PayRefundDO> {
         return selectCount(new LambdaQueryWrapperX<PayRefundDO>().eq(PayRefundDO::getOrderId, orderId).eq(PayRefundDO::getStatus, status));
     }
 
+    default Long selectCountByChannelIdAndStatus(Long channelId, Integer status) {
+        return selectCount(new LambdaQueryWrapperX<PayRefundDO>().eq(PayRefundDO::getChannelId, channelId).eq(PayRefundDO::getStatus, status));
+    }
+
     default int updateByIdAndStatus(Long id, Integer whereStatus, PayRefundDO update) {
         return update(update, new LambdaUpdateWrapper<PayRefundDO>().eq(PayRefundDO::getId, id).eq(PayRefundDO::getStatus, whereStatus));
     }

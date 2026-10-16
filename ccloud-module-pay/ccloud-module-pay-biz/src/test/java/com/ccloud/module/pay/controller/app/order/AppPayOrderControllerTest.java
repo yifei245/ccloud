@@ -146,4 +146,34 @@ class AppPayOrderControllerTest extends BasePayWebIntegrationTest {
         mockMvc.perform(get("/app-api/pay/order/get").param("id", String.valueOf(myOrderId)).header("X-Tenant-Id", TENANT))
                 .andExpect(jsonPath("$.code").value(401));
     }
+
+    @Test
+    void 应用已禁用时会员不能提交支付_不产生支付尝试() throws Exception {
+        jdbcTemplate.update("UPDATE pay_app SET status = 1 WHERE app_key = 'webtest-cashier'");
+
+        mockMvc.perform(asMember(post("/app-api/pay/order/submit").contentType(MediaType.APPLICATION_JSON)
+                        .content(submitBody(myOrderId)), MEMBER_ID))
+                .andExpect(jsonPath("$.code").value(1_007_000_001));
+
+        Integer attempts = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pay_order_extension WHERE order_id = ?", Integer.class, myOrderId);
+        assertThat(attempts).isZero();
+    }
+
+    @Test
+    void 渠道额外参数序列化后超过长度上限返回400_合理大小可以提交() throws Exception {
+        String tooLong = "x".repeat(1100);
+        mockMvc.perform(asMember(post("/app-api/pay/order/submit").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":" + myOrderId + ",\"channelCode\":\"mock\",\"channelExtras\":{\"openid\":\"" + tooLong + "\"}}"),
+                MEMBER_ID))
+                .andExpect(jsonPath("$.code").value(400));
+        Integer attempts = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pay_order_extension WHERE order_id = ?", Integer.class, myOrderId);
+        assertThat(attempts).as("被拒绝的提交没有产生支付尝试").isZero();
+
+        mockMvc.perform(asMember(post("/app-api/pay/order/submit").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":" + myOrderId + ",\"channelCode\":\"mock\",\"channelExtras\":{\"openid\":\"o-123\"}}"),
+                MEMBER_ID))
+                .andExpect(jsonPath("$.code").value(0));
+    }
 }

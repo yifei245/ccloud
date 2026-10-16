@@ -567,4 +567,38 @@ class PayTransferServiceImplTest extends BasePayDbAndRedisUnitTest {
                 .anySatisfy(e -> assertThat(e.getFormattedMessage()).contains(orphanNo).contains(channel.getId().toString()));
         assertThat(statusOf(orphan)).isEqualTo(PayTransferStatusEnum.PROCESSING.getStatus());
     }
+
+    // ---------- 终审修复：中断与时间预算 ----------
+
+    @Test
+    void 补查_线程已被中断时不处理任何转账_保留中断标记() {
+        processingTransfer("TF-I1");
+        fakeProvider.client().onGetTransfer = no -> {
+            throw new AssertionError("线程已中断，不应再查询渠道");
+        };
+        Thread.currentThread().interrupt();
+        try {
+            assertThat(transferService.syncTransfer(100)).isZero();
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void 补查_查询时被中断则停止本轮并重新置位中断标记() {
+        processingTransfer("TF-I2");
+        AtomicInteger queries = new AtomicInteger();
+        fakeProvider.client().onGetTransfer = no -> {
+            queries.incrementAndGet();
+            throw new IllegalStateException("查询被中断", new InterruptedException());
+        };
+        try {
+            assertThat(transferService.syncTransfer(1)).isZero();
+            assertThat(Thread.currentThread().isInterrupted()).as("中断标记被重新置位").isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+        assertThat(queries.get()).isEqualTo(1);
+    }
 }

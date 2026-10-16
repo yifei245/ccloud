@@ -1,7 +1,9 @@
 package com.ccloud.module.pay.service.wallet;
 
 import com.ccloud.framework.common.enums.UserTypeEnum;
+import com.ccloud.framework.common.exception.ServiceException;
 import com.ccloud.framework.mq.outbox.core.OutboxMessageService;
+import com.ccloud.framework.tenant.core.util.TenantUtils;
 import com.ccloud.module.open.api.app.OpenAppApi;
 import com.ccloud.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import com.ccloud.module.pay.api.refund.dto.PayRefundCreateReqDTO;
@@ -41,8 +43,17 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.ccloud.module.pay.enums.ErrorCodeConstants.PAY_ORDER_STATUS_IS_NOT_WAITING;
+import static com.ccloud.module.pay.enums.ErrorCodeConstants.PAY_ORDER_SUBMIT_IN_PROGRESS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -169,5 +180,53 @@ class WalletChannelEndToEndTest extends BasePayDbAndRedisUnitTest {
                         .setSubject("红包二").setPrice(300).setUserAccount(String.valueOf(PAYEE)).setUserIp("1.1.1.1")));
         assertThat(balanceOf(PAYEE)).isEqualTo(1000);
         assertThat(queryInt("SELECT status FROM pay_transfer WHERE id = ?", inTx)).isEqualTo(PayTransferStatusEnum.SUCCESS.getStatus());
+    }
+
+    @Test
+    void 同一订单并发用钱包支付_只扣一次款且只有一条支付尝试() throws Exception {
+        Long walletId = walletService.getOrCreateWallet(PAYER, UserTypeEnum.MEMBER.getValue()).getId();
+        walletService.addBalance(walletId, PayWalletBizTypeEnum.ADJUST, "e2e-conc-init", "初始", 20000);
+        Long orderId = orderService.createOrder(new PayOrderCreateReqDTO().setAppKey("ut-e2e").setMerchantOrderId("E2E-C1")
+                .setSubject("并发钱包").setPrice(1000).setExpireTime(LocalDateTime.now().plusHours(1)).setUserIp("1.1.1.1")
+                .setUserId(PAYER).setUserType(UserTypeEnum.MEMBER.getValue()));
+
+        int threads = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch ready = new CountDownLatch(threads);
+        CountDownLatch go = new CountDownLatch(1);
+        List<Future<Boolean>> futures = new ArrayList<>();
+        for (int i = 0; i < threads; i++) {
+            futures.add(pool.submit(() -> {
+                ready.countDown();
+                go.await();
+                try {
+                    TenantUtils.execute(TENANT_ID, () -> orderService.submitOrder(orderId,
+                            new PayOrderSubmitReqVO().setChannelCode("wallet"), "1.1.1.1"));
+                    return true;
+                } catch (ServiceException e) {
+                    // 落败方：支付单正在处理，或已被支付
+                    assertThat(e.getCode()).isIn(PAY_ORDER_SUBMIT_IN_PROGRESS.getCode(), PAY_ORDER_STATUS_IS_NOT_WAITING.getCode());
+                    return false;
+                }
+            }));
+        }
+        ready.await();
+        go.countDown();
+        int succeeded = 0;
+        for (Future<Boolean> f : futures) {
+            if (f.get(60, TimeUnit.SECONDS)) {
+                succeeded++;
+            }
+        }
+        pool.shutdown();
+
+        assertThat(succeeded).as("只有一个请求支付成功").isEqualTo(1);
+        assertThat(balanceOf(PAYER)).as("余额只扣一次").isEqualTo(19000);
+        assertThat(queryInt("SELECT COUNT(*) FROM pay_wallet_transaction WHERE wallet_id = ? AND biz_type = ?", walletId,
+                PayWalletBizTypeEnum.PAYMENT.getType())).as("只有一条支付流水").isEqualTo(1);
+        assertThat(queryInt("SELECT COUNT(*) FROM pay_order_extension WHERE order_id = ?", orderId)).as("只有一条支付尝试").isEqualTo(1);
+        assertThat(queryInt("SELECT COUNT(*) FROM pay_order_extension WHERE order_id = ? AND status = ?", orderId,
+                PayOrderStatusEnum.SUCCESS.getStatus())).isEqualTo(1);
+        assertThat(queryInt("SELECT status FROM pay_order WHERE id = ?", orderId)).isEqualTo(PayOrderStatusEnum.SUCCESS.getStatus());
     }
 }

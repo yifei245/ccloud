@@ -131,4 +131,19 @@ class PayAppServiceImplTest extends BasePayDbUnitTest {
         assertThat(payChannelMapper.selectListByAppId(id)).isEmpty();
         assertServiceException(() -> payAppService.deleteApp(id), PAY_APP_NOT_FOUND);
     }
+
+    @Test
+    void 钱包充值应用不能绑定开放应用() {
+        stubOpenApp("open-1", 91L, TENANT_ID);
+        // 默认的充值应用标识是 wallet：绑定后，该开放应用的调用方可借开放接口触达充值订单
+        assertServiceException(() -> payAppService.createApp(req("wallet", "open-1")), PAY_APP_RECHARGE_NOT_ALLOWED);
+        assertThat(payAppMapper.selectByAppKey("wallet")).isNull();
+
+        Long id = payAppService.createApp(req("wallet", null));
+        assertServiceException(() -> payAppService.updateApp(req("wallet", "open-1").setId(id)), PAY_APP_RECHARGE_NOT_ALLOWED);
+        assertThat(payAppMapper.selectById(id).getOpenAppId()).isNull();
+        // 不绑定的普通更新不受影响
+        payAppService.updateApp(req("wallet", null).setId(id).setName("改名"));
+        assertThat(payAppMapper.selectById(id).getName()).isEqualTo("改名");
+    }
 }

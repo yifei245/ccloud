@@ -4,6 +4,8 @@ import com.ccloud.framework.common.enums.UserTypeEnum;
 import com.ccloud.framework.common.exception.ServiceException;
 import com.ccloud.framework.common.pojo.PageParam;
 import com.ccloud.framework.mq.outbox.core.OutboxMessageService;
+import com.ccloud.framework.tenant.core.context.TenantContextHolder;
+import com.ccloud.framework.tenant.core.util.TenantUtils;
 import com.ccloud.module.open.api.app.OpenAppApi;
 import com.ccloud.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import com.ccloud.module.pay.controller.admin.order.vo.PayOrderSubmitReqVO;
@@ -32,10 +34,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 import static com.ccloud.module.pay.enums.ErrorCodeConstants.*;
@@ -393,5 +397,179 @@ class PayOrderServiceImplTest extends BasePayDbAndRedisUnitTest {
     void 有支付单的应用不能删除() {
         orderService.createOrder(orderReq("M16", 100));
         assertServiceException(() -> appService.deleteApp(app.getId()), PAY_APP_EXIST_ORDER);
+    }
+
+    // ---------- 终审修复 ----------
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private PayProperties payProperties;
+
+    @Test
+    void 同一订单的发起支付已有请求在处理时直接拒绝_不产生支付尝试() {
+        Long id = orderService.createOrder(orderReq("M40", 100));
+        String key = "pay:order:submit:" + id;
+        stringRedisTemplate.opsForValue().set(key, "other-request", Duration.ofSeconds(30));
+        try {
+            assertServiceException(() -> orderService.submitOrder(id, submit("mock"), "1.1.1.1"), PAY_ORDER_SUBMIT_IN_PROGRESS);
+            assertThat(extensionMapper.selectListByOrderId(id)).isEmpty();
+            assertThat(stringRedisTemplate.opsForValue().get(key)).as("不得释放别人持有的锁").isEqualTo("other-request");
+        } finally {
+            stringRedisTemplate.delete(key);
+        }
+    }
+
+    @Test
+    void 发起支付结束后释放锁_成功与失败都不残留() {
+        Long id = orderService.createOrder(orderReq("M41", 100));
+        String key = "pay:order:submit:" + id;
+        fakeProvider.client().throwOnCall = new IllegalStateException("timeout");
+        assertServiceException(() -> orderService.submitOrder(id, submit("mock"), "1.1.1.1"), PAY_ORDER_SUBMIT_CHANNEL_ERROR);
+        assertThat(stringRedisTemplate.hasKey(key)).as("渠道异常后锁已释放").isFalse();
+
+        fakeProvider.client().throwOnCall = null;
+        orderService.submitOrder(id, submit("mock"), "1.1.1.1");
+        assertThat(stringRedisTemplate.hasKey(key)).as("成功后锁已释放").isFalse();
+        // 前置校验失败同样释放
+        assertServiceException(() -> orderService.submitOrder(-1L, submit("mock"), "1.1.1.1"), PAY_ORDER_NOT_FOUND);
+        assertThat(stringRedisTemplate.hasKey("pay:order:submit:-1")).isFalse();
+    }
+
+    @Test
+    void 外部调用不能为钱包充值应用创建支付单_内部带应用的重载不受影响() {
+        PayAppDO recharge = new PayAppDO().setAppKey("wallet").setName("钱包充值").setStatus(0);
+        appMapper.insert(recharge);
+        assertServiceException(() -> orderService.createOrder(orderReq("WR-X", 100).setAppKey("wallet")), PAY_APP_RECHARGE_NOT_ALLOWED);
+        assertThat(orderMapper.selectByAppIdAndMerchantOrderId(recharge.getId(), "WR-X")).isNull();
+
+        Long id = orderService.createOrder(recharge, orderReq("WR-Y", 100).setAppKey("wallet"));
+        assertThat(orderMapper.selectById(id).getAppId()).isEqualTo(recharge.getId());
+    }
+
+    @Test
+    void 渠道编码已不受支持时发起支付_不产生支付尝试() {
+        PayChannelDO legacy = new PayChannelDO().setAppId(app.getId()).setCode("wx_lite").setStatus(0).setFeeRate(0D).setConfig("{}");
+        channelMapper.insert(legacy);
+        Long id = orderService.createOrder(orderReq("M42", 100));
+
+        assertServiceException(() -> orderService.submitOrder(id, submit("wx_lite"), "1.1.1.1"), CHANNEL_NOT_SUPPORTED);
+
+        assertThat(extensionMapper.selectListByOrderId(id)).as("没有遗留的孤儿支付尝试").isEmpty();
+    }
+
+    @Test
+    void 超时关单_支付尝试的渠道编码已不受支持时当作渠道已删除_订单仍可关闭() {
+        Long id = orderService.createOrder(orderReq("M43", 100));
+        PayOrderExtensionDO ext = submitAndGetExtension(id);
+        PayChannelDO legacy = new PayChannelDO().setAppId(app.getId()).setCode("wx_lite").setStatus(0).setFeeRate(0D).setConfig("{}");
+        channelMapper.insert(legacy);
+        jdbcTemplate.update("UPDATE pay_order_extension SET channel_id = ?, channel_code = 'wx_lite' WHERE id = ?", legacy.getId(), ext.getId());
+        orderMapper.updateById(new PayOrderDO().setId(id).setExpireTime(LocalDateTime.now().minusMinutes(1)));
+
+        assertThat(orderService.expireOrder(100)).isGreaterThanOrEqualTo(1);
+
+        assertThat(orderMapper.selectById(id).getStatus()).isEqualTo(PayOrderStatusEnum.CLOSED.getStatus());
+        assertThat(extensionMapper.selectById(ext.getId()).getStatus()).isEqualTo(PayOrderStatusEnum.CLOSED.getStatus());
+    }
+
+    @Test
+    void 支付成功消息的租户取自订单_而不是当前线程的租户上下文() {
+        Long id = orderService.createOrder(orderReq("M44", 100));
+        PayOrderExtensionDO ext = submitAndGetExtension(id);
+
+        // 上下文租户与订单不同（忽略租户查询时可能出现）：消息仍须落在订单所属租户
+        TenantContextHolder.setTenantId(999L);
+        TenantUtils.executeIgnore(() -> {
+            orderService.notifyOrder(channel, success(ext, 100));
+            return null;
+        });
+
+        ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
+        verify(outboxMessageService).saveAndPublish(eq(PayOrderMessage.TOPIC_PAID), payload.capture());
+        assertThat(((PayOrderMessage) payload.getValue()).getTenantId()).isEqualTo(TENANT_ID);
+    }
+
+    @Test
+    void 补查_线程已被中断时不处理任何单据_保留中断标记() {
+        Long id = orderService.createOrder(orderReq("M45", 100));
+        PayOrderExtensionDO ext = submitAndGetExtension(id);
+        jdbcTemplate.update("UPDATE pay_order_extension SET create_time = ? WHERE id = ?", LocalDateTime.now().minusMinutes(5), ext.getId());
+        fakeProvider.client().onGetOrder = no -> {
+            throw new AssertionError("线程已中断，不应再查询渠道");
+        };
+        Thread.currentThread().interrupt();
+        try {
+            assertThat(orderService.syncOrder(100)).isZero();
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void 补查_时间预算用完即结束() {
+        Long id = orderService.createOrder(orderReq("M46", 100));
+        PayOrderExtensionDO ext = submitAndGetExtension(id);
+        jdbcTemplate.update("UPDATE pay_order_extension SET create_time = ? WHERE id = ?", LocalDateTime.now().minusMinutes(5), ext.getId());
+        fakeProvider.client().onGetOrder = no -> {
+            throw new AssertionError("预算已用完，不应再查询渠道");
+        };
+        Duration original = payProperties.getJob().getTimeBudget();
+        payProperties.getJob().setTimeBudget(Duration.ZERO);
+        try {
+            assertThat(orderService.syncOrder(100)).isZero();
+            assertThat(orderService.expireOrder(100)).isZero();
+        } finally {
+            payProperties.getJob().setTimeBudget(original);
+        }
+    }
+
+    @Test
+    void 补查_某条查询时被中断则停止本轮_不继续处理后一条_并重新置位中断标记() {
+        Long first = orderService.createOrder(orderReq("M47", 100));
+        Long second = orderService.createOrder(orderReq("M48", 100));
+        PayOrderExtensionDO ext1 = submitAndGetExtension(first);
+        PayOrderExtensionDO ext2 = submitAndGetExtension(second);
+        jdbcTemplate.update("UPDATE pay_order_extension SET create_time = ? WHERE id IN (?, ?)",
+                LocalDateTime.now().minusMinutes(5), ext1.getId(), ext2.getId());
+        fakeProvider.client().onGetOrder = no -> {
+            if (no.equals(ext1.getNo())) {
+                // 调度中心终止任务时，阻塞调用抛 InterruptedException，常被包进运行时异常
+                throw new IllegalStateException("查询被中断", new InterruptedException());
+            }
+            return PayOrderResult.success(no, "CH", 100, LocalDateTime.now(), "{}");
+        };
+        try {
+            orderService.syncOrder(1);
+            assertThat(Thread.currentThread().isInterrupted()).as("中断标记被重新置位").isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+        assertThat(orderMapper.selectById(second).getStatus()).as("后一条留给下一轮").isEqualTo(PayOrderStatusEnum.WAITING.getStatus());
+    }
+
+    @Test
+    void 超时关单_某个订单查询时被中断则停止本轮并重新置位中断标记() {
+        Long first = orderService.createOrder(orderReq("M49", 100));
+        Long second = orderService.createOrder(orderReq("M50", 100));
+        PayOrderExtensionDO ext1 = submitAndGetExtension(first);
+        submitAndGetExtension(second);
+        LocalDateTime past = LocalDateTime.now().minusMinutes(1);
+        orderMapper.updateById(new PayOrderDO().setId(first).setExpireTime(past));
+        orderMapper.updateById(new PayOrderDO().setId(second).setExpireTime(past));
+        fakeProvider.client().onGetOrder = no -> {
+            if (no.equals(ext1.getNo())) {
+                throw new IllegalStateException("查询被中断", new InterruptedException());
+            }
+            return PayOrderResult.waiting(no, null, null);
+        };
+        try {
+            orderService.expireOrder(1);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+        assertThat(orderMapper.selectById(second).getStatus()).isEqualTo(PayOrderStatusEnum.WAITING.getStatus());
     }
 }

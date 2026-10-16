@@ -427,4 +427,61 @@ class PayRefundServiceImplTest extends PayRefundTestBase {
 
         assertThat(queries.get()).isEqualTo(1);
     }
+
+    // ---------- 终审修复 ----------
+
+    @Resource
+    private PayProperties payProperties;
+
+    @Test
+    void 外部调用不能对钱包充值应用退款_带应用的重载不受影响() {
+        String original = payProperties.getWallet().getRechargeAppKey();
+        // 把本测试的应用当作钱包充值应用
+        payProperties.getWallet().setRechargeAppKey("ut-refund");
+        try {
+            assertServiceException(() -> refundService.createRefund(refundReq("RF-WR1", 100)), PAY_APP_RECHARGE_NOT_ALLOWED);
+            assertThat(refundMapper.selectByAppIdAndMerchantRefundId(app.getId(), "RF-WR1")).isNull();
+            assertThat(orderMapper.selectById(paidOrderId).getRefundPrice()).as("没有预占额度").isZero();
+
+            // 钱包充值服务走的重载：应用已校验，不受限制
+            Long id = refundService.createRefund(app, refundReq("RF-WR2", 100));
+            assertThat(refundMapper.selectById(id).getStatus()).isEqualTo(PayRefundStatusEnum.WAITING.getStatus());
+        } finally {
+            payProperties.getWallet().setRechargeAppKey(original);
+        }
+    }
+
+    @Test
+    void 补查_线程已被中断时不处理任何退款_保留中断标记() {
+        Long id = refundService.createRefund(refundReq("RF-I1", 100));
+        jdbcTemplate.update("UPDATE pay_refund SET create_time = ? WHERE id = ?", LocalDateTime.now().minusMinutes(5), id);
+        fakeProvider.client().onGetRefund = no -> {
+            throw new AssertionError("线程已中断，不应再查询渠道");
+        };
+        Thread.currentThread().interrupt();
+        try {
+            assertThat(refundService.syncRefund(100)).isZero();
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void 补查_查询时被中断则停止本轮并重新置位中断标记() {
+        Long id = refundService.createRefund(refundReq("RF-I2", 100));
+        jdbcTemplate.update("UPDATE pay_refund SET create_time = ? WHERE id = ?", LocalDateTime.now().minusMinutes(5), id);
+        AtomicInteger queries = new AtomicInteger();
+        fakeProvider.client().onGetRefund = no -> {
+            queries.incrementAndGet();
+            throw new IllegalStateException("查询被中断", new InterruptedException());
+        };
+        try {
+            assertThat(refundService.syncRefund(1)).isZero();
+            assertThat(Thread.currentThread().isInterrupted()).as("中断标记被重新置位").isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+        assertThat(queries.get()).isEqualTo(1);
+    }
 }

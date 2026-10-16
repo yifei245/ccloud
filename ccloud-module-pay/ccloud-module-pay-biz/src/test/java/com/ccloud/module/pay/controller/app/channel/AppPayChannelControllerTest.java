@@ -102,4 +102,14 @@ class AppPayChannelControllerTest extends BasePayWebIntegrationTest {
         mockMvc.perform(asAdmin(get("/app-api/pay/channel/list").param("appId", String.valueOf(shopAppId)), ADMIN_ID))
                 .andExpect(jsonPath("$.code").value(401));
     }
+
+    @Test
+    void 编码已不受支持的渠道不返回_避免用户选了无法支付的渠道() throws Exception {
+        // 遗留的渠道：库里仍是开启状态，但本环境没有对应实现（如关闭模拟支付后遗留的 mock；这里用未实现的 wx_lite 代表）
+        Long legacyAppId = TenantUtils.execute(TENANT, () -> insertApp("webtest-legacy", "wx_lite", 0, "wallet", 0, null, 0));
+
+        mockMvc.perform(asMember(get("/app-api/pay/channel/list").param("appId", String.valueOf(legacyAppId)), MEMBER_ID))
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data[*].code", contains("wallet")));
+    }
 }

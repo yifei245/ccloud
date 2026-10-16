@@ -85,11 +85,12 @@ class PayJobsTest extends BaseMockitoUnitTest {
 
     @Test
     void 服务抛异常时任务原样抛出且不上报成功() {
+        payProperties.getJob().setBatchSize(23);
         RuntimeException boom = new RuntimeException("boom");
-        when(orderService.expireOrder(100)).thenThrow(boom);
-        when(orderService.syncOrder(100)).thenThrow(boom);
-        when(refundService.syncRefund(100)).thenThrow(boom);
-        when(transferService.syncTransfer(100)).thenThrow(boom);
+        when(orderService.expireOrder(23)).thenThrow(boom);
+        when(orderService.syncOrder(23)).thenThrow(boom);
+        when(refundService.syncRefund(23)).thenThrow(boom);
+        when(transferService.syncTransfer(23)).thenThrow(boom);
 
         try (MockedStatic<XxlJobHelper> helper = mockStatic(XxlJobHelper.class)) {
             assertSame(boom, assertThrows(RuntimeException.class, expireJob::execute));

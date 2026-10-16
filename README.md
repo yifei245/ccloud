@@ -112,7 +112,7 @@ ccloud
 | 管理端 | `admin` | `admin123` | 超级管理员，租户「ccloud 总部」（编号 1） |
 | 管理端 | `ccloud` | `ccloud123` | 普通管理员，仅查询与导出类权限，演示按钮级权限差异 |
 | C 端 | `13800138000` | `member123` | 会员，租户 1 |
-| 开放 API | AppKey `ccloud-open-demo` | `ccloud-open-demo-secret` | 演示应用，数据见 `sql/mysql/dml/07-demo.sql`，已授权 `GET /open-api/member/user/get`，调用示例见[接口鉴权说明](docs/接口鉴权说明.md#演示应用与完整调用示例)；生产环境必须删除该演示应用（见[快速开始](docs/快速开始.md#方式三从源码构建)的生产部署说明） |
+| 开放 API | AppKey `ccloud-open-demo` | `ccloud-open-demo-secret` | 演示应用，数据见 `sql/mysql/dml/07-demo.sql`，已授权 `GET /open-api/member/user/get` 与支付的 5 个开放接口，调用示例见[接口鉴权说明](docs/接口鉴权说明.md#演示应用与完整调用示例)；生产环境必须删除该演示应用（见[快速开始](docs/快速开始.md#方式三从源码构建)的生产部署说明） |
 | 支付应用 | `mall`、`wallet` | | 演示数据：`mall` 绑定演示开放应用并开通 Mock 与钱包渠道，`wallet` 为钱包充值应用（套餐「充 100 送 10」「充 500 送 80」）。**Mock 渠道仅本地可用**：只有 `local`、`dev` profile 开启模拟支付，生产必须关闭并删除演示渠道（见[快速开始](docs/快速开始.md#方式三从源码构建)） |
 | Nacos | 本机 Nacos 的账号 | | 写在 `~/.ccloud/middleware.env`；ccloud 使用 `ccloud` 命名空间 |
 | XXL-Job | `admin` | `ccloud123` | `docker/.env` 的 `XXL_JOB_ADMIN_PASSWORD`（首次登记 ccloud 任务时写入） |

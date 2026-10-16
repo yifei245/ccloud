@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 启动 ccloud 的应用编排（本地开发与联调）。中间件使用本机已有的实例，ccloud 只启动自己的 6 个应用。
+# 启动 ccloud 的应用编排（本地开发与联调）。中间件使用本机已有的实例，ccloud 只启动自己的 7 个应用。
 # 用法：
 #   scripts/docker-up.sh               检查本机中间件，初始化 ccloud 库、XXL-Job 任务与 Nacos 配置，打包、构建镜像并启动应用
 #   scripts/docker-up.sh init          只做初始化，不启动应用（在 IDE 中运行应用时使用）

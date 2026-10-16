@@ -5,12 +5,13 @@
 | dataId | 导入的服务 | 内容 |
 |---|---|---|
 | `ccloud-common.yaml` | 全部 | 内部签名时效、租户校验缓存、文案刷新、消息重投 |
-| `ccloud-datasource.yaml` | system、infra、member、open | 连接池的通用行为 |
+| `ccloud-datasource.yaml` | system、infra、member、open、pay | 连接池的通用行为 |
 | `ccloud-gateway.yaml` | gateway | 限流阈值、令牌缓存、开放接口时间戳偏差与应用缓存 |
 | `ccloud-system-server.yaml` | system | 登录失败锁定、短信验证码 |
 | `ccloud-infra-server.yaml` | infra | 文件大小上限、访问日志与异常日志保留天数 |
 | `ccloud-member-server.yaml` | member | 会员登录失败锁定、C 端功能开关 |
 | `ccloud-open-server.yaml` | open | 回调的连接与读取超时、调用日志保留天数（回调内网开关 `allow-private-address` 不在配置包中，见约定 5） |
+| `ccloud-pay-server.yaml` | pay | 钱包充值应用标识、充值单有效期、定时任务批量与补查时间（模拟支付开关与回调地址不在配置包中，见约定 6） |
 
 ## 导入
 
@@ -35,3 +36,6 @@ Nacos 3 已移除 v1、v2 的配置发布接口，脚本使用 `/nacos/v3/admin/
    **已导入过旧配置包的环境**（2026-10 之前的 `ccloud-open-server.yaml` 含 `allow-private-address: true`）：导入脚本对已存在的 dataId 跳过，
    不会自动更新，须在该环境 Nacos 控制台的 `ccloud-open-server.yaml` 中手工删除这一行并发布，否则生产会关闭回调的 SSRF 防护；
    也可用 `scripts/nacos-import.sh --overwrite` 以仓库文件为准覆盖（会同时覆盖控制台改过的其他值）。
+6. **模拟支付开关只在 profile 中设置**：pay 的 `ccloud.pay.mock-enabled` 只在 local、dev 的 profile 中为 `true`，配置包不得包含该项，
+   `verify-nacos.sh` 发现 `mock-enabled: true` 即失败。生产必须为 `false`，否则任何人都能经免登录的确认页让 Mock 订单"支付成功"。
+   渠道回调地址前缀 `ccloud.pay.notify-base-url` 属于各环境的部署地址，同样不放进配置包。

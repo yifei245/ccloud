@@ -17,6 +17,7 @@ import com.ccloud.module.open.service.app.OpenAppService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -65,20 +66,27 @@ public class OpenNotifyServiceImpl implements OpenNotifyService, DisposableBean 
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long sendNotify(Long appId, String event, Map<String, Object> data) {
+    public Long sendNotify(Long appId, String eventId, String event, Map<String, Object> data) {
+        if (StrUtil.isNotBlank(eventId)) {
+            // 调用方重投同一事件（如消费事务提交失败后消息重投）时不重复回调
+            OpenNotifyLogDO existing = TenantUtils.executeIgnore(() -> openNotifyLogMapper.selectByEventId(eventId));
+            if (existing != null) {
+                return existing.getId();
+            }
+        }
         OpenAppDO app = openAppService.getAppIgnoreTenant(appId);
         if (app == null) {
             throw exception(OPEN_APP_NOT_EXISTS);
         }
-        String eventId = IdUtil.fastSimpleUUID();
+        String finalEventId = StrUtil.isNotBlank(eventId) ? eventId : IdUtil.fastSimpleUUID();
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("eventId", eventId);
+        body.put("eventId", finalEventId);
         body.put("event", event);
         body.put("appKey", app.getAppKey());
         body.put("timestamp", System.currentTimeMillis());
         body.put("data", data);
         boolean noUrl = StrUtil.isBlank(app.getNotifyUrl());
-        OpenNotifyLogDO notifyLog = new OpenNotifyLogDO().setAppId(appId).setEventId(eventId).setEvent(event)
+        OpenNotifyLogDO notifyLog = new OpenNotifyLogDO().setAppId(appId).setEventId(finalEventId).setEvent(event)
                 .setPayload(JsonUtils.toJsonString(body))
                 .setNotifyUrl(StrUtil.nullToEmpty(app.getNotifyUrl()))
                 .setStatus(noUrl ? OpenNotifyStatusEnum.ABANDONED.getStatus() : OpenNotifyStatusEnum.WAITING.getStatus())
@@ -87,7 +95,12 @@ public class OpenNotifyServiceImpl implements OpenNotifyService, DisposableBean 
                 .setResponseBody(noUrl ? "应用未配置回调地址" : null);
         // 回调记录属于应用所在租户；调用方可能是其他租户上下文中的业务服务
         notifyLog.setTenantId(app.getTenantId());
-        TenantUtils.executeIgnore(() -> openNotifyLogMapper.insert(notifyLog));
+        try {
+            TenantUtils.executeIgnore(() -> openNotifyLogMapper.insert(notifyLog));
+        } catch (DuplicateKeyException e) {
+            // 并发重投：另一线程已写入同一事件。可重复读下前面的查询已固定快照，须加锁读取才能看到对方已提交的记录
+            return TenantUtils.executeIgnore(() -> openNotifyLogMapper.selectIdByEventIdForShare(finalEventId));
+        }
         if (!noUrl) {
             executeAfterCommit(notifyLog.getId());
         }
@@ -103,7 +116,7 @@ public class OpenNotifyServiceImpl implements OpenNotifyService, DisposableBean 
         if (StrUtil.isBlank(app.getNotifyUrl())) {
             throw exception(OPEN_APP_NOTIFY_URL_NOT_CONFIGURED);
         }
-        return sendNotify(appId, OpenNotifyEvents.TEST, Map.of("message", "ccloud test"));
+        return sendNotify(appId, null, OpenNotifyEvents.TEST, Map.of("message", "ccloud test"));
     }
 
     @Override

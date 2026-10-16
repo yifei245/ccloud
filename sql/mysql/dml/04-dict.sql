@@ -35,7 +35,6 @@ INSERT INTO `system_dict_type` (`id`, `name`, `type`, `status`, `remark`, `creat
   (29, '支付渠道编码', 'pay_channel_code', 0, NULL, '1'),
   (30, '支付订单状态', 'pay_order_status', 0, NULL, '1'),
   (31, '退款订单状态', 'pay_refund_status', 0, NULL, '1'),
-  (32, '回调通知状态', 'pay_notify_status', 0, NULL, '1'),
   (33, '钱包流水类型', 'pay_wallet_biz_type', 0, NULL, '1'),
   (34, '流程模型类型', 'bpm_model_type', 0, NULL, '1'),
   (35, '流程表单类型', 'bpm_model_form_type', 0, NULL, '1'),
@@ -51,7 +50,8 @@ INSERT INTO `system_dict_type` (`id`, `name`, `type`, `status`, `remark`, `creat
   (45, '营销商品范围', 'promotion_product_scope', 0, NULL, '1'),
   (46, 'AI 平台', 'ai_platform', 0, NULL, '1'),
   (47, 'AI 模型类型', 'ai_model_type', 0, NULL, '1'),
-  (48, '开放平台回调状态', 'open_notify_status', 0, NULL, '1');
+  (48, '开放平台回调状态', 'open_notify_status', 0, NULL, '1'),
+  (49, '转账状态', 'pay_transfer_status', 0, NULL, '1');
 
 INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `status`, `color_type`, `css_class`, `remark`, `creator`) VALUES
   (1, 1, '开启', '0', 'common_status', 0, 'primary', '', NULL, '1'),
@@ -173,11 +173,6 @@ INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `st
   (123, 1, '未退款', '0', 'pay_refund_status', 0, 'info', '', NULL, '1'),
   (124, 2, '退款成功', '10', 'pay_refund_status', 0, 'success', '', NULL, '1'),
   (125, 3, '退款失败', '20', 'pay_refund_status', 0, 'danger', '', NULL, '1'),
-  (126, 1, '等待通知', '0', 'pay_notify_status', 0, 'info', '', NULL, '1'),
-  (127, 2, '通知成功', '10', 'pay_notify_status', 0, 'success', '', NULL, '1'),
-  (128, 3, '通知失败', '20', 'pay_notify_status', 0, 'danger', '', NULL, '1'),
-  (129, 4, '请求成功但结果失败', '21', 'pay_notify_status', 0, 'warning', '', NULL, '1'),
-  (130, 5, '请求失败', '22', 'pay_notify_status', 0, 'danger', '', NULL, '1'),
   (131, 1, '充值', '1', 'pay_wallet_biz_type', 0, '', '', NULL, '1'),
   (132, 2, '充值退款', '2', 'pay_wallet_biz_type', 0, '', '', NULL, '1'),
   (133, 3, '支付', '3', 'pay_wallet_biz_type', 0, '', '', NULL, '1'),
@@ -241,5 +236,11 @@ INSERT INTO `system_dict_data` (`id`, `sort`, `label`, `value`, `dict_type`, `st
   (192, 1, '待通知', '0', 'open_notify_status', 0, 'info', '', NULL, '1'),
   (193, 2, '成功', '10', 'open_notify_status', 0, 'success', '', NULL, '1'),
   (194, 3, '失败待重试', '20', 'open_notify_status', 0, 'warning', '', NULL, '1'),
-  (195, 4, '放弃', '30', 'open_notify_status', 0, 'danger', '', NULL, '1');
+  (195, 4, '放弃', '30', 'open_notify_status', 0, 'danger', '', NULL, '1'),
+  (196, 1, '等待转账', '0', 'pay_transfer_status', 0, 'info', '', NULL, '1'),
+  (197, 2, '转账进行中', '5', 'pay_transfer_status', 0, 'primary', '', NULL, '1'),
+  (198, 3, '转账成功', '10', 'pay_transfer_status', 0, 'success', '', NULL, '1'),
+  (199, 4, '转账失败', '20', 'pay_transfer_status', 0, 'danger', '', NULL, '1'),
+  (200, 6, '后台调整', '6', 'pay_wallet_biz_type', 0, '', '', NULL, '1'),
+  (201, 7, '转账入账', '7', 'pay_wallet_biz_type', 0, '', '', NULL, '1');
 

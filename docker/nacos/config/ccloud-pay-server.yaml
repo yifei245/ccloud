@@ -1,0 +1,20 @@
+# ccloud-pay-server 的可调配置
+#
+# 模拟支付开关 mock-enabled 与渠道回调地址前缀 notify-base-url 不在这里：前者只能由 local / dev 的 profile 打开
+# （写进配置包会覆盖各环境的 profile，让生产也能用模拟支付白拿商品），后者属于各环境的部署地址
+
+ccloud:
+  pay:
+    wallet:
+      # 钱包充值所用支付应用的标识，各租户在后台自建同名支付应用并开通渠道。
+      # 有未完成的充值时不要修改：充值订单按这个标识识别，改了以后在途的充值（已支付待入账、待退款）会成为孤儿，余额不再入账、也不能退款
+      recharge-app-key: wallet
+      # 充值支付单的有效期
+      recharge-expire: 2h
+    job:
+      # 定时任务每次处理的条数上限
+      batch-size: 100
+      # 支付尝试创建多久后仍在等待才主动查单
+      sync-delay: 1m
+      # 只补查这段时间内创建的支付尝试
+      sync-window: 1d

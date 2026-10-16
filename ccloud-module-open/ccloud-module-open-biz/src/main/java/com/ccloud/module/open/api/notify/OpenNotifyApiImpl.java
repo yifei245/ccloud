@@ -18,6 +18,6 @@ public class OpenNotifyApiImpl implements OpenNotifyApi {
 
     @Override
     public CommonResult<Long> sendNotify(OpenNotifySendReqDTO reqDTO) {
-        return success(openNotifyService.sendNotify(reqDTO.getAppId(), reqDTO.getEvent(), reqDTO.getData()));
+        return success(openNotifyService.sendNotify(reqDTO.getAppId(), reqDTO.getEventId(), reqDTO.getEvent(), reqDTO.getData()));
     }
 }

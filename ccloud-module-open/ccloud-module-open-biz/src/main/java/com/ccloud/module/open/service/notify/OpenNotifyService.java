@@ -14,9 +14,10 @@ public interface OpenNotifyService {
     /**
      * 向应用发送事件回调。记录属于应用所在的租户，调用方可在任意租户上下文中调用
      *
+     * @param eventId 事件编号，供调用方去重；为空时自动生成，已存在时直接返回已有回调日志编号
      * @return 回调日志编号；应用未配置回调地址时记录直接记为放弃
      */
-    Long sendNotify(Long appId, String event, Map<String, Object> data);
+    Long sendNotify(Long appId, String eventId, String event, Map<String, Object> data);
 
     /**
      * 向当前租户的应用发送测试回调（事件 open.test）；应用未配置回调地址时报错

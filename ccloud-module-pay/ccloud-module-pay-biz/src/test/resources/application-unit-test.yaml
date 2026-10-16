@@ -1,0 +1,46 @@
+# pay 模块测试配置。与 starter-test 的同名文件互斥（本文件优先），因此需自包含。
+# 与框架默认不同：Redis 不排除，由 Testcontainers 提供真实实例（protection 等 starter 无条件依赖 Redis）。
+spring:
+  datasource:
+    dynamic:
+      primary: master
+      datasource:
+        master:
+          url: jdbc:h2:mem:ccloud_pay_ut;MODE=MYSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+          driver-class-name: org.h2.Driver
+          username: sa
+          password: ""
+  boot:
+    admin:
+      client:
+        enabled: false
+
+management:
+  tracing:
+    enabled: false
+  zipkin:
+    tracing:
+      export:
+        enabled: false
+
+xxl:
+  job:
+    enabled: false
+
+ccloud:
+  # Web 测试不记访问日志：它们不回滚事务，日志会残留在共享测试库。需要的测试自行打开
+  access-log:
+    enable: false
+  mybatis:
+    encrypt-key: ccloud1234567890
+  security:
+    internal-sign-secret: unit-test-secret
+  pay:
+    # Web 测试需要 Mock 渠道与确认页
+    mock-enabled: true
+    # 测试中无人监听的地址：Mock 的回调必然失败，"回调丢失由补查兜底"的用例依赖这一点；也避免误打到本机正在运行的网关
+    notify-base-url: http://127.0.0.1:1
+
+logging:
+  level:
+    com.ccloud: debug

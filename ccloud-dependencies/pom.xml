@@ -167,6 +167,8 @@
             <dependency><groupId>com.ccloud</groupId><artifactId>ccloud-module-member-biz</artifactId><version>${revision}</version></dependency>
             <dependency><groupId>com.ccloud</groupId><artifactId>ccloud-module-open-api</artifactId><version>${revision}</version></dependency>
             <dependency><groupId>com.ccloud</groupId><artifactId>ccloud-module-open-biz</artifactId><version>${revision}</version></dependency>
+            <dependency><groupId>com.ccloud</groupId><artifactId>ccloud-module-pay-api</artifactId><version>${revision}</version></dependency>
+            <dependency><groupId>com.ccloud</groupId><artifactId>ccloud-module-pay-biz</artifactId><version>${revision}</version></dependency>
 
             <!-- ==================== 持久层 ==================== -->
             <dependency>

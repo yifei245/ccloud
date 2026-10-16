@@ -97,6 +97,9 @@ ccloud:
       - /app-api/member/auth/logout
       # ---- infra ----
       - GET /admin-api/infra/file/*/get/**
+      # ---- pay ----
+      - /app-api/pay/notify/**
+      - /app-api/pay/mock/confirm
       # ---- 接口文档转发路由（ccloud.swagger.enable=false 时不注册） ----
       - /*/v3/api-docs/*
     # 登出后立即清除网关上该令牌的缓存

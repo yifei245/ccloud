@@ -6,6 +6,7 @@ import com.ccloud.framework.tenant.core.util.TenantUtils;
 import com.ccloud.module.open.dal.dataobject.app.OpenAppDO;
 import com.ccloud.module.open.dal.dataobject.notify.OpenNotifyLogDO;
 import com.ccloud.module.open.dal.mysql.app.OpenAppMapper;
+import com.ccloud.module.open.dal.mysql.notify.OpenNotifyLogMapper;
 import com.ccloud.module.open.enums.notify.OpenNotifyEvents;
 import com.ccloud.module.open.enums.notify.OpenNotifyStatusEnum;
 import com.ccloud.module.open.framework.config.OpenProperties;
@@ -37,6 +38,7 @@ import static com.ccloud.module.open.enums.ErrorCodeConstants.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 
 @Import({OpenNotifyServiceImpl.class, OpenNotifyClient.class, OpenAppServiceImpl.class, OpenApiServiceImpl.class})
 @EnableConfigurationProperties(OpenProperties.class)
@@ -48,6 +50,8 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     private OpenNotifyService openNotifyService;
     @Resource
     private OpenAppMapper openAppMapper;
+    @MockitoSpyBean
+    private OpenNotifyLogMapper openNotifyLogMapper;
     @Resource
     private JdbcTemplate jdbcTemplate;
     @MockitoBean
@@ -80,7 +84,7 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     @Test
     void 发送_写待通知记录_请求体含事件内容() {
         Long appId = 新建应用(receiver.url("/n"));
-        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of("k", "v"));
+        Long id = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of("k", "v"));
         OpenNotifyLogDO log = openNotifyService.getNotifyLog(id);
         assertThat(log.getStatus()).isEqualTo(OpenNotifyStatusEnum.WAITING.getStatus());
         assertThat(log.getEventId()).hasSize(32);
@@ -93,7 +97,7 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     @Test
     void 应用没有回调地址_记为放弃() {
         Long noUrlAppId = 新建应用(null);
-        Long id = openNotifyService.sendNotify(noUrlAppId, "webtest.event", Map.of());
+        Long id = openNotifyService.sendNotify(noUrlAppId, null, "webtest.event", Map.of());
         OpenNotifyLogDO log = openNotifyService.getNotifyLog(id);
         assertThat(log.getStatus()).isEqualTo(OpenNotifyStatusEnum.ABANDONED.getStatus());
         assertThat(log.getResponseBody()).isEqualTo("应用未配置回调地址");
@@ -104,13 +108,49 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     }
 
     @Test
+    void 相同事件编号重复发送只记一条回调() {
+        Long first = openNotifyService.sendNotify(appId, "pay-msg-0001", "pay.order.paid", Map.of("merchantOrderId", "M1"));
+        Long second = openNotifyService.sendNotify(appId, "pay-msg-0001", "pay.order.paid", Map.of("merchantOrderId", "M1"));
+
+        assertThat(second).isEqualTo(first);
+        assertThat(openNotifyLogMapper.selectCount(OpenNotifyLogDO::getEventId, "pay-msg-0001")).isEqualTo(1L);
+    }
+
+    @Test
+    void 并发重投_前置查询未命中_插入冲突后返回已有记录() {
+        Long first = openNotifyService.sendNotify(appId, "pay-msg-0004", "pay.order.paid", Map.of());
+        // 模拟另一线程在本线程前置查询之后才提交：第一次按事件编号查询看不到已有记录
+        doReturn(null).doCallRealMethod().when(openNotifyLogMapper).selectByEventId("pay-msg-0004");
+
+        Long second = openNotifyService.sendNotify(appId, "pay-msg-0004", "pay.order.paid", Map.of());
+
+        assertThat(second).isEqualTo(first);
+        assertThat(openNotifyLogMapper.selectCount(OpenNotifyLogDO::getEventId, "pay-msg-0004")).isEqualTo(1L);
+    }
+
+    @Test
+    void 未指定事件编号时自动生成() {
+        Long id = openNotifyService.sendNotify(appId, null, "open.test", Map.of("message", "x"));
+        assertThat(openNotifyLogMapper.selectById(id).getEventId()).hasSize(32);
+    }
+
+    @Test
+    void 指定事件编号时用作回调事件编号() {
+        Long id = openNotifyService.sendNotify(appId, "pay-msg-0003", "pay.order.paid", Map.of());
+        OpenNotifyLogDO log = openNotifyService.getNotifyLog(id);
+        assertThat(log.getEventId()).isEqualTo("pay-msg-0003");
+        Map<String, Object> body = JsonUtils.parseObject(log.getPayload(), new TypeReference<>() {});
+        assertThat(body).containsEntry("eventId", "pay-msg-0003");
+    }
+
+    @Test
     void 发送_应用不存在报错() {
-        assertServiceException(() -> openNotifyService.sendNotify(-1L, "webtest.event", Map.of()), OPEN_APP_NOT_EXISTS);
+        assertServiceException(() -> openNotifyService.sendNotify(-1L, null, "webtest.event", Map.of()), OPEN_APP_NOT_EXISTS);
     }
 
     @Test
     void 执行_成功_对方能验签() {
-        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        Long id = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
         assertThat(((OpenNotifyServiceImpl) openNotifyService).execute(id)).isTrue();
         OpenNotifyLogDO log = openNotifyService.getNotifyLog(id);
         assertThat(log.getStatus()).isEqualTo(OpenNotifyStatusEnum.SUCCESS.getStatus());
@@ -126,7 +166,7 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     @Test
     void 执行_失败按退避_第6次重试仍失败放弃() {
         receiver.status = 500;
-        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        Long id = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
         LocalDateTime before = LocalDateTime.now();
         impl.execute(id);
         OpenNotifyLogDO log = openNotifyService.getNotifyLog(id);
@@ -148,7 +188,7 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
 
     @Test
     void 已被抢占或未到期的记录不重复发送() {
-        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        Long id = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
         receiver.status = 500;
         impl.execute(id);                       // 失败，下次 15 秒后
         assertThat(impl.execute(id)).isFalse(); // 未到期
@@ -158,8 +198,8 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     @Test
     void 定时任务处理所有租户到期的记录() {
         Long tenant2AppId = TenantUtils.execute(2L, () -> 新建应用(receiver.url("/n")));
-        Long id1 = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
-        Long id2 = openNotifyService.sendNotify(tenant2AppId, "webtest.event", Map.of());
+        Long id1 = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
+        Long id2 = openNotifyService.sendNotify(tenant2AppId, null, "webtest.event", Map.of());
 
         assertThat(openNotifyService.executeDueNotifies(100)).isEqualTo(2);
 
@@ -170,13 +210,13 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
 
     @Test
     void 手工重新通知_只限失败与放弃_次数清零() {
-        Long successId = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        Long successId = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
         impl.execute(successId);
         assertThat(statusOf(successId)).isEqualTo(OpenNotifyStatusEnum.SUCCESS.getStatus());
         assertServiceException(() -> openNotifyService.retryNotify(successId), OPEN_NOTIFY_LOG_CANNOT_RETRY);
         assertServiceException(() -> openNotifyService.retryNotify(-1L), OPEN_NOTIFY_LOG_NOT_EXISTS);
 
-        Long abandonedId = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        Long abandonedId = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
         jdbcTemplate.update("UPDATE open_notify_log SET status = 30, retry_count = 6 WHERE id = ?", abandonedId);
         LocalDateTime before = LocalDateTime.now().minusSeconds(1);
         openNotifyService.retryNotify(abandonedId);
@@ -188,7 +228,7 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
 
     @Test
     void 租约过期后被他方重新抢占_本次回写被丢弃() {
-        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        Long id = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
         LocalDateTime otherLease = LocalDateTime.now().plusMinutes(5).truncatedTo(ChronoUnit.SECONDS);
         doAnswer(inv -> {
             // 发送进行中：另一执行方在租约过期后重新抢占，租约结束时间变为它的
@@ -210,7 +250,7 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     @Test
     void 发送中被重新通知且同一秒再次被抢占_本次回写被丢弃() {
         receiver.status = 500;
-        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        Long id = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
         jdbcTemplate.update("UPDATE open_notify_log SET status = 20, retry_count = 3 WHERE id = ?", id);
         doAnswer(inv -> {
             LocalDateTime lease = jdbcTemplate.queryForObject("SELECT next_retry_time FROM open_notify_log WHERE id = ?",
@@ -233,7 +273,7 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     @Test
     void 重新通知_状态已被并发改为成功_报错且记录不变() {
         receiver.status = 500;
-        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        Long id = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
         impl.execute(id);
         // 管理员看到"失败待重试"后、点击重新通知前，定时任务已发送成功
         jdbcTemplate.update("UPDATE open_notify_log SET status = 10, http_status = 200 WHERE id = ?", id);
@@ -251,7 +291,7 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     @Test
     void 重新通知_其他租户的记录不存在且不受影响() {
         Long tenant2AppId = TenantUtils.execute(2L, () -> 新建应用(receiver.url("/n")));
-        Long id = openNotifyService.sendNotify(tenant2AppId, "webtest.event", Map.of());
+        Long id = openNotifyService.sendNotify(tenant2AppId, null, "webtest.event", Map.of());
         jdbcTemplate.update("UPDATE open_notify_log SET status = 30, retry_count = 6 WHERE id = ?", id);
 
         assertServiceException(() -> openNotifyService.retryNotify(id), OPEN_NOTIFY_LOG_NOT_EXISTS);
@@ -264,7 +304,7 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
     @Test
     void 重试时使用应用当前的回调地址与密钥() throws IOException {
         receiver.status = 500;
-        Long id = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        Long id = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
         impl.execute(id);
         assertThat(receiver.requests).hasSize(1);
 
@@ -305,11 +345,11 @@ class OpenNotifyServiceImplTest extends BaseOpenDbUnitTest {
 
     @Test
     void 清理只删除过期的成功与放弃记录() {
-        Long waiting = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
-        Long success = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
-        Long failure = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
-        Long abandoned = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
-        Long recentSuccess = openNotifyService.sendNotify(appId, "webtest.event", Map.of());
+        Long waiting = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
+        Long success = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
+        Long failure = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
+        Long abandoned = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
+        Long recentSuccess = openNotifyService.sendNotify(appId, null, "webtest.event", Map.of());
         jdbcTemplate.update("UPDATE open_notify_log SET status = 10 WHERE id IN (?, ?)", success, recentSuccess);
         jdbcTemplate.update("UPDATE open_notify_log SET status = 20 WHERE id = ?", failure);
         jdbcTemplate.update("UPDATE open_notify_log SET status = 30 WHERE id = ?", abandoned);

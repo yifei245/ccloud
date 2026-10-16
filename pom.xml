@@ -28,6 +28,7 @@
         <module>ccloud-module-infra</module>
         <module>ccloud-module-open</module>
         <module>ccloud-module-member</module>
+        <module>ccloud-module-pay</module>
         <module>ccloud-gateway</module>
         <module>ccloud-monitor</module>
     </modules>
